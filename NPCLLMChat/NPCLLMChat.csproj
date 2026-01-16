@@ -1,0 +1,100 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>NPCLLMChat</AssemblyName>
+    <RootNamespace>NPCLLMChat</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <!-- Output directly to mod folder -->
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+
+    <!-- Suppress warnings about missing XML docs -->
+    <NoWarn>CS1591;CS0436</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Paths configured for marc's system
+  -->
+  <PropertyGroup>
+    <GamePath>/home/marc/.steam/steam/steamapps/common/7 Days To Die</GamePath>
+    <ManagedPath>$(GamePath)/7DaysToDie_Data/Managed</ManagedPath>
+    <SCorePath>$(GamePath)/Mods/0-SCore-2.5.35.841</SCorePath>
+    <HarmonyPath>$(GamePath)/Mods/0_TFP_Harmony</HarmonyPath>
+  </PropertyGroup>
+
+  <!-- Game Assembly References -->
+  <ItemGroup>
+    <!-- Core Unity -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedPath)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(ManagedPath)/UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>$(ManagedPath)/UnityEngine.JSONSerializeModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(ManagedPath)/UnityEngine.AnimationModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(ManagedPath)/UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- 7DTD Game Assembly -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ManagedPath)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- Harmony (from TFP_Harmony) -->
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyPath)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
+    <!-- System libs -->
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+  <!-- Source files are auto-included by SDK -->
+
+  <!-- Copy DLL to mod folder after build -->
+  <Target Name="CopyToModFolder" AfterTargets="Build">
+    <Message Text="Build complete! DLL at: $(OutputPath)$(AssemblyName).dll" Importance="high" />
+    <Message Text="Copy to your 7DTD Mods folder to install." Importance="high" />
+  </Target>
+
+  <!-- Optional: Auto-deploy to game mods folder -->
+  <Target Name="DeployToGame" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true'">
+    <PropertyGroup>
+      <ModsFolder>$(GamePath)/Mods/NPCLLMChat</ModsFolder>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModsFolder)" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModsFolder)" />
+    <Copy SourceFiles="ModInfo.xml" DestinationFolder="$(ModsFolder)" />
+    <Copy SourceFiles="Config\llmconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
+    <Copy SourceFiles="Config\personalities.xml" DestinationFolder="$(ModsFolder)\Config" />
+    <Message Text="Deployed to: $(ModsFolder)" Importance="high" />
+  </Target>
+
+</Project>

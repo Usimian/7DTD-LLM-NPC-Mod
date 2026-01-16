@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    NPC LLM Chat Configuration
+
+    Optimized for RTX 6000 Pro (48GB VRAM)
+    You can run larger models like llama3:70b or mixtral for better roleplay!
+-->
+<LLMConfig>
+    <!-- LLM Server Configuration -->
+    <Server>
+        <!--
+            Endpoints:
+            - Ollama: http://localhost:11434/api/generate
+            - LM Studio: http://localhost:1234/v1/chat/completions
+            - Text-generation-webui: http://localhost:5000/v1/chat/completions
+        -->
+        <Endpoint>http://localhost:11434/api/generate</Endpoint>
+
+        <!--
+            Recommended models for RTX 6000 Pro (48GB VRAM):
+
+            Fast responses (< 1 second):
+            - gemma2:9b        - Fast, good quality
+            - llama3:8b        - Great balance
+            - mistral:7b       - Fast and capable
+
+            Better roleplay (1-2 seconds):
+            - llama3:70b       - Excellent roleplay, fits in VRAM!
+            - mixtral:8x7b     - Great multi-character voice
+            - command-r:35b    - Good conversation
+
+            Best quality (2-4 seconds):
+            - llama3:70b-instruct-q8_0  - Best quality
+            - qwen2:72b        - Excellent Chinese/English
+
+            For your GPU, llama3:70b gives the best roleplay quality
+            while still maintaining reasonable response times.
+        -->
+        <Model>llama3.3:70b</Model>
+
+        <!-- Timeout - can be shorter with fast GPU -->
+        <TimeoutSeconds>15</TimeoutSeconds>
+
+        <!--
+            Token limits - higher = longer responses
+            RTX 6000 Pro can handle large context easily
+        -->
+        <MaxTokens>200</MaxTokens>
+
+        <!--
+            Temperature - controls creativity/randomness
+            0.7-0.9 is good for roleplay, lower for factual responses
+        -->
+        <Temperature>0.8</Temperature>
+
+        <!--
+            GPU Layers - Ollama auto-detects, but you can force full GPU offload
+            For 70B model on 48GB: use 80+ layers
+        -->
+        <NumGPULayers>83</NumGPULayers>
+
+        <!--
+            Context window - how much conversation history to consider
+            Larger = better memory but more VRAM
+        -->
+        <NumCtx>4096</NumCtx>
+    </Server>
+
+    <!-- NPC Personality Defaults -->
+    <Personality>
+        <!--
+            Base system prompt for all NPCs.
+            Individual NPCs can have additional personality traits.
+        -->
+        <SystemPrompt>You are a survivor in a post-apocalyptic zombie wasteland set in Arizona. The year is approximately 7 years after the outbreak. You speak naturally with personality, showing the weariness of survival but also moments of hope or dark humor. Keep responses brief (1-3 sentences) and deeply in-character. Never break character or mention being an AI. React to the player's tone and build rapport over multiple exchanges. You have your own goals, fears, and opinions.</SystemPrompt>
+
+        <!--
+            Context Memory - number of previous exchanges to remember
+            Higher = better continuity but uses more tokens
+            With 48GB VRAM, you can afford more memory
+        -->
+        <ContextMemory>10</ContextMemory>
+    </Personality>
+
+    <!-- Response Handling -->
+    <Response>
+        <!--
+            Typing indicator - shows "..." while thinking
+            Disable for faster feel with powerful GPU
+        -->
+        <ShowTypingIndicator>false</ShowTypingIndicator>
+
+        <!--
+            Typing delay per character (milliseconds)
+            0 = instant display, 30-50 = typewriter effect
+            With fast GPU, you may prefer instant
+        -->
+        <TypingDelayMs>0</TypingDelayMs>
+
+        <!--
+            Maximum response length in characters
+            Longer responses are more immersive but take more time
+        -->
+        <MaxResponseLength>300</MaxResponseLength>
+    </Response>
+
+    <!-- Action System Settings -->
+    <Actions>
+        <!--
+            Enable NPC actions (follow, trade, guard, etc.)
+        -->
+        <Enabled>true</Enabled>
+
+        <!--
+            Require explicit consent for dangerous actions
+        -->
+        <RequireConfirmation>true</RequireConfirmation>
+
+        <!--
+            Default follow distance in meters
+        -->
+        <FollowDistance>3.0</FollowDistance>
+
+        <!--
+            Default guard radius in meters
+        -->
+        <GuardRadius>10.0</GuardRadius>
+    </Actions>
+</LLMConfig>

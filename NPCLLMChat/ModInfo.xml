@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<xml>
+    <Name value="NPC LLM Chat" />
+    <DisplayName value="NPC LLM Chat - AI Conversations" />
+    <Version value="1.0.0" />
+    <Description value="Integrates local LLM (Ollama/LM Studio) with NPCCore for dynamic NPC conversations" />
+    <Author value="Custom" />
+    <Website value="" />
+</xml>
