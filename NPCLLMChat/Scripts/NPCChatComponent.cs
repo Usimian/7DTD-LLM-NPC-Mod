@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using NPCLLMChat.Actions;
+using NPCLLMChat.TTS;
 
 namespace NPCLLMChat
 {
@@ -31,12 +32,18 @@ namespace NPCLLMChat
         // Configuration
         private LLMConfig _config;
 
+        // TTS Audio Player
+        private NPCAudioPlayer _audioPlayer;
+        private bool _ttsEnabled = true;
+
         // Events for UI integration
         public event Action<string> OnResponseStarted;
         public event Action<string> OnResponseComplete;
         public event Action<string> OnTypingUpdate;
         public event Action<string> OnError;
         public event Action<NPCAction> OnActionExecuted;
+        public event Action<string> OnSpeechStarted;
+        public event Action OnSpeechComplete;
 
         // Action system integration
         private bool _actionsEnabled = true;
@@ -54,6 +61,20 @@ namespace NPCLLMChat
 
             // Build personality-specific system prompt
             _systemPrompt = BuildSystemPrompt();
+
+            // Initialize TTS audio player if TTS is enabled
+            var ttsConfig = NPCLLMChatMod.TTSConfig;
+            if (ttsConfig != null && ttsConfig.Enabled && TTSService.Instance.IsInitialized)
+            {
+                _audioPlayer = gameObject.AddComponent<NPCAudioPlayer>();
+                _audioPlayer.Initialize(npcEntity, ttsConfig);
+                _ttsEnabled = true;
+                Log.Out($"[NPCLLMChat] TTS enabled for NPC: {_npcName}");
+            }
+            else
+            {
+                _ttsEnabled = false;
+            }
 
             Log.Out($"[NPCLLMChat] Initialized chat component for NPC: {_npcName} (ID: {_entityId})");
         }
@@ -255,6 +276,13 @@ Stay in character. Only perform actions that make sense for your personality.";
                 OnResponseComplete?.Invoke(dialogueResponse);
                 onComplete?.Invoke(dialogueResponse);
             }
+
+            // Trigger TTS if enabled
+            if (_ttsEnabled && _audioPlayer != null && TTSService.Instance.ServerAvailable)
+            {
+                OnSpeechStarted?.Invoke(dialogueResponse);
+                _audioPlayer.Speak(dialogueResponse, () => OnSpeechComplete?.Invoke());
+            }
         }
 
         private IEnumerator TypeResponseCoroutine(string fullResponse, Action<string> onComplete)
@@ -333,6 +361,37 @@ Stay in character. Only perform actions that make sense for your personality.";
         {
             get => _actionsEnabled;
             set => _actionsEnabled = value;
+        }
+
+        // TTS properties and methods
+        public bool TTSEnabled
+        {
+            get => _ttsEnabled;
+            set => _ttsEnabled = value;
+        }
+
+        public bool IsSpeaking => _audioPlayer != null && _audioPlayer.IsSpeaking;
+
+        /// <summary>
+        /// Stop any current speech playback
+        /// </summary>
+        public void StopSpeaking()
+        {
+            if (_audioPlayer != null)
+            {
+                _audioPlayer.StopSpeaking();
+            }
+        }
+
+        /// <summary>
+        /// Set a custom voice for this NPC
+        /// </summary>
+        public void SetVoice(string voiceId)
+        {
+            if (_audioPlayer != null)
+            {
+                _audioPlayer.SetVoice(voiceId);
+            }
         }
 
         /// <summary>

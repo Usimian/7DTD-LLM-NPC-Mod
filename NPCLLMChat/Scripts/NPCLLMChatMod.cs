@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Xml;
 using UnityEngine;
+using NPCLLMChat.TTS;
 
 namespace NPCLLMChat
 {
@@ -13,14 +14,17 @@ namespace NPCLLMChat
     {
         private static string _modPath;
         private static LLMConfig _config;
+        private static TTSConfig _ttsConfig;
         private static bool _initialized = false;
+
+        public static TTSConfig TTSConfig => _ttsConfig;
 
         public void InitMod(Mod _modInstance)
         {
             _modPath = _modInstance.Path;
             Log.Out("Initializing NPC LLM Chat mod...");
 
-            // Load configuration
+            // Load configurations
             _config = LoadConfig();
             if (_config == null)
             {
@@ -30,6 +34,13 @@ namespace NPCLLMChat
 
             // Initialize LLM Service
             LLMService.Instance.Initialize(_config);
+
+            // Load TTS configuration and initialize TTS service
+            _ttsConfig = LoadTTSConfig();
+            if (_ttsConfig != null && _ttsConfig.Enabled)
+            {
+                TTSService.Instance.Initialize(_ttsConfig);
+            }
 
             // Register for game events using A21 API with proper delegate signatures
             ModEvents.GameStartDone.RegisterHandler(GameStartDoneHandler);
@@ -162,6 +173,80 @@ namespace NPCLLMChat
                 ActionsEnabled = true,
                 FollowDistance = 3.0f,
                 GuardRadius = 10.0f
+            };
+        }
+
+        private TTSConfig LoadTTSConfig()
+        {
+            string configPath = Path.Combine(_modPath, "Config", "ttsconfig.xml");
+
+            if (!File.Exists(configPath))
+            {
+                Log.Warning($"TTS config file not found at {configPath}, using defaults");
+                return GetDefaultTTSConfig();
+            }
+
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.Load(configPath);
+
+                var config = new TTSConfig();
+
+                // Server settings
+                var serverNode = doc.SelectSingleNode("//Server");
+                if (serverNode != null)
+                {
+                    config.Enabled = bool.Parse(GetNodeValue(serverNode, "Enabled", "true"));
+                    config.Endpoint = GetNodeValue(serverNode, "Endpoint", "http://localhost:5050/synthesize");
+                    config.TimeoutSeconds = int.Parse(GetNodeValue(serverNode, "TimeoutSeconds", "10"));
+                }
+
+                // Audio settings
+                var audioNode = doc.SelectSingleNode("//Audio");
+                if (audioNode != null)
+                {
+                    config.Volume = float.Parse(GetNodeValue(audioNode, "Volume", "0.8"), System.Globalization.CultureInfo.InvariantCulture);
+                    config.MaxDistance = float.Parse(GetNodeValue(audioNode, "MaxDistance", "20"), System.Globalization.CultureInfo.InvariantCulture);
+                    config.MinDistance = float.Parse(GetNodeValue(audioNode, "MinDistance", "2"), System.Globalization.CultureInfo.InvariantCulture);
+                    config.SpeechRate = float.Parse(GetNodeValue(audioNode, "SpeechRate", "1.0"), System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                // Voice settings
+                var voicesNode = doc.SelectSingleNode("//Voices");
+                if (voicesNode != null)
+                {
+                    config.DefaultVoice = GetNodeValue(voicesNode, "DefaultVoice", "en_US-lessac-medium");
+                    config.TraderVoice = GetNodeValue(voicesNode, "TraderVoice", "en_US-ryan-medium");
+                    config.CompanionVoice = GetNodeValue(voicesNode, "CompanionVoice", "en_US-amy-medium");
+                    config.BanditVoice = GetNodeValue(voicesNode, "BanditVoice", "en_US-ryan-medium");
+                }
+
+                Log.Out($"TTS configuration loaded - Enabled: {config.Enabled}, Default voice: {config.DefaultVoice}");
+                return config;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error loading TTS config: {ex.Message}");
+                return GetDefaultTTSConfig();
+            }
+        }
+
+        private TTSConfig GetDefaultTTSConfig()
+        {
+            return new TTSConfig
+            {
+                Enabled = true,
+                Endpoint = "http://localhost:5050/synthesize",
+                TimeoutSeconds = 10,
+                Volume = 0.8f,
+                MaxDistance = 20f,
+                MinDistance = 2f,
+                SpeechRate = 1.0f,
+                DefaultVoice = "en_US-lessac-medium",
+                TraderVoice = "en_US-ryan-medium",
+                CompanionVoice = "en_US-amy-medium",
+                BanditVoice = "en_US-ryan-medium"
             };
         }
     }

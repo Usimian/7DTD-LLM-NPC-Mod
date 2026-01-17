@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    NPC LLM Chat - Text-to-Speech Configuration
+
+    Requires Piper TTS server running on the specified endpoint.
+    Start server with: python piper_server.py --port 5050
+-->
+<TTSConfig>
+    <!-- TTS Server Configuration -->
+    <Server>
+        <!--
+            Enable or disable TTS entirely.
+            Set to false for text-only responses.
+        -->
+        <Enabled>true</Enabled>
+
+        <!--
+            Piper TTS server endpoint.
+            Default port is 5050 for our custom server.
+        -->
+        <Endpoint>http://localhost:5050/synthesize</Endpoint>
+
+        <!--
+            Request timeout in seconds.
+            TTS usually completes in under 500ms.
+        -->
+        <TimeoutSeconds>10</TimeoutSeconds>
+    </Server>
+
+    <!-- Audio Playback Settings -->
+    <Audio>
+        <!--
+            Master volume for NPC speech (0.0 to 1.0)
+        -->
+        <Volume>0.8</Volume>
+
+        <!--
+            3D spatial audio settings.
+            MaxDistance: How far away you can hear NPCs (in meters)
+            MinDistance: Distance at which audio is at full volume
+        -->
+        <MaxDistance>20</MaxDistance>
+        <MinDistance>2</MinDistance>
+
+        <!--
+            Speech rate multiplier.
+            1.0 = normal speed
+            1.2 = 20% faster
+            0.8 = 20% slower
+        -->
+        <SpeechRate>1.0</SpeechRate>
+    </Audio>
+
+    <!--
+        Voice Configuration
+
+        Available voices (download more from huggingface.co/rhasspy/piper-voices):
+        - en_US-lessac-medium  (neutral, clear)
+        - en_US-ryan-medium    (male, deeper)
+        - en_US-amy-medium     (female, warm)
+
+        Voice files go in: ~/.local/share/piper/voices/
+    -->
+    <Voices>
+        <!-- Default voice for generic NPCs -->
+        <DefaultVoice>en_US-lessac-medium</DefaultVoice>
+
+        <!-- Voice for trader NPCs -->
+        <TraderVoice>en_US-ryan-medium</TraderVoice>
+
+        <!-- Voice for companion/hireling NPCs -->
+        <CompanionVoice>en_US-amy-medium</CompanionVoice>
+
+        <!-- Voice for hostile/bandit NPCs -->
+        <BanditVoice>en_US-ryan-medium</BanditVoice>
+    </Voices>
+</TTSConfig>

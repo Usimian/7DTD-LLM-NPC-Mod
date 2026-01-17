@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using NPCLLMChat.Actions;
+using NPCLLMChat.TTS;
 
 namespace NPCLLMChat
 {
@@ -16,7 +17,7 @@ namespace NPCLLMChat
 
         public override string getDescription()
         {
-            return "NPC LLM Chat commands - llmchat <test|status|talk|action>";
+            return "NPC LLM Chat commands - llmchat <test|status|talk|tts|action>";
         }
 
         public override string getHelp()
@@ -30,9 +31,17 @@ llmchat action <action> - Execute action (follow, stop, guard, wait)
 llmchat clear           - Clear conversation history
 llmchat list            - List active NPC sessions
 
+TTS Commands:
+llmchat tts             - Show TTS status
+llmchat tts test        - Test TTS with sample speech
+llmchat tts on          - Enable TTS globally
+llmchat tts off         - Disable TTS globally
+llmchat tts voices      - List available voices
+
 Examples:
   llmchat test
   llmchat talk Hello, how are you?
+  llmchat tts test
   llmchat action follow";
         }
 
@@ -76,6 +85,9 @@ Examples:
                     break;
                 case "list":
                     ListActiveSessions();
+                    break;
+                case "tts":
+                    HandleTTSCommand(_params);
                     break;
                 default:
                     SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Unknown: {subCommand}");
@@ -282,6 +294,189 @@ Examples:
 
             if (count == 0) output.Output("  No active sessions");
             output.Output($"Total: {count}");
+        }
+
+        private void HandleTTSCommand(List<string> _params)
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var tts = TTSService.Instance;
+
+            // Default: show status
+            if (_params.Count < 2)
+            {
+                ShowTTSStatus();
+                return;
+            }
+
+            string subCommand = _params[1].ToLower();
+
+            switch (subCommand)
+            {
+                case "test":
+                    TestTTS();
+                    break;
+                case "on":
+                    EnableTTS(true);
+                    break;
+                case "off":
+                    EnableTTS(false);
+                    break;
+                case "voices":
+                    ListVoices();
+                    break;
+                case "status":
+                    ShowTTSStatus();
+                    break;
+                default:
+                    output.Output($"Unknown TTS command: {subCommand}");
+                    output.Output("Use: tts, tts test, tts on, tts off, tts voices");
+                    break;
+            }
+        }
+
+        private void ShowTTSStatus()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var tts = TTSService.Instance;
+            var config = NPCLLMChatMod.TTSConfig;
+
+            output.Output("=== TTS Status ===");
+            output.Output($"TTS Enabled: {(config?.Enabled ?? false)}");
+            output.Output($"TTS Initialized: {(tts?.IsInitialized ?? false)}");
+            output.Output($"Server Available: {(tts?.ServerAvailable ?? false)}");
+
+            if (tts != null && tts.RequestCount > 0)
+            {
+                output.Output($"Requests: {tts.RequestCount}");
+                output.Output($"Last Synthesis: {tts.LastSynthesisTimeMs:F0}ms");
+                output.Output($"Avg Synthesis: {tts.AvgSynthesisTimeMs:F0}ms");
+            }
+
+            if (config != null)
+            {
+                output.Output($"Default Voice: {config.DefaultVoice}");
+                output.Output($"Volume: {config.Volume:P0}");
+            }
+
+            if (!(tts?.ServerAvailable ?? false))
+            {
+                output.Output("");
+                output.Output("To start TTS server:");
+                output.Output("  python piper_server.py --port 5050");
+            }
+        }
+
+        private void TestTTS()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var tts = TTSService.Instance;
+
+            if (tts == null || !tts.IsInitialized)
+            {
+                output.Output("TTS not initialized");
+                return;
+            }
+
+            if (!tts.ServerAvailable)
+            {
+                output.Output("TTS server not available. Checking...");
+                tts.RefreshServerStatus();
+                return;
+            }
+
+            output.Output("Testing TTS synthesis...");
+
+            // Create a test audio source at player position
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                output.Output("No player found for audio test");
+                return;
+            }
+
+            string testText = "Hey survivor, the wasteland is rough but we will make it through together.";
+
+            tts.Synthesize(
+                testText,
+                null,
+                clip =>
+                {
+                    output.Output($"[SUCCESS] Generated {clip.length:F1}s audio clip");
+
+                    // Play at player position
+                    var go = new GameObject("TTSTest");
+                    go.transform.position = player.position;
+                    var audioSource = go.AddComponent<AudioSource>();
+                    audioSource.clip = clip;
+                    audioSource.volume = NPCLLMChatMod.TTSConfig?.Volume ?? 0.8f;
+                    audioSource.Play();
+
+                    // Clean up after playing
+                    Object.Destroy(go, clip.length + 0.5f);
+
+                    output.Output("Playing audio...");
+                },
+                error =>
+                {
+                    output.Output($"[ERROR] TTS failed: {error}");
+                    output.Output("Make sure piper_server.py is running on port 5050");
+                }
+            );
+        }
+
+        private void EnableTTS(bool enabled)
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var config = NPCLLMChatMod.TTSConfig;
+
+            if (config == null)
+            {
+                output.Output("TTS config not loaded");
+                return;
+            }
+
+            // Note: This only affects runtime state, not the config file
+            // We need to update all active NPC chat components
+
+            var world = GameManager.Instance?.World;
+            if (world != null)
+            {
+                int updated = 0;
+                foreach (var entity in world.Entities.list)
+                {
+                    if (entity is EntityAlive alive)
+                    {
+                        var chat = alive.GetComponent<NPCChatComponent>();
+                        if (chat != null)
+                        {
+                            chat.TTSEnabled = enabled;
+                            updated++;
+                        }
+                    }
+                }
+                output.Output($"TTS {(enabled ? "enabled" : "disabled")} for {updated} NPCs");
+            }
+
+            if (enabled && !TTSService.Instance.ServerAvailable)
+            {
+                output.Output("Warning: TTS server not available");
+                TTSService.Instance.RefreshServerStatus();
+            }
+        }
+
+        private void ListVoices()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var config = NPCLLMChatMod.TTSConfig;
+
+            output.Output("=== Available Voices ===");
+            output.Output($"Default: {config?.DefaultVoice ?? "en_US-lessac-medium"}");
+            output.Output($"Trader: {config?.TraderVoice ?? "en_US-ryan-medium"}");
+            output.Output($"Companion: {config?.CompanionVoice ?? "en_US-amy-medium"}");
+            output.Output($"Bandit: {config?.BanditVoice ?? "en_US-ryan-medium"}");
+            output.Output("");
+            output.Output("Download more voices from:");
+            output.Output("https://huggingface.co/rhasspy/piper-voices");
         }
     }
 }

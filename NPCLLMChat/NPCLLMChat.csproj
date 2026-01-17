@@ -57,6 +57,10 @@
       <HintPath>$(ManagedPath)/UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(ManagedPath)/UnityEngine.AudioModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
 
     <!-- 7DTD Game Assembly -->
     <Reference Include="Assembly-CSharp">
@@ -90,10 +94,11 @@
       <ModsFolder>$(GamePath)/Mods/NPCLLMChat</ModsFolder>
     </PropertyGroup>
     <MakeDir Directories="$(ModsFolder)" />
+    <MakeDir Directories="$(ModsFolder)/Config" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModsFolder)" />
     <Copy SourceFiles="ModInfo.xml" DestinationFolder="$(ModsFolder)" />
     <Copy SourceFiles="Config\llmconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
-    <Copy SourceFiles="Config\personalities.xml" DestinationFolder="$(ModsFolder)\Config" />
+    <Copy SourceFiles="Config\ttsconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
     <Message Text="Deployed to: $(ModsFolder)" Importance="high" />
   </Target>
 
