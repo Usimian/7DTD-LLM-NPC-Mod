@@ -38,17 +38,23 @@ namespace NPCLLMChat.TTS
             _audioSource = gameObject.AddComponent<AudioSource>();
 
             // 3D spatial audio settings
-            _audioSource.spatialBlend = 1.0f;  // Full 3D
+            _audioSource.spatialBlend = 0.7f;  // Mostly 3D but with some 2D fallback for audibility
             _audioSource.rolloffMode = AudioRolloffMode.Linear;
             _audioSource.maxDistance = config.MaxDistance;
             _audioSource.minDistance = config.MinDistance;
             _audioSource.dopplerLevel = 0f;  // Disable doppler for speech clarity
-            _audioSource.spread = 30f;  // Narrow spread for directional audio
+            _audioSource.spread = 60f;  // Wider spread for better audibility
 
             // General settings
             _audioSource.volume = config.Volume;
             _audioSource.playOnAwake = false;
             _audioSource.loop = false;
+
+            // Bypass game audio processing that might block custom audio
+            _audioSource.bypassEffects = true;
+            _audioSource.bypassListenerEffects = true;
+            _audioSource.bypassReverbZones = true;
+            _audioSource.priority = 0;  // Highest priority
 
             // Determine voice based on NPC type
             _voiceId = DetermineVoice(npc);

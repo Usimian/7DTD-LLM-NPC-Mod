@@ -403,12 +403,17 @@ Examples:
                 {
                     output.Output($"[SUCCESS] Generated {clip.length:F1}s audio clip");
 
-                    // Play at player position
+                    // Play at player position with 2D audio for guaranteed audibility
                     var go = new GameObject("TTSTest");
                     go.transform.position = player.position;
                     var audioSource = go.AddComponent<AudioSource>();
                     audioSource.clip = clip;
                     audioSource.volume = NPCLLMChatMod.TTSConfig?.Volume ?? 0.8f;
+                    audioSource.spatialBlend = 0f;  // 2D audio - always audible
+                    audioSource.bypassEffects = true;
+                    audioSource.bypassListenerEffects = true;
+                    audioSource.bypassReverbZones = true;
+                    audioSource.priority = 0;
                     audioSource.Play();
 
                     // Clean up after playing
