@@ -221,45 +221,62 @@ namespace NPCLLMChat
         {
             try
             {
-                // Simple JSON parsing without external dependencies
                 // For Ollama: look for "response" field
+                // Format: "response":"text" or "response": "text"
                 if (jsonResponse.Contains("\"response\""))
                 {
-                    int start = jsonResponse.IndexOf("\"response\":\"") + 12;
-                    int end = jsonResponse.IndexOf("\"", start);
-                    if (start > 11 && end > start)
-                    {
-                        return UnescapeJson(jsonResponse.Substring(start, end - start));
-                    }
+                    // Find the start of the response value
+                    int keyIndex = jsonResponse.IndexOf("\"response\"");
+                    int colonIndex = jsonResponse.IndexOf(':', keyIndex);
+                    if (colonIndex < 0) return null;
 
-                    // Try alternate format with escaped quotes
-                    start = jsonResponse.IndexOf("\"response\": \"") + 13;
-                    end = FindClosingQuote(jsonResponse, start);
-                    if (start > 12 && end > start)
+                    // Skip whitespace after colon
+                    int valueStart = colonIndex + 1;
+                    while (valueStart < jsonResponse.Length && char.IsWhiteSpace(jsonResponse[valueStart]))
+                        valueStart++;
+
+                    // Check if it's a string value (starts with quote)
+                    if (valueStart < jsonResponse.Length && jsonResponse[valueStart] == '"')
                     {
-                        return UnescapeJson(jsonResponse.Substring(start, end - start));
+                        valueStart++; // Skip opening quote
+                        int valueEnd = FindClosingQuote(jsonResponse, valueStart);
+                        if (valueEnd > valueStart)
+                        {
+                            string response = jsonResponse.Substring(valueStart, valueEnd - valueStart);
+                            return UnescapeJson(response);
+                        }
                     }
                 }
 
                 // For OpenAI format: look for "content" in choices
                 if (jsonResponse.Contains("\"content\""))
                 {
-                    int start = jsonResponse.IndexOf("\"content\":\"") + 11;
-                    if (start < 11)
-                        start = jsonResponse.IndexOf("\"content\": \"") + 12;
-                    int end = FindClosingQuote(jsonResponse, start);
-                    if (start > 10 && end > start)
+                    int keyIndex = jsonResponse.IndexOf("\"content\"");
+                    int colonIndex = jsonResponse.IndexOf(':', keyIndex);
+                    if (colonIndex > 0)
                     {
-                        return UnescapeJson(jsonResponse.Substring(start, end - start));
+                        int valueStart = colonIndex + 1;
+                        while (valueStart < jsonResponse.Length && char.IsWhiteSpace(jsonResponse[valueStart]))
+                            valueStart++;
+
+                        if (valueStart < jsonResponse.Length && jsonResponse[valueStart] == '"')
+                        {
+                            valueStart++;
+                            int valueEnd = FindClosingQuote(jsonResponse, valueStart);
+                            if (valueEnd > valueStart)
+                            {
+                                return UnescapeJson(jsonResponse.Substring(valueStart, valueEnd - valueStart));
+                            }
+                        }
                     }
                 }
 
-                Log.Warning($"[NPCLLMChat] Could not parse response: {jsonResponse.Substring(0, Math.Min(200, jsonResponse.Length))}");
+                Log.Warning($"Could not parse response: {jsonResponse.Substring(0, Math.Min(300, jsonResponse.Length))}");
                 return null;
             }
             catch (Exception ex)
             {
-                Log.Error($"[NPCLLMChat] Error parsing LLM response: {ex.Message}");
+                Log.Error($"Error parsing LLM response: {ex.Message}");
                 return null;
             }
         }
@@ -268,7 +285,7 @@ namespace NPCLLMChat
         {
             for (int i = start; i < str.Length; i++)
             {
-                if (str[i] == '"' && str[i - 1] != '\\')
+                if (str[i] == '"' && (i == 0 || str[i - 1] != '\\'))
                     return i;
             }
             return -1;
