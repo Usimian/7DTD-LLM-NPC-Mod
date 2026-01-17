@@ -54,13 +54,13 @@ namespace NPCLLMChat.Actions
                         ExecuteFollow(npc, player, state);
                         break;
                     case NPCActionType.StopFollow:
-                        ExecuteStopFollow(npc, state);
+                        ExecuteStopFollow(npc, player, state);
                         break;
                     case NPCActionType.Wait:
-                        ExecuteWait(npc, state);
+                        ExecuteWait(npc, player, state);
                         break;
                     case NPCActionType.Guard:
-                        ExecuteGuard(npc, state, action);
+                        ExecuteGuard(npc, player, state, action);
                         break;
                     case NPCActionType.Trade:
                         ExecuteTrade(npc, player);
@@ -92,11 +92,12 @@ namespace NPCLLMChat.Actions
             state.IsFollowing = true;
             state.FollowTarget = player;
 
-            // Try NPCCore/SCore task system via reflection
-            TrySetNPCCoreTask(npc, "follow", player.entityId);
-
-            // Fallback: Start follow coroutine
-            StartCoroutine(FollowPlayerCoroutine(npc, player, state));
+            // Try SCore's ExecuteCMD - "FollowMe" command
+            if (!TryExecuteSCoreCommand(npc, "FollowMe", player))
+            {
+                // Fallback: Start follow coroutine
+                StartCoroutine(FollowPlayerCoroutine(npc, player, state));
+            }
             Log.Out($"NPC {npc.entityId} following player");
         }
 
@@ -129,29 +130,35 @@ namespace NPCLLMChat.Actions
             }
         }
 
-        private void ExecuteStopFollow(EntityAlive npc, NPCState state)
+        private void ExecuteStopFollow(EntityAlive npc, EntityPlayer player, NPCState state)
         {
             state.IsFollowing = false;
             state.FollowTarget = null;
-            TrySetNPCCoreTask(npc, "stay", 0);
+
+            // Try SCore's ExecuteCMD - "StayHere" command
+            TryExecuteSCoreCommand(npc, "StayHere", player);
             Log.Out($"NPC {npc.entityId} stopped following");
         }
 
-        private void ExecuteWait(EntityAlive npc, NPCState state)
+        private void ExecuteWait(EntityAlive npc, EntityPlayer player, NPCState state)
         {
             state.IsFollowing = false;
             state.IsWaiting = true;
             state.WaitPosition = npc.position;
-            TrySetNPCCoreTask(npc, "stay", 0);
+
+            // Try SCore's ExecuteCMD - "StayHere" command
+            TryExecuteSCoreCommand(npc, "StayHere", player);
             Log.Out($"NPC {npc.entityId} waiting at position");
         }
 
-        private void ExecuteGuard(EntityAlive npc, NPCState state, NPCAction action)
+        private void ExecuteGuard(EntityAlive npc, EntityPlayer player, NPCState state, NPCAction action)
         {
             state.IsGuarding = true;
             state.GuardPosition = npc.position;
             state.GuardRadius = action.GetParamFloat("radius", 10f);
-            TrySetNPCCoreTask(npc, "guard", 0);
+
+            // Try SCore's ExecuteCMD - "GuardHere" command (stay + look direction)
+            TryExecuteSCoreCommand(npc, "GuardHere", player);
             Log.Out($"NPC {npc.entityId} guarding area");
         }
 
@@ -191,25 +198,46 @@ namespace NPCLLMChat.Actions
             // Animation would be triggered here if NPC has animator
         }
 
-        private bool TrySetNPCCoreTask(EntityAlive npc, string taskName, int targetId)
+        /// <summary>
+        /// Execute an SCore NPC command using EntityUtilities.ExecuteCMD
+        /// Available commands: FollowMe, StayHere, GuardHere, Wander, Patrol, Dismiss, etc.
+        /// </summary>
+        private bool TryExecuteSCoreCommand(EntityAlive npc, string command, EntityPlayer player)
         {
             try
             {
-                // Try SCore's EntityUtilities if available
-                var utilsType = Type.GetType("SCore.Scripts.Utils.EntityUtilities, SCore");
+                // Try SCore's EntityUtilities.ExecuteCMD(int EntityID, string strCommand, EntityPlayer player)
+                var utilsType = Type.GetType("EntityUtilities, SCore");
+                if (utilsType == null)
+                {
+                    // Try alternate namespace
+                    utilsType = Type.GetType("SCore.Scripts.Utils.EntityUtilities, SCore");
+                }
+
                 if (utilsType != null)
                 {
-                    var setTaskMethod = utilsType.GetMethod("SetCurrentOrder");
-                    if (setTaskMethod != null)
+                    var executeMethod = utilsType.GetMethod("ExecuteCMD",
+                        new Type[] { typeof(int), typeof(string), typeof(EntityPlayer) });
+
+                    if (executeMethod != null)
                     {
-                        setTaskMethod.Invoke(null, new object[] { npc.entityId, taskName });
-                        return true;
+                        bool result = (bool)executeMethod.Invoke(null, new object[] { npc.entityId, command, player });
+                        Log.Out($"[NPCLLMChat] SCore ExecuteCMD '{command}' for NPC {npc.entityId}: {(result ? "success" : "failed")}");
+                        return result;
                     }
+                    else
+                    {
+                        Log.Warning("[NPCLLMChat] ExecuteCMD method not found in EntityUtilities");
+                    }
+                }
+                else
+                {
+                    Log.Out("[NPCLLMChat] SCore EntityUtilities not found - using fallback behavior");
                 }
             }
             catch (Exception ex)
             {
-                Log.Out($"Could not set NPCCore task: {ex.Message}");
+                Log.Warning($"[NPCLLMChat] SCore command failed: {ex.Message}");
             }
             return false;
         }
