@@ -14,3 +14,5 @@ Thumbs.db
 
 # Debug
 *.pdb
+whisper-server/venv/
+.vscode/

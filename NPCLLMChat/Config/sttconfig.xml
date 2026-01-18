@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    NPC LLM Chat - Speech-to-Text Configuration
+
+    Requires Whisper STT server running on the specified endpoint.
+    Start server with: python whisper_server.py --port 5051
+
+    Dependencies:
+        pip install faster-whisper flask
+-->
+<STTConfig>
+    <!-- STT Server Configuration -->
+    <Server>
+        <!--
+            Enable or disable STT entirely.
+            Set to false to disable voice input.
+        -->
+        <Enabled>true</Enabled>
+
+        <!--
+            Whisper STT server endpoint.
+            Default port is 5051 for our custom server.
+        -->
+        <Endpoint>http://localhost:5051/transcribe</Endpoint>
+
+        <!--
+            Request timeout in seconds.
+            Transcription usually completes in 0.5-2s depending on model.
+        -->
+        <TimeoutSeconds>10</TimeoutSeconds>
+    </Server>
+
+    <!-- Audio Recording Settings -->
+    <Audio>
+        <!--
+            Sample rate in Hz. Whisper expects 16000 Hz.
+            Do not change unless you know what you're doing.
+        -->
+        <SampleRate>16000</SampleRate>
+
+        <!--
+            Maximum recording duration in seconds.
+            Recording stops automatically after this time.
+        -->
+        <MaxRecordingSeconds>15</MaxRecordingSeconds>
+    </Audio>
+
+    <!-- Input Settings -->
+    <Input>
+        <!--
+            Push-to-talk key. Hold this key to record.
+            Uses Unity KeyCode names: V, LeftAlt, Mouse3, etc.
+            See: https://docs.unity3d.com/ScriptReference/KeyCode.html
+        -->
+        <PushToTalkKey>V</PushToTalkKey>
+    </Input>
+
+    <!-- Whisper Model Settings -->
+    <Whisper>
+        <!--
+            Whisper model to use. Options:
+            - tiny.en    : Fastest, least accurate
+            - base.en    : Good balance (recommended)
+            - small.en   : More accurate, slower
+            - medium.en  : Very accurate, much slower
+            - large-v3   : Most accurate, requires lots of VRAM
+
+            Note: .en models are English-only but faster/more accurate for English.
+        -->
+        <Model>base.en</Model>
+
+        <!--
+            Language code for transcription.
+            For .en models, this should be "en".
+        -->
+        <Language>en</Language>
+    </Whisper>
+</STTConfig>

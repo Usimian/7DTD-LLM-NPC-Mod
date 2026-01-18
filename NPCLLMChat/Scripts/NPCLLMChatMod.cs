@@ -3,6 +3,7 @@ using System.IO;
 using System.Xml;
 using UnityEngine;
 using NPCLLMChat.TTS;
+using NPCLLMChat.STT;
 
 namespace NPCLLMChat
 {
@@ -15,9 +16,11 @@ namespace NPCLLMChat
         private static string _modPath;
         private static LLMConfig _config;
         private static TTSConfig _ttsConfig;
+        private static STTConfig _sttConfig;
         private static bool _initialized = false;
 
         public static TTSConfig TTSConfig => _ttsConfig;
+        public static STTConfig STTConfig => _sttConfig;
 
         public void InitMod(Mod _modInstance)
         {
@@ -40,6 +43,17 @@ namespace NPCLLMChat
             if (_ttsConfig != null && _ttsConfig.Enabled)
             {
                 TTSService.Instance.Initialize(_ttsConfig);
+            }
+
+            // Load STT configuration and initialize STT service
+            _sttConfig = LoadSTTConfig();
+            if (_sttConfig != null && _sttConfig.Enabled)
+            {
+                STTService.Instance.Initialize(_sttConfig);
+                MicrophoneCapture.Instance.Initialize(_sttConfig);
+
+                // Wire up microphone capture to talk to nearest NPC
+                MicrophoneCapture.Instance.OnTranscriptionComplete += OnVoiceTranscribed;
             }
 
             // Register for game events using A21 API with proper delegate signatures
@@ -72,6 +86,117 @@ namespace NPCLLMChat
             Log.Out("Shutting down...");
             Harmony.NPCCorePatches.Shutdown();
             _initialized = false;
+        }
+
+        /// <summary>
+        /// Called when voice transcription completes - sends message to nearest NPC
+        /// </summary>
+        private static void OnVoiceTranscribed(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                Log.Warning("[NPCLLMChat] Voice transcription returned empty text");
+                return;
+            }
+
+            Log.Out($"[NPCLLMChat] Voice transcribed: \"{text}\"");
+
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                Log.Warning("[NPCLLMChat] No player found for voice input");
+                return;
+            }
+
+            // Find nearest NPC within range
+            EntityAlive nearestNPC = FindNearestNPC(player, 15f);
+            if (nearestNPC == null)
+            {
+                Log.Out("[NPCLLMChat] No NPC nearby to talk to via voice");
+                Log.Out($"[NPCLLMChat] Checked {GameManager.Instance?.World?.Entities?.list?.Count ?? 0} entities");
+                // Show feedback to player
+                GameManager.ShowTooltip(player, "No NPC nearby to talk to", false);
+                return;
+            }
+
+            // Get or create chat component
+            var chatComponent = Harmony.NPCCorePatches.GetOrCreateChatComponent(nearestNPC);
+            if (chatComponent == null)
+            {
+                Log.Warning("[NPCLLMChat] Failed to get chat component for NPC");
+                return;
+            }
+
+            Log.Out($"[NPCLLMChat] Voice message to {chatComponent.NPCName}: \"{text}\"");
+
+            // Show what we heard
+            GameManager.ShowTooltip(player, $"You: {text}", false);
+
+            // Send message to NPC
+            chatComponent.ProcessPlayerMessage(text, player, response =>
+            {
+                Log.Out($"[NPCLLMChat] {chatComponent.NPCName} responded: {response}");
+            });
+        }
+
+        /// <summary>
+        /// Find nearest NPC within range
+        /// </summary>
+        private static EntityAlive FindNearestNPC(EntityPlayer player, float maxDistance)
+        {
+            EntityAlive closest = null;
+            float closestDist = maxDistance;
+            int npcCount = 0;
+
+            var world = GameManager.Instance?.World;
+            if (world == null) return null;
+
+            Log.Out("[NPCLLMChat] Scanning entities for NPCs...");
+            foreach (var entity in world.Entities.list)
+            {
+                if (entity is EntityAlive alive && alive.entityId != player.entityId)
+                {
+                    float dist = UnityEngine.Vector3.Distance(player.position, alive.position);
+                    bool isNPC = IsNPC(alive);
+                    Log.Out($"[NPCLLMChat] Entity: {alive.EntityName} (type: {alive.GetType().Name}) at {dist:F1}m - IsNPC: {isNPC}");
+
+                    if (isNPC)
+                    {
+                        npcCount++;
+                        if (dist < closestDist)
+                        {
+                            closest = alive;
+                            closestDist = dist;
+                        }
+                    }
+                }
+            }
+
+            Log.Out($"[NPCLLMChat] Found {npcCount} NPCs total, closest: {closest?.EntityName ?? "none"} at {closestDist:F1}m");
+            return closest;
+        }
+
+        /// <summary>
+        /// Check if entity is an NPC
+        /// </summary>
+        private static bool IsNPC(EntityAlive entity)
+        {
+            if (entity == null) return false;
+            string name = entity.GetType().Name;
+
+            // Check for common NPC type names
+            if (name.Contains("NPC") || name.Contains("Trader") || name.Contains("Hired")) return true;
+
+            // Check for SCore/SDX NPCs
+            if (name.Contains("SDX")) return true;
+
+            // Check for other player entities that aren't the local player
+            if (entity is EntityPlayer && !(entity is EntityPlayerLocal))
+            {
+                return ConnectionManager.Instance?.Clients?.ForEntityId(entity.entityId) == null;
+            }
+
+            return false;
         }
 
         private LLMConfig LoadConfig()
@@ -247,6 +372,80 @@ namespace NPCLLMChat
                 TraderVoice = "en_US-ryan-medium",
                 CompanionVoice = "en_US-amy-medium",
                 BanditVoice = "en_US-ryan-medium"
+            };
+        }
+
+        private STTConfig LoadSTTConfig()
+        {
+            string configPath = Path.Combine(_modPath, "Config", "sttconfig.xml");
+
+            if (!File.Exists(configPath))
+            {
+                Log.Warning($"STT config file not found at {configPath}, using defaults");
+                return GetDefaultSTTConfig();
+            }
+
+            try
+            {
+                XmlDocument doc = new XmlDocument();
+                doc.Load(configPath);
+
+                var config = new STTConfig();
+
+                // Server settings
+                var serverNode = doc.SelectSingleNode("//Server");
+                if (serverNode != null)
+                {
+                    config.Enabled = bool.Parse(GetNodeValue(serverNode, "Enabled", "true"));
+                    config.Endpoint = GetNodeValue(serverNode, "Endpoint", "http://localhost:5051/transcribe");
+                    config.TimeoutSeconds = int.Parse(GetNodeValue(serverNode, "TimeoutSeconds", "10"));
+                }
+
+                // Audio settings
+                var audioNode = doc.SelectSingleNode("//Audio");
+                if (audioNode != null)
+                {
+                    config.SampleRate = int.Parse(GetNodeValue(audioNode, "SampleRate", "16000"));
+                    config.MaxRecordingSeconds = int.Parse(GetNodeValue(audioNode, "MaxRecordingSeconds", "15"));
+                }
+
+                // Input settings
+                var inputNode = doc.SelectSingleNode("//Input");
+                if (inputNode != null)
+                {
+                    config.PushToTalkKey = GetNodeValue(inputNode, "PushToTalkKey", "V");
+                }
+
+                // Whisper settings
+                var whisperNode = doc.SelectSingleNode("//Whisper");
+                if (whisperNode != null)
+                {
+                    config.Model = GetNodeValue(whisperNode, "Model", "base.en");
+                    config.Language = GetNodeValue(whisperNode, "Language", "en");
+                }
+
+                Log.Out($"STT configuration loaded - Enabled: {config.Enabled}, Push-to-talk: {config.PushToTalkKey}");
+                return config;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error loading STT config: {ex.Message}");
+                return GetDefaultSTTConfig();
+            }
+        }
+
+        private STTConfig GetDefaultSTTConfig()
+        {
+            return new STTConfig
+            {
+                Enabled = true,
+                Endpoint = "http://localhost:5051/transcribe",
+                TimeoutSeconds = 10,
+                SampleRate = 16000,
+                MaxRecordingSeconds = 15,
+                PushToTalkKey = "V",
+                Model = "base.en",
+                Language = "en"
             };
         }
     }

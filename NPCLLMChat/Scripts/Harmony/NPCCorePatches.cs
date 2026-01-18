@@ -39,7 +39,17 @@ namespace NPCLLMChat.Harmony
 
         public static NPCChatComponent GetOrCreateChatComponent(EntityAlive npc)
         {
-            if (npc == null) return null;
+            if (npc == null)
+            {
+                Log.Warning("[NPCLLMChat] GetOrCreateChatComponent: npc is null");
+                return null;
+            }
+
+            if (npc.gameObject == null)
+            {
+                Log.Warning($"[NPCLLMChat] GetOrCreateChatComponent: GameObject is null for {npc.EntityName}");
+                return null;
+            }
 
             int entityId = npc.entityId;
 
@@ -49,8 +59,18 @@ namespace NPCLLMChat.Harmony
 
                 if (chatComponent == null)
                 {
-                    chatComponent = npc.gameObject.AddComponent<NPCChatComponent>();
-                    chatComponent.Initialize(npc, _config);
+                    try
+                    {
+                        Log.Out($"[NPCLLMChat] Adding NPCChatComponent to {npc.EntityName} (type: {npc.GetType().Name})");
+                        chatComponent = npc.gameObject.AddComponent<NPCChatComponent>();
+                        chatComponent.Initialize(npc, _config);
+                        Log.Out($"[NPCLLMChat] Successfully initialized chat component for {npc.EntityName}");
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Error($"[NPCLLMChat] Failed to add NPCChatComponent: {ex.Message}");
+                        return null;
+                    }
                 }
 
                 _npcChatComponents[entityId] = chatComponent;
