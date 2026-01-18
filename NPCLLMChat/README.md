@@ -4,10 +4,13 @@ Add AI-powered conversations to NPCCore NPCs using a local LLM (Ollama, LM Studi
 
 ## Features
 
-- **Natural Conversations**: Talk to NPCs naturally using chat
+- **Natural Conversations**: Talk to NPCs naturally using text or voice
+- **Voice Input (STT)**: Push-to-talk with V key using Whisper speech recognition
+- **Voice Output (TTS)**: NPCs speak their responses with Piper text-to-speech
 - **Context Memory**: NPCs remember previous exchanges
 - **Dynamic Actions**: NPCs can follow, guard, trade, heal, and more based on conversation
 - **Multiple Personalities**: Each NPC has unique personality traits
+- **3D Spatial Audio**: NPC voices positioned in 3D space
 - **GPU Optimized**: Configured for high-end GPUs like RTX 6000 Pro
 - **Performance Tracking**: Built-in benchmarking and response time monitoring
 
@@ -18,6 +21,9 @@ Add AI-powered conversations to NPCCore NPCs using a local LLM (Ollama, LM Studi
 - Local LLM server (Ollama recommended)
 - [Harmony](https://github.com/pardeike/Harmony) (usually included with SCore)
 - .NET 4.8 SDK (for building)
+- **Python 3.8+** (for TTS/STT servers)
+- **Piper TTS** (for voice output)
+- **Whisper** (for voice input)
 
 ## Installation
 
@@ -28,16 +34,45 @@ Add AI-powered conversations to NPCCore NPCs using a local LLM (Ollama, LM Studi
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull a model (for RTX 6000 Pro with 48GB VRAM, use the full 70B model!)
-ollama pull llama3:70b
+ollama pull llama3.3:70b
 
 # Or for faster responses:
-ollama pull llama3:8b
+ollama pull llama3.2:3b
 
 # Start Ollama server
 ollama serve
 ```
 
-### 2. Build the Mod
+### 2. Set Up TTS (Text-to-Speech)
+
+```bash
+# Install Piper TTS
+pipx install piper-tts
+
+# Download voices
+mkdir -p ~/.local/share/piper/voices
+cd ~/.local/share/piper/voices
+
+# Download a voice (example: lessac medium)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
+
+# More voices available at: https://huggingface.co/rhasspy/piper-voices
+```
+
+### 3. Set Up STT (Speech-to-Text)
+
+```bash
+# Navigate to whisper server directory
+cd /path/to/7DTD-LLM-NPC-Mod/whisper-server
+
+# Create virtual environment and install dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 4. Build the Mod
 
 **Option A: Using .NET CLI**
 ```bash
@@ -52,7 +87,7 @@ dotnet build -c Release
 2. Update assembly references if paths differ
 3. Build → Release
 
-### 3. Install the Mod
+### 5. Install the Mod
 
 Copy the built `NPCLLMChat.dll` and configuration files to your 7DTD Mods folder:
 ```bash
@@ -67,10 +102,41 @@ cp Config/*.xml ~/.local/share/7DaysToDie/Mods/NPCLLMChat/Config/
 
 ## Usage
 
+### Starting Servers
+
+Before using voice features, start the TTS and STT servers:
+
+**Option 1: Start all servers together (recommended)**
+```bash
+cd /path/to/7DTD-LLM-NPC-Mod
+./start_servers.sh
+```
+
+**Option 2: Start servers individually (for debugging)**
+```bash
+# Terminal 1: TTS Server
+./start_tts_server.sh
+
+# Terminal 2: STT Server
+./start_stt_server.sh
+```
+
+**Stop servers:**
+```bash
+./stop_servers.sh
+```
+
 ### Talking to NPCs
 
-**In-Game Chat** (primary method):
-1. Stand near an NPC (within 3 meters)
+**Voice Input (NEW!):**
+1. Stand within 15 meters of an NPC
+2. **Hold V key** (configurable push-to-talk)
+3. **Speak your message**
+4. **Release V key**
+5. NPC responds with voice and text
+
+**In-Game Chat (text):**
+1. Stand near an NPC (within 5 meters)
 2. Open chat (T key)
 3. Prefix your message with `@`
 
@@ -86,15 +152,37 @@ cp Config/*.xml ~/.local/share/7DaysToDie/Mods/NPCLLMChat/Config/
 
 Press F1 to open console, then:
 
+**General Commands:**
 ```
 llmchat test            # Test LLM server connection
 llmchat status          # Show status and performance stats
-llmchat benchmark       # Run 5-request performance test
 llmchat talk <message>  # Talk to nearest NPC via console
-llmchat action follow   # Force NPC to follow (for testing)
-llmchat action stop     # Stop NPC from following
 llmchat list            # List active NPC conversations
 llmchat clear           # Clear all conversation history
+```
+
+**TTS Commands:**
+```
+llmchat tts             # Show TTS status
+llmchat tts test        # Test TTS with sample text
+llmchat tts on/off      # Enable/disable voice output
+llmchat tts voices      # List available voices
+```
+
+**STT Commands:**
+```
+llmchat stt             # Show STT status
+llmchat stt test        # Test microphone and transcription (3s)
+llmchat stt on/off      # Enable/disable voice input
+llmchat stt devices     # List available microphones
+```
+
+**Action Commands:**
+```
+llmchat action follow   # Force NPC to follow
+llmchat action stop     # Stop NPC from following
+llmchat action guard    # Guard current location
+llmchat action wait     # Wait at current location
 ```
 
 ### NPC Actions
@@ -114,7 +202,12 @@ NPCs can perform these actions based on conversation:
 
 ## Configuration
 
-### GPU-Optimized Settings (RTX 6000 Pro)
+All configuration files are in `Config/`:
+- `llmconfig.xml` - LLM server and action settings
+- `ttsconfig.xml` - Text-to-speech voice settings
+- `sttconfig.xml` - Speech-to-text input settings
+
+### LLM Settings (llmconfig.xml)
 
 The default `Config/llmconfig.xml` is optimized for your RTX 6000 Pro:
 
@@ -139,6 +232,76 @@ The default `Config/llmconfig.xml` is optimized for your RTX 6000 Pro:
 | 12GB | mistral:7b | < 1 second |
 | 8GB | gemma2:2b | < 0.5 seconds |
 
+### TTS Settings (ttsconfig.xml)
+
+Configure voice output in `Config/ttsconfig.xml`:
+
+```xml
+<TTSConfig>
+    <Server>
+        <Enabled>true</Enabled>
+        <Endpoint>http://localhost:5050/synthesize</Endpoint>
+        <TimeoutSeconds>10</TimeoutSeconds>
+    </Server>
+    <Audio>
+        <Volume>0.8</Volume>
+        <MaxDistance>20</MaxDistance>  <!-- How far you can hear NPCs -->
+        <MinDistance>2</MinDistance>   <!-- Distance for full volume -->
+        <SpeechRate>1.0</SpeechRate>   <!-- 1.0 = normal speed -->
+    </Audio>
+    <Voices>
+        <DefaultVoice>en_US-lessac-medium</DefaultVoice>
+        <TraderVoice>en_US-ryan-medium</TraderVoice>
+        <CompanionVoice>en_US-amy-medium</CompanionVoice>
+        <BanditVoice>en_US-ryan-medium</BanditVoice>
+    </Voices>
+</TTSConfig>
+```
+
+Available Piper voices (download from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices)):
+- `en_US-lessac-medium` - Neutral, clear
+- `en_US-ryan-medium` - Male, deeper
+- `en_US-amy-medium` - Female, warm
+- `en_US-joe-medium` - Male, casual
+- `en_GB-alan-medium` - British male
+- Many more available for different languages and accents
+
+### STT Settings (sttconfig.xml)
+
+Configure voice input in `Config/sttconfig.xml`:
+
+```xml
+<STTConfig>
+    <Server>
+        <Enabled>true</Enabled>
+        <Endpoint>http://localhost:5051/transcribe</Endpoint>
+        <TimeoutSeconds>10</TimeoutSeconds>
+    </Server>
+    <Audio>
+        <SampleRate>16000</SampleRate>           <!-- Whisper requires 16kHz -->
+        <MaxRecordingSeconds>15</MaxRecordingSeconds>
+    </Audio>
+    <Input>
+        <PushToTalkKey>V</PushToTalkKey>        <!-- Configurable PTT key -->
+    </Input>
+    <Whisper>
+        <Model>base.en</Model>                   <!-- Balance of speed/accuracy -->
+        <Language>en</Language>
+    </Whisper>
+</STTConfig>
+```
+
+**Whisper Model Recommendations:**
+
+| Model | Size | Speed | Accuracy | VRAM |
+|-------|------|-------|----------|------|
+| tiny.en | 39M | Very fast | Good | < 1GB |
+| base.en | 74M | Fast | Better | ~1GB |
+| small.en | 244M | Medium | Very good | ~2GB |
+| medium.en | 769M | Slow | Excellent | ~5GB |
+
+Use `base.en` for best balance. Change with `llmchat stt` commands or edit config.
+
 ### Personality Customization
 
 Edit `Config/personalities.xml` to add custom NPC personalities:
@@ -153,16 +316,21 @@ Edit `Config/personalities.xml` to add custom NPC personalities:
 ## Performance
 
 With RTX 6000 Pro and llama3:70b, expect:
-- **Response Time**: 1-2 seconds
+- **LLM Response Time**: 1-2 seconds
+- **TTS Generation**: < 500ms (Piper is very fast)
+- **STT Transcription**: 1-2 seconds (base.en model)
+- **Total Voice-to-Voice**: 3-5 seconds
 - **Quality**: Excellent roleplay, nuanced responses
 - **Actions**: Reliable action parsing
 
-Run `llmchat benchmark` in-game to test your setup:
+Run `llmchat status` in-game to see performance stats:
 ```
-=== Benchmark Complete ===
-Total Time: 4500ms
-Average: 900ms per request
-Performance: GOOD
+=== NPC LLM Chat Status ===
+LLM Server: Connected (http://localhost:11434)
+TTS Server: Connected (http://localhost:5050)
+STT Server: Connected (http://localhost:5051)
+Active Conversations: 2
+Average Response Time: 1250ms
 ```
 
 ## Troubleshooting
@@ -191,14 +359,73 @@ systemctl restart ollama  # or: ollama serve
 - Say "come with me" not "maybe you could follow"
 - Check console (F1) for action parsing logs
 
+### Voice input not working
+```bash
+# Check STT server
+curl http://localhost:5051/health
+
+# Test microphone
+llmchat stt devices  # List available microphones
+llmchat stt test     # Record 3 seconds and transcribe
+
+# Check for conflicts with in-game voice chat
+# Disable game's built-in voice chat if needed
+```
+
+### No voice output from NPCs
+```bash
+# Check TTS server
+curl http://localhost:5050/health
+
+# Test TTS
+llmchat tts test
+
+# Verify voice files exist
+ls ~/.local/share/piper/voices/*.onnx
+
+# Enable/disable TTS
+llmchat tts on
+```
+
+### Recording stops immediately or no audio captured
+- Hold V key for at least 0.5 seconds before speaking
+- Check that no other application is using the microphone
+- Disable in-game voice chat (can conflict with microphone access)
+- Verify microphone works: `llmchat stt devices`
+
+### "No NPC around to talk to" error
+- Make sure you're within 15 meters of an NPC
+- NPCs must be from NPCCore/SCore (not vanilla NPCs)
+- Check console (F1) for NPC detection logs
+
 ## Architecture
 
+**Voice-to-Voice Flow:**
 ```
-Player Chat → Harmony Patch → NPCChatComponent → LLMService → Ollama
-                                    ↓
-                             ActionParser
-                                    ↓
-                             ActionExecutor → NPC AI Tasks
+Player (Hold V) → MicrophoneCapture → WAV Audio → STTService → Whisper Server
+                                                                      ↓
+                                                               Transcribed Text
+                                                                      ↓
+                  NPCChatComponent ← Find Nearest NPC ←──────────────┘
+                         ↓
+                    LLMService → Ollama → Response Text
+                         ↓
+                  ┌──────┴──────┐
+                  ↓             ↓
+           ActionParser    TTSService → Piper Server → Audio
+                  ↓                                        ↓
+           ActionExecutor                          3D Spatial Audio
+                  ↓
+           NPC AI Tasks (Follow, Guard, Trade, etc.)
+```
+
+**Text Chat Flow:**
+```
+Player Chat (@message) → Harmony Patch → NPCChatComponent → LLMService → Ollama
+                                               ↓
+                                         ActionParser
+                                               ↓
+                                         ActionExecutor → NPC AI Tasks
 ```
 
 ## License
@@ -209,4 +436,7 @@ MIT - Feel free to modify and share!
 
 - NPCCore/SCore team for the NPC framework
 - Ollama team for local LLM inference
+- Rhasspy/Piper team for neural TTS
+- OpenAI Whisper team for speech recognition
+- faster-whisper contributors for optimized inference
 - 7DTD Modding community

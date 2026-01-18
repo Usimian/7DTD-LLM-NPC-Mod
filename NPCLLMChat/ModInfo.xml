@@ -3,7 +3,7 @@
     <Name value="NPCLLMChat" />
     <DisplayName value="NPC LLM Chat - AI Conversations" />
     <Version value="1.0.0" />
-    <Description value="Integrates local LLM (Ollama/LM Studio) with NPCCore for dynamic NPC conversations" />
+    <Description value="Integrates local LLM (Ollama) with NPCCore for dynamic NPC conversations" />
     <Author value="Custom" />
     <Website value="" />
 </xml>
