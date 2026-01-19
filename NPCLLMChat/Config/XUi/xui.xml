@@ -1,0 +1,18 @@
+<!--
+    NPC LLM Chat - XUI Registration
+
+    Registers window groups and controllers for the configuration UI.
+-->
+<configs>
+    <!-- Register our config window group -->
+    <append xpath="/xui/ruleset[@name='default']">
+        <window_group name="NPCLLMChatConfigGroup" close_compass_on_open="true">
+            <window name="windowNPCLLMChatConfig"/>
+        </window_group>
+    </append>
+
+    <!-- Add our button to the pause menu -->
+    <append xpath="//window_group[@name='ingameMenu']">
+        <window name="ingameMenuNPCLLMChat"/>
+    </append>
+</configs>

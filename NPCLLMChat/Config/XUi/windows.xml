@@ -1,0 +1,151 @@
+<!--
+    NPC LLM Chat - In-Game Configuration UI
+
+    Defines the pause menu button and configuration window for NPCLLMChat settings.
+    Window groups and menu registration are in xui.xml
+-->
+<configs>
+    <!-- Pause menu button -->
+    <append xpath="/windows">
+        <window name="ingameMenuNPCLLMChat" anchor="RightTop" pos="-620,-190" width="300" height="200"
+                controller="XUiC_NPCLLMChatInGameMenu, NPCLLMChat" cursor_area="true">
+            <grid name="buttons" pos="0, -0" cols="1" width="250" cell_width="250" cell_height="56"
+                  arrangement="vertical" repeat_content="false">
+                <simplebutton enabled="true" name="btnNPCLLMChatConfig" depth="3" width="250" height="46"
+                              caption="NPC AI Chat Settings" font_size="32"/>
+            </grid>
+        </window>
+    </append>
+
+    <!-- Main configuration window -->
+    <append xpath="/windows">
+        <window name="windowNPCLLMChatConfig" depth="99" width="700" height="650"
+                pos="-350,325" anchor="CenterCenter" cursor_area="true" controller="XUiC_NPCLLMChatConfig, NPCLLMChat">
+
+            <!-- Main content panel -->
+            <panel depth="3" name="content" pos="0,0" width="700" height="650" backgroundcolor="0,0,0,200">
+
+                <!-- Header -->
+                <label depth="2" pos="20,15" width="660" height="32" text="NPC AI Chat Configuration"
+                       font_size="24" justify="center"/>
+
+                <!-- Close button -->
+                <simplebutton enabled="true" name="btnClose" pos="665,10" width="30" height="36" depth="4"
+                              caption="X" font_size="18"/>
+
+                <!-- Settings Grid - 1 column, everything stacks vertically -->
+                <grid name="settingsGrid" depth="10" pos="30,55" cols="1" width="640" height="585"
+                      cell_width="640" cell_height="36" arrangement="vertical" repeat_content="false">
+
+                    <!-- TTS Enable Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Text-to-Speech" font_size="16" style="label_outline"/>
+                        <togglebutton enabled="true" name="toggleTTS" pos="480,0" width="150" height="31" depth="3"
+                                      font_size="15" caption="Enabled"/>
+                    </panel>
+
+                    <!-- Volume Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Volume" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderVolume" pos="180,0" width="450" height="31" depth="3"
+                                min_value="0" max_value="100"/>
+                    </panel>
+
+                    <!-- Speech Rate Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Speech Rate" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderSpeechRate" pos="180,0" width="450" height="31" depth="3"
+                                min_value="50" max_value="200"/>
+                    </panel>
+
+                    <!-- Default Voice Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Default Voice" font_size="16" style="label_outline"/>
+                        <textfield enabled="true" name="txtDefaultVoice" pos="180,0" width="450" height="31" depth="3"
+                                   font_size="14" text="en_US-lessac-medium"/>
+                    </panel>
+
+                    <!-- Companion Voice Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Companion Voice" font_size="16" style="label_outline"/>
+                        <textfield enabled="true" name="txtCompanionVoice" pos="180,0" width="450" height="31" depth="3"
+                                   font_size="14" text="en_US-amy-medium"/>
+                    </panel>
+
+                    <!-- Trader Voice Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Trader Voice" font_size="16" style="label_outline"/>
+                        <textfield enabled="true" name="txtTraderVoice" pos="180,0" width="450" height="31" depth="3"
+                                   font_size="14" text="en_US-ryan-medium"/>
+                    </panel>
+
+                    <!-- STT Enable Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Speech-to-Text" font_size="16" style="label_outline"/>
+                        <togglebutton enabled="true" name="toggleSTT" pos="480,0" width="150" height="31" depth="3"
+                                      font_size="15" caption="Enabled"/>
+                    </panel>
+
+                    <!-- AI Model Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="AI Model" font_size="16" style="label_outline"/>
+                        <textfield enabled="true" name="txtModel" pos="180,0" width="450" height="31" depth="3"
+                                   font_size="14" text="llama3.3:70b"/>
+                    </panel>
+
+                    <!-- Memory Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Memory (3-20)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderMaxHistory" pos="180,0" width="450" height="31" depth="3"
+                                min_value="3" max_value="20"/>
+                    </panel>
+
+                    <!-- Chat Distance Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Chat Distance (3-15m)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderChatDistance" pos="180,0" width="450" height="31" depth="3"
+                                min_value="3" max_value="15"/>
+                    </panel>
+
+                    <!-- Voice Range Row -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Voice Range (5-20m)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderVoiceDistance" pos="180,0" width="450" height="31" depth="3"
+                                min_value="5" max_value="20"/>
+                    </panel>
+
+                    <!-- Spacer -->
+                    <rect/>
+
+                    <!-- Test Voice Button -->
+                    <simplebutton enabled="true" name="btnTestTTS" width="620" height="36" depth="3"
+                                  font_size="16" caption="Test Voice"/>
+
+                    <!-- Test Microphone Button -->
+                    <simplebutton enabled="true" name="btnTestSTT" width="620" height="36" depth="3"
+                                  font_size="16" caption="Test Microphone"/>
+
+                    <!-- Test AI Button -->
+                    <simplebutton enabled="true" name="btnTestLLM" width="620" height="36" depth="3"
+                                  font_size="16" caption="Test AI Connection"/>
+
+                    <!-- Clear Conversations Button -->
+                    <simplebutton enabled="true" name="btnClearConversations" width="620" height="36"
+                                  depth="3" font_size="16" caption="Clear All Conversations"/>
+
+                    <!-- Spacer -->
+                    <rect/>
+
+                    <!-- Save Button -->
+                    <simplebutton enabled="true" name="btnSave" width="620" height="40" depth="3"
+                                  font_size="18" caption="Save Settings"/>
+
+                    <!-- Cancel Button -->
+                    <simplebutton enabled="true" name="btnCancel" width="620" height="40" depth="3"
+                                  font_size="18" caption="Cancel"/>
+
+                </grid>
+            </panel>
+        </window>
+    </append>
+</configs>

@@ -99,11 +99,14 @@
     </PropertyGroup>
     <MakeDir Directories="$(ModsFolder)" />
     <MakeDir Directories="$(ModsFolder)/Config" />
+    <MakeDir Directories="$(ModsFolder)/Config/XUi" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ModsFolder)" />
     <Copy SourceFiles="ModInfo.xml" DestinationFolder="$(ModsFolder)" />
     <Copy SourceFiles="Config\llmconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
     <Copy SourceFiles="Config\ttsconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
     <Copy SourceFiles="Config\sttconfig.xml" DestinationFolder="$(ModsFolder)\Config" />
+    <Copy SourceFiles="Config\XUi\windows.xml" DestinationFolder="$(ModsFolder)\Config\XUi" />
+    <Copy SourceFiles="Config\XUi\xui.xml" DestinationFolder="$(ModsFolder)\Config\XUi" />
     <Message Text="Deployed to: $(ModsFolder)" Importance="high" />
   </Target>
 
