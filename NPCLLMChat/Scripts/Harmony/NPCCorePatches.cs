@@ -189,25 +189,13 @@ namespace NPCLLMChat.Harmony
                 return;
             }
 
-            // Show thinking indicator
-            DisplayNPCResponse(player, chatComponent.NPCName, "*thinking...*");
-
             // Process the message with player reference for actions
+            // NPC response will be spoken via TTS, no visual feedback needed to avoid hiding NPC
             chatComponent.ProcessPlayerMessage(message, player, response =>
             {
-                DisplayNPCResponse(player, chatComponent.NPCName, response);
+                // Response is logged and spoken via TTS in NPCChatComponent
+                Log.Out($"[NPCLLMChat] {chatComponent.NPCName}: {response}");
             });
-        }
-
-        static void DisplayNPCResponse(EntityPlayer player, string npcName, string message)
-        {
-            string formattedMessage = $"[{npcName}]: {message}";
-
-            if (player is EntityPlayerLocal localPlayer)
-            {
-                // Show as tooltip
-                GameManager.ShowTooltip(localPlayer, formattedMessage, false);
-            }
         }
     }
 

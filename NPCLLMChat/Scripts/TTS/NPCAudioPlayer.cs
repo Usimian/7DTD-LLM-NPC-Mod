@@ -162,9 +162,6 @@ namespace NPCLLMChat.TTS
                 return;
             }
 
-            // Update position to match NPC
-            UpdatePosition();
-
             // Play the audio
             _audioSource.clip = clip;
             _audioSource.Play();
@@ -206,28 +203,8 @@ namespace NPCLLMChat.TTS
             _onSpeechComplete = null;
         }
 
-        /// <summary>
-        /// Update audio source position to match NPC
-        /// </summary>
-        private void UpdatePosition()
-        {
-            if (_npcEntity != null && _audioSource != null)
-            {
-                // Position audio at NPC's head (approximate)
-                Vector3 headPos = _npcEntity.position;
-                headPos.y += 1.6f; // Rough head height
-                transform.position = headPos;
-            }
-        }
-
         private void Update()
         {
-            // Keep position synced with NPC
-            if (_isSpeaking)
-            {
-                UpdatePosition();
-            }
-
             // Check if speech finished
             if (_isSpeaking && _audioSource != null && !_audioSource.isPlaying)
             {
