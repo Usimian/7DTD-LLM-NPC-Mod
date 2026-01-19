@@ -38,6 +38,14 @@ namespace NPCLLMChat
             // Initialize LLM Service
             LLMService.Instance.Initialize(_config);
 
+            // Check if player has overridden the model in PlayerPrefs
+            string savedModel = PlayerPrefs.GetString("NPCLLMChat_Model", "");
+            if (!string.IsNullOrEmpty(savedModel))
+            {
+                LLMService.Instance.SetModel(savedModel);
+                Log.Out($"[NPCLLMChat] Using player-configured model: {savedModel}");
+            }
+
             // Load TTS configuration and initialize TTS service
             _ttsConfig = LoadTTSConfig();
             if (_ttsConfig != null && _ttsConfig.Enabled)

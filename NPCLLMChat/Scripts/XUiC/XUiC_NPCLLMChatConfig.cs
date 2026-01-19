@@ -352,8 +352,15 @@ public class XUiC_NPCLLMChatConfig : XUiController
             // Save model setting
             if (txtModel != null)
             {
-                SetStringCVar(CVAR_MODEL, txtModel.Text);
-                // Note: Model change requires restart or manual update in config
+                string newModel = txtModel.Text.Trim();
+                SetStringCVar(CVAR_MODEL, newModel);
+
+                // Update LLMService model immediately
+                if (LLMService.Instance != null)
+                {
+                    LLMService.Instance.SetModel(newModel);
+                    UnityEngine.Debug.Log($"[NPCLLMChat] Updated LLMService model to: {newModel}");
+                }
             }
 
             GameManager.ShowTooltip(_entityPlayerLocal, "Settings saved successfully", false);

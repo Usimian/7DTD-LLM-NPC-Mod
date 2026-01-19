@@ -64,6 +64,18 @@ namespace NPCLLMChat
         public int RequestCount => _requestCount;
 
         /// <summary>
+        /// Update the model name at runtime (e.g., from in-game settings UI)
+        /// </summary>
+        public void SetModel(string modelName)
+        {
+            if (!string.IsNullOrEmpty(modelName))
+            {
+                _model = modelName;
+                Log.Out($"[NPCLLMChat] LLM model changed to: {_model}");
+            }
+        }
+
+        /// <summary>
         /// Send a chat message to the LLM and get a response asynchronously.
         /// </summary>
         /// <param name="npcId">Unique NPC entity ID for tracking</param>
