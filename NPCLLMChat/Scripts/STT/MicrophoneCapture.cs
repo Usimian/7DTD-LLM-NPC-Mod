@@ -37,7 +37,6 @@ namespace NPCLLMChat.STT
         private AudioClip _recordingClip;
         private string _selectedDevice;
         private float _recordingStartTime;
-        private bool _keyReleased = false;
 
         // Push-to-talk key
         private KeyCode _pushToTalkKeyCode = KeyCode.V;
@@ -47,13 +46,6 @@ namespace NPCLLMChat.STT
         public event Action OnRecordingStopped;
         public event Action<string> OnTranscriptionComplete;
         public event Action<string> OnTranscriptionError;
-
-        // Visual feedback
-        private float _lastTooltipTime = 0f;
-        private const float TooltipInterval = 0.5f;
-
-        // Minimum recording duration to allow audio capture
-        private const float MinRecordingDuration = 0.3f;
 
         // State properties
         public bool IsInitialized => _isInitialized;
@@ -137,16 +129,10 @@ namespace NPCLLMChat.STT
             // This ensures we can stop recording even if UI state changes
             if (_isRecording)
             {
-                // Check if user released the key
-                if (UnityEngine.Input.GetKeyUp(_pushToTalkKeyCode) && !_keyReleased)
+                // Check if user released the key - stop immediately
+                if (UnityEngine.Input.GetKeyUp(_pushToTalkKeyCode))
                 {
-                    _keyReleased = true;
-                    Log.Out($"[NPCLLMChat] Key released at {RecordingDuration:F2}s");
-                }
-
-                // Stop recording if key was released and minimum duration met
-                if (_keyReleased && RecordingDuration >= MinRecordingDuration)
-                {
+                    Log.Out($"[NPCLLMChat] V key released detected at {RecordingDuration:F2}s");
                     StopRecordingAndTranscribe();
                     return;
                 }
@@ -160,6 +146,7 @@ namespace NPCLLMChat.STT
                 // Push-to-talk start
                 if (UnityEngine.Input.GetKeyDown(_pushToTalkKeyCode))
                 {
+                    Log.Out("[NPCLLMChat] V key pressed detected");
                     StartRecording();
                 }
             }
@@ -171,35 +158,7 @@ namespace NPCLLMChat.STT
                 StopRecordingAndTranscribe();
             }
 
-            // Show recording feedback periodically
-            if (_isRecording && Time.time - _lastTooltipTime >= TooltipInterval)
-            {
-                ShowRecordingFeedback();
-                _lastTooltipTime = Time.time;
-            }
-        }
-
-        /// <summary>
-        /// Show visual feedback while recording
-        /// </summary>
-        private void ShowRecordingFeedback()
-        {
-            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
-            if (player != null)
-            {
-                int dots = ((int)(RecordingDuration * 2)) % 4;
-                string dotsStr = new string('.', dots + 1);
-
-                // Show different message if waiting for minimum duration
-                if (_keyReleased && RecordingDuration < MinRecordingDuration)
-                {
-                    GameManager.ShowTooltip(player, $"[Capturing audio{dotsStr}]", false);
-                }
-                else
-                {
-                    GameManager.ShowTooltip(player, $"[Recording{dotsStr}]", false);
-                }
-            }
+            // Recording tooltip removed per user request
         }
 
         /// <summary>
@@ -262,7 +221,6 @@ namespace NPCLLMChat.STT
 
             _isRecording = true;
             _recordingStartTime = Time.time;
-            _keyReleased = false;
 
             Log.Out("[NPCLLMChat] Recording started...");
             OnRecordingStarted?.Invoke();
@@ -278,22 +236,16 @@ namespace NPCLLMChat.STT
                 return;
             }
 
-            // Get the final sample position before stopping
+            _isRecording = false;
+
+            // Get the final sample position before stopping microphone
             int samplePosition = Microphone.GetPosition(_selectedDevice);
 
-            // Stop recording
+            // Stop the microphone
             Microphone.End(_selectedDevice);
-            _isRecording = false;
 
             float recordingDuration = Time.time - _recordingStartTime;
             Log.Out($"[NPCLLMChat] Recording stopped ({recordingDuration:F1}s)");
-
-            // Clear the recording tooltip
-            var localPlayer = GameManager.Instance?.World?.GetPrimaryPlayer();
-            if (localPlayer != null)
-            {
-                GameManager.ShowTooltip(localPlayer, "", false);
-            }
 
             OnRecordingStopped?.Invoke();
 
@@ -320,13 +272,6 @@ namespace NPCLLMChat.STT
                 }
 
                 Log.Out($"[NPCLLMChat] Sending {wavData.Length} bytes to STT server...");
-
-                // Show processing feedback
-                var player = GameManager.Instance?.World?.GetPrimaryPlayer();
-                if (player != null)
-                {
-                    GameManager.ShowTooltip(player, "[Processing speech...]", false);
-                }
 
                 // Send to STT service
                 STTService.Instance.Transcribe(

@@ -61,22 +61,34 @@
                     <!-- Default Voice Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Default Voice" font_size="16" style="label_outline"/>
-                        <textfield enabled="true" name="txtDefaultVoice" pos="180,0" width="450" height="31" depth="3"
-                                   font_size="14" text="en_US-lessac-medium"/>
+                        <togglebutton enabled="true" name="radioDefaultLessac" pos="180,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Lessac" value="true" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioDefaultAmy" pos="310,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Amy" value="false" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioDefaultRyan" pos="440,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Ryan" value="false" toggle_type="radio"/>
                     </panel>
 
                     <!-- Companion Voice Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Companion Voice" font_size="16" style="label_outline"/>
-                        <textfield enabled="true" name="txtCompanionVoice" pos="180,0" width="450" height="31" depth="3"
-                                   font_size="14" text="en_US-amy-medium"/>
+                        <togglebutton enabled="true" name="radioCompanionLessac" pos="180,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Lessac" value="false" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioCompanionAmy" pos="310,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Amy" value="true" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioCompanionRyan" pos="440,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Ryan" value="false" toggle_type="radio"/>
                     </panel>
 
                     <!-- Trader Voice Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Trader Voice" font_size="16" style="label_outline"/>
-                        <textfield enabled="true" name="txtTraderVoice" pos="180,0" width="450" height="31" depth="3"
-                                   font_size="14" text="en_US-ryan-medium"/>
+                        <togglebutton enabled="true" name="radioTraderLessac" pos="180,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Lessac" value="false" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioTraderAmy" pos="310,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Amy" value="false" toggle_type="radio"/>
+                        <togglebutton enabled="true" name="radioTraderRyan" pos="440,0" width="120" height="31" depth="3"
+                                      font_size="14" caption="Ryan" value="true" toggle_type="radio"/>
                     </panel>
 
                     <!-- STT Enable Row -->

@@ -99,8 +99,8 @@ def synthesize():
         # Get voice model
         voice = data.get("voice", DEFAULT_VOICE)
 
-        # Print the text being synthesized
-        print(f"Synthesizing ({voice}): \"{text[:100]}{'...' if len(text) > 100 else ''}\"", flush=True)
+        # Print the full text being synthesized
+        print(f"Synthesizing ({voice}): \"{text}\"", flush=True)
         model_path = VOICES_DIR / f"{voice}.onnx"
 
         if not model_path.exists():
