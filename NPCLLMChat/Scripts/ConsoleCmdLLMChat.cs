@@ -533,9 +533,12 @@ Examples:
                 case "status":
                     ShowSTTStatus();
                     break;
+                case "refresh":
+                    RefreshSTT();
+                    break;
                 default:
                     output.Output($"Unknown STT command: {subCommand}");
-                    output.Output("Use: stt, stt test, stt on, stt off, stt devices");
+                    output.Output("Use: stt, stt test, stt on, stt off, stt devices, stt refresh");
                     break;
             }
         }
@@ -693,6 +696,22 @@ Examples:
 
             output.Output("");
             output.Output($"Total: {devices.Length} device(s)");
+        }
+
+        private void RefreshSTT()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var stt = STTService.Instance;
+
+            if (stt == null || !stt.IsInitialized)
+            {
+                output.Output("STT not initialized");
+                return;
+            }
+
+            output.Output("Refreshing STT server connection...");
+            stt.RefreshServerStatus();
+            output.Output($"Server available: {stt.ServerAvailable}");
         }
     }
 }

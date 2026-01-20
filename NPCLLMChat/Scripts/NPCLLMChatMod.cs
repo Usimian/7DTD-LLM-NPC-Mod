@@ -27,6 +27,9 @@ namespace NPCLLMChat
             _modPath = _modInstance.Path;
             Log.Out("Initializing NPC LLM Chat mod...");
 
+            // Auto-start TTS/STT servers on Windows
+            ServerManager.StartServers();
+
             // Load configurations
             _config = LoadConfig();
             if (_config == null)
@@ -93,6 +96,7 @@ namespace NPCLLMChat
         {
             Log.Out("Shutting down...");
             Harmony.NPCCorePatches.Shutdown();
+            ServerManager.StopServers();
             _initialized = false;
         }
 

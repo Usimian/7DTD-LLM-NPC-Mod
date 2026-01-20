@@ -119,11 +119,39 @@ namespace NPCLLMChat.Actions
                 string actionStr = jsonMatch.Groups[1].Value.ToLower();
                 action.Type = ParseActionType(actionStr);
 
-                // Extract dialogue
-                var dialogueMatch = JsonDialoguePattern.Match(jsonBlock);
+                // Extract dialogue - handle escaped quotes
+                var dialogueMatch = JsonDialoguePattern.Match(response);
                 if (dialogueMatch.Success)
                 {
                     action.DialogueBefore = UnescapeJson(dialogueMatch.Groups[1].Value);
+                }
+                else
+                {
+                    // Try alternative extraction for escaped strings
+                    int dialogueStart = response.IndexOf("\"dialogue\"");
+                    if (dialogueStart >= 0)
+                    {
+                        int colonPos = response.IndexOf(':', dialogueStart);
+                        if (colonPos >= 0)
+                        {
+                            int quoteStart = response.IndexOf('"', colonPos);
+                            if (quoteStart >= 0)
+                            {
+                                // Find matching end quote (accounting for escaped quotes)
+                                int quoteEnd = quoteStart + 1;
+                                while (quoteEnd < response.Length)
+                                {
+                                    if (response[quoteEnd] == '"' && response[quoteEnd - 1] != '\\')
+                                        break;
+                                    quoteEnd++;
+                                }
+                                if (quoteEnd < response.Length)
+                                {
+                                    action.DialogueBefore = UnescapeJson(response.Substring(quoteStart + 1, quoteEnd - quoteStart - 1));
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Extract parameters
