@@ -38,15 +38,21 @@ Transform your 7 Days to Die NPCs into intelligent, voice-enabled companions pow
 ## 📋 Requirements
 
 ### All Platforms
+
+#### Required Mods
 - **7 Days to Die** (Alpha 21+)
+- **[0-SCore](https://gitlab.com/sphereii/SCore)** - Core mod framework (v21.0+)
+- **[0-NPCCore](https://gitlab.com/sphereii/NPCCore)** - NPC functionality framework (v21.0+)
+
+#### Required Software
 - **[Ollama](https://ollama.ai)** - Local LLM server (runs the AI brain)
 - **Python 3.10+** - For TTS/STT servers
 
 ### Windows Additional Requirements
-- **.NET SDK 6.0+** (for building from source)
+- **.NET SDK 6.0+** (for building from source only)
 
 ### Ubuntu Additional Requirements
-- **Build tools**: `sudo apt install build-essential`
+- **Build tools**: `sudo apt install build-essential` (for building from source only)
 
 ## 🎯 Quick Start
 
@@ -70,7 +76,16 @@ pip install piper-tts flask numpy
 # Install whisper in the mod's venv (done automatically by install script)
 ```
 
-#### 3. Install the Mod
+#### 3. Install Required Mods
+```batch
+# Download and install these mods to your 7DTD\Mods folder:
+# 1. 0-SCore: https://gitlab.com/sphereii/SCore/-/releases
+# 2. 0-NPCCore: https://gitlab.com/sphereii/NPCCore/-/releases
+
+# Extract both to: C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\
+```
+
+#### 4. Install NPCLLMChat Mod
 ```batch
 # Clone this repository
 git clone https://github.com/Usimian/7DTD-LLM-NPC-Mod.git
@@ -80,13 +95,13 @@ cd 7DTD-LLM-NPC-Mod
 install_mod_windows.bat
 ```
 
-#### 4. Download a Voice (First Time Only)
+#### 5. Download a Voice (First Time Only)
 ```batch
 # Run this once to download a TTS voice model (~60MB)
 setup_piper_voice.bat
 ```
 
-#### 5. Play!
+#### 6. Play!
 Just launch 7 Days to Die normally. The mod will:
 - ✅ Auto-start Piper TTS server
 - ✅ Auto-start Whisper STT server  
@@ -125,7 +140,17 @@ deactivate
 cd ..
 ```
 
-#### 3. Install the Mod
+#### 3. Install Required Mods
+```bash
+# Download and install these mods to your 7DTD Mods folder:
+# 1. 0-SCore: https://gitlab.com/sphereii/SCore/-/releases
+# 2. 0-NPCCore: https://gitlab.com/sphereii/NPCCore/-/releases
+
+# Extract both to: ~/.local/share/7DaysToDie/Mods/
+# Or your custom Mods folder location
+```
+
+#### 4. Install NPCLLMChat Mod
 ```bash
 # Clone the repo
 git clone https://github.com/Usimian/7DTD-LLM-NPC-Mod.git
@@ -141,7 +166,7 @@ cp -r Config ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
 cp ModInfo.xml ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
 ```
 
-#### 4. Start Servers (Each Game Session)
+#### 5. Start Servers (Each Game Session)
 ```bash
 # Terminal 1 - Piper TTS
 ./start_tts_server.sh
@@ -150,7 +175,7 @@ cp ModInfo.xml ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
 ./start_stt_server.sh
 ```
 
-#### 5. Play!
+#### 6. Play!
 Launch 7 Days to Die and enjoy AI-powered NPCs!
 
 ---
@@ -229,6 +254,18 @@ Located in `Mods/NPCLLMChat/Config/`:
 
 ## 🔧 Troubleshooting
 
+### Missing Dependencies Error
+```
+Error: Could not find 0-SCore or 0-NPCCore
+```
+
+**Solution:**
+1. Download [0-SCore](https://gitlab.com/sphereii/SCore/-/releases) (v21.0+)
+2. Download [0-NPCCore](https://gitlab.com/sphereii/NPCCore/-/releases) (v21.0+)
+3. Extract both to your `7 Days To Die\Mods\` folder
+4. Ensure folder names start with `0-` (e.g., `0-SCore`, `0-NPCCore`)
+5. Restart the game
+
 ### "LLM not available"
 ```bash
 # Check Ollama is running
@@ -302,6 +339,8 @@ MIT License - see LICENSE file for details
 
 ## 🙏 Credits
 
+- **Mod Framework**: [0-SCore](https://gitlab.com/sphereii/SCore) by sphereii
+- **NPC System**: [0-NPCCore](https://gitlab.com/sphereii/NPCCore) by sphereii
 - **AI Models**: [Ollama](https://ollama.ai)
 - **TTS**: [Piper](https://github.com/rhasspy/piper)
 - **STT**: [Faster Whisper](https://github.com/guillaumekln/faster-whisper)
@@ -311,7 +350,7 @@ MIT License - see LICENSE file for details
 
 - First voice response after game start may have 5-10 second delay (servers warming up)
 - Some special characters in NPC dialogue may display incorrectly
-- Action system requires SCore mod for some NPCs
+- Requires 0-SCore and 0-NPCCore mods to function properly
 
 ## 🗺️ Roadmap
 
