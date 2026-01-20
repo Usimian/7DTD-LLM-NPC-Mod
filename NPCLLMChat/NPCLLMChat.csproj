@@ -20,10 +20,15 @@
   </PropertyGroup>
 
   <!--
-    Platform-specific paths - uncomment the appropriate section for your system
+    Platform-specific paths - CUSTOMIZE THESE FOR YOUR SYSTEM!
+    
+    Common Windows Steam locations:
+      - C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die
+      - C:\Program Files\Steam\steamapps\common\7 Days To Die
+      - D:\SteamLibrary\steamapps\common\7 Days To Die
   -->
   
-  <!-- Windows paths -->
+  <!-- Windows paths (edit GamePath to match your installation) -->
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <GamePath>C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die</GamePath>
     <ManagedPath>$(GamePath)\7DaysToDie_Data\Managed</ManagedPath>
@@ -31,11 +36,11 @@
     <HarmonyPath>$(GamePath)\Mods\0_TFP_Harmony</HarmonyPath>
   </PropertyGroup>
 
-  <!-- Linux paths -->
+  <!-- Linux paths (customize for your system) -->
   <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
-    <GamePath>/home/marc/.steam/steam/steamapps/common/7 Days To Die</GamePath>
+    <GamePath>$(HOME)/.steam/steam/steamapps/common/7 Days To Die</GamePath>
     <ManagedPath>$(GamePath)/7DaysToDie_Data/Managed</ManagedPath>
-    <SCorePath>$(GamePath)/Mods/0-SCore-2.5.35.841</SCorePath>
+    <SCorePath>$(GamePath)/Mods/0-SCore</SCorePath>
     <HarmonyPath>$(GamePath)/Mods/0_TFP_Harmony</HarmonyPath>
   </PropertyGroup>
 

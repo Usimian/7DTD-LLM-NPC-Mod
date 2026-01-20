@@ -82,7 +82,11 @@ pip install piper-tts flask numpy
 # 1. 0-SCore: https://gitlab.com/sphereii/SCore/-/releases
 # 2. 0-NPCCore: https://gitlab.com/sphereii/NPCCore/-/releases
 
-# Extract both to: C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\
+# Extract both to: <Your Steam Installation>\steamapps\common\7 Days To Die\Mods\
+# Common locations:
+#   C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\
+#   C:\Program Files\Steam\steamapps\common\7 Days To Die\Mods\
+#   D:\SteamLibrary\steamapps\common\7 Days To Die\Mods\
 ```
 
 #### 4. Install NPCLLMChat Mod

@@ -19,10 +19,13 @@ Ollama auto-starts with Windows - that's all you need!
 ### Step 2: Install the Mod
 
 1. Download `NPCLLMChat.zip` from [Releases](https://github.com/Usimian/7DTD-LLM-NPC-Mod/releases)
-2. Extract to your 7DTD Mods folder:
+2. Extract to your 7DTD Mods folder (common locations):
    ```
    C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat\
+   C:\Program Files\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat\
+   D:\SteamLibrary\steamapps\common\7 Days To Die\Mods\NPCLLMChat\
    ```
+   (Use your actual Steam library location)
 
 ### Step 3: Play!
 
