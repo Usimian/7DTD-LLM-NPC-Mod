@@ -45,8 +45,7 @@ namespace NPCLLMChat.TTS
         private int _requestCount = 0;
 
         public bool IsInitialized => _isInitialized;
-        public bool ServerAvailable => _activeProvider == TTSProvider.Windows ? 
-            WindowsTTSProvider.Instance.IsAvailable : _piperServerAvailable;
+        public bool ServerAvailable => _piperServerAvailable;
         public TTSProvider ActiveProvider => _activeProvider;
         public float LastSynthesisTimeMs => _lastSynthesisTimeMs;
         public float AvgSynthesisTimeMs => _avgSynthesisTimeMs;
@@ -75,45 +74,10 @@ namespace NPCLLMChat.TTS
 
         private void DetermineProvider()
         {
-            switch (_config.Provider)
-            {
-                case TTSProvider.Windows:
-                    _activeProvider = TTSProvider.Windows;
-                    InitializeWindows();
-                    break;
-
-                case TTSProvider.Piper:
-                    _activeProvider = TTSProvider.Piper;
-                    StartCoroutine(InitializePiper());
-                    break;
-
-                case TTSProvider.Auto:
-                default:
-                    if (PlatformHelper.IsWindows)
-                    {
-                        _activeProvider = TTSProvider.Windows;
-                        InitializeWindows();
-                    }
-                    else
-                    {
-                        _activeProvider = TTSProvider.Piper;
-                        StartCoroutine(InitializePiper());
-                    }
-                    break;
-            }
-        }
-
-        private void InitializeWindows()
-        {
-            if (WindowsTTSProvider.Instance.IsAvailable)
-            {
-                Log.Out($"[NPCLLMChat] TTS using Windows SAPI");
-                Log.Out($"[NPCLLMChat] {WindowsTTSProvider.Instance.GetVoiceInfo()}");
-            }
-            else
-            {
-                Log.Warning("[NPCLLMChat] Windows SAPI not available!");
-            }
+            // Note: Windows SAPI (System.Speech) is not available in Unity's Mono runtime
+            // All platforms use Piper TTS server
+            _activeProvider = TTSProvider.Piper;
+            StartCoroutine(InitializePiper());
         }
 
         private IEnumerator InitializePiper()
@@ -160,14 +124,8 @@ namespace NPCLLMChat.TTS
 
             string selectedVoice = string.IsNullOrEmpty(voice) ? _config.DefaultVoice : voice;
 
-            if (_activeProvider == TTSProvider.Windows)
-            {
-                SynthesizeWithWindows(text, selectedVoice, onSuccess, onError);
-            }
-            else
-            {
-                SynthesizeWithPiper(text, selectedVoice, onSuccess, onError);
-            }
+            // All platforms use Piper TTS server
+            SynthesizeWithPiper(text, selectedVoice, onSuccess, onError);
         }
 
         /// <summary>
@@ -197,32 +155,6 @@ namespace NPCLLMChat.TTS
                     return _config.DefaultVoice;
             }
         }
-
-        #region Windows SAPI
-
-        private void SynthesizeWithWindows(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
-        {
-            if (!WindowsTTSProvider.Instance.IsAvailable)
-            {
-                onError?.Invoke("Windows TTS not available");
-                return;
-            }
-
-            float startTime = Time.realtimeSinceStartup;
-
-            WindowsTTSProvider.Instance.Synthesize(
-                text,
-                voice,
-                _config.SpeechRate,
-                wavData =>
-                {
-                    StartCoroutine(ProcessWavResult(wavData, text, startTime, onSuccess, onError));
-                },
-                error => onError?.Invoke(error)
-            );
-        }
-
-        #endregion
 
         #region Piper Server
 
@@ -448,16 +380,7 @@ namespace NPCLLMChat.TTS
         public string GetStatusString()
         {
             if (!_isInitialized || !_config.Enabled) return "Disabled";
-
-            switch (_activeProvider)
-            {
-                case TTSProvider.Windows:
-                    return $"Windows SAPI ({WindowsTTSProvider.Instance.AvailableVoices?.Length ?? 0} voices)";
-                case TTSProvider.Piper:
-                    return _piperServerAvailable ? $"Piper Server ({_config.Endpoint})" : "Piper (not connected)";
-                default:
-                    return "Unknown";
-            }
+            return _piperServerAvailable ? $"Piper Server ({_config.Endpoint})" : "Piper (not connected)";
         }
     }
 

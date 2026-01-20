@@ -45,8 +45,7 @@ namespace NPCLLMChat.STT
         private int _requestCount = 0;
 
         public bool IsInitialized => _isInitialized;
-        public bool ServerAvailable => _activeProvider == STTProvider.Windows ?
-            WindowsSTTProvider.Instance.IsAvailable : _whisperServerAvailable;
+        public bool ServerAvailable => _whisperServerAvailable;
         public STTProvider ActiveProvider => _activeProvider;
         public float LastTranscriptionTimeMs => _lastTranscriptionTimeMs;
         public float AvgTranscriptionTimeMs => _avgTranscriptionTimeMs;
@@ -76,46 +75,10 @@ namespace NPCLLMChat.STT
 
         private void DetermineProvider()
         {
-            switch (_config.Provider)
-            {
-                case STTProvider.Windows:
-                    _activeProvider = STTProvider.Windows;
-                    InitializeWindows();
-                    break;
-
-                case STTProvider.Whisper:
-                    _activeProvider = STTProvider.Whisper;
-                    StartCoroutine(InitializeWhisper());
-                    break;
-
-                case STTProvider.Auto:
-                default:
-                    if (PlatformHelper.IsWindows)
-                    {
-                        _activeProvider = STTProvider.Windows;
-                        InitializeWindows();
-                    }
-                    else
-                    {
-                        _activeProvider = STTProvider.Whisper;
-                        StartCoroutine(InitializeWhisper());
-                    }
-                    break;
-            }
-        }
-
-        private void InitializeWindows()
-        {
-            if (WindowsSTTProvider.Instance.IsAvailable)
-            {
-                Log.Out("[NPCLLMChat] STT using Windows Speech Recognition");
-                Log.Out($"[NPCLLMChat] {WindowsSTTProvider.Instance.GetProviderInfo()}");
-            }
-            else
-            {
-                Log.Warning("[NPCLLMChat] Windows Speech Recognition not available!");
-                Log.Warning("[NPCLLMChat] Enable in Settings > Time & Language > Speech");
-            }
+            // Note: Windows Speech Recognition (System.Speech) is not available in Unity's Mono runtime
+            // All platforms use Whisper STT server
+            _activeProvider = STTProvider.Whisper;
+            StartCoroutine(InitializeWhisper());
         }
 
         private IEnumerator InitializeWhisper()
@@ -176,44 +139,9 @@ namespace NPCLLMChat.STT
                 return;
             }
 
-            if (_activeProvider == STTProvider.Windows)
-            {
-                TranscribeWithWindows(wavData, onSuccess, onError);
-            }
-            else
-            {
-                TranscribeWithWhisper(wavData, onSuccess, onError);
-            }
+            // All platforms use Whisper STT server
+            TranscribeWithWhisper(wavData, onSuccess, onError);
         }
-
-        #region Windows Speech Recognition
-
-        private void TranscribeWithWindows(byte[] wavData, Action<string> onSuccess, Action<string> onError)
-        {
-            if (!WindowsSTTProvider.Instance.IsAvailable)
-            {
-                onError?.Invoke("Windows Speech Recognition not available");
-                return;
-            }
-
-            float startTime = Time.realtimeSinceStartup;
-
-            WindowsSTTProvider.Instance.Transcribe(
-                wavData,
-                text =>
-                {
-                    _lastTranscriptionTimeMs = (Time.realtimeSinceStartup - startTime) * 1000f;
-                    _requestCount++;
-                    _avgTranscriptionTimeMs = ((_avgTranscriptionTimeMs * (_requestCount - 1)) + _lastTranscriptionTimeMs) / _requestCount;
-
-                    Log.Out($"[NPCLLMChat] Windows STT completed in {_lastTranscriptionTimeMs:F0}ms: \"{text}\"");
-                    onSuccess?.Invoke(text);
-                },
-                error => onError?.Invoke(error)
-            );
-        }
-
-        #endregion
 
         #region Whisper Server
 
@@ -343,18 +271,7 @@ namespace NPCLLMChat.STT
         public string GetStatusString()
         {
             if (!_isInitialized || !_config.Enabled) return "Disabled";
-
-            switch (_activeProvider)
-            {
-                case STTProvider.Windows:
-                    return WindowsSTTProvider.Instance.IsAvailable ?
-                        "Windows Speech Recognition" : "Windows (not available)";
-                case STTProvider.Whisper:
-                    return _whisperServerAvailable ?
-                        $"Whisper Server ({_config.Model})" : "Whisper (not connected)";
-                default:
-                    return "Unknown";
-            }
+            return _whisperServerAvailable ? $"Whisper Server ({_config.Model})" : "Whisper (not connected)";
         }
     }
 

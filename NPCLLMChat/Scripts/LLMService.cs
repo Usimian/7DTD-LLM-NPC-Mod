@@ -141,6 +141,9 @@ namespace NPCLLMChat
                 request.timeout = _timeoutSeconds;
 
                 Log.Out($"[NPCLLMChat] Sending request to LLM for NPC {npcId}");
+                Log.Out($"[NPCLLMChat] Endpoint: {_endpoint}");
+                Log.Out($"[NPCLLMChat] Model: {_model}");
+                Log.Out($"[NPCLLMChat] Request body (first 200 chars): {requestBody.Substring(0, Math.Min(200, requestBody.Length))}");
 
                 yield return request.SendWebRequest();
 
@@ -168,6 +171,8 @@ namespace NPCLLMChat
                 {
                     string error = $"LLM request failed: {request.error}";
                     Log.Warning($"[NPCLLMChat] {error}");
+                    Log.Warning($"[NPCLLMChat] Response code: {request.responseCode}");
+                    Log.Warning($"[NPCLLMChat] Response text: {request.downloadHandler?.text}");
                     onError?.Invoke(error);
                 }
             }
@@ -255,7 +260,12 @@ namespace NPCLLMChat
                         if (valueEnd > valueStart)
                         {
                             string response = jsonResponse.Substring(valueStart, valueEnd - valueStart);
-                            return UnescapeJson(response);
+                            response = UnescapeJson(response);
+                            
+                            // Clean up common LLM artifacts
+                            response = CleanResponse(response);
+                            
+                            return response;
                         }
                     }
                 }
@@ -319,6 +329,28 @@ namespace NPCLLMChat
                       .Replace("\\t", "\t")
                       .Replace("\\\"", "\"")
                       .Replace("\\\\", "\\");
+        }
+
+        private string CleanResponse(string response)
+        {
+            if (string.IsNullOrEmpty(response)) return response;
+
+            // Remove common LLM formatting artifacts
+            string cleaned = response.Trim();
+            
+            // Remove "Response:" prefix (case insensitive)
+            if (cleaned.StartsWith("Response:", System.StringComparison.OrdinalIgnoreCase))
+            {
+                cleaned = cleaned.Substring(9).TrimStart();
+            }
+            
+            // Remove "NPC:" prefix if present
+            if (cleaned.StartsWith("NPC:", System.StringComparison.OrdinalIgnoreCase))
+            {
+                cleaned = cleaned.Substring(4).TrimStart();
+            }
+            
+            return cleaned;
         }
 
         public bool IsRequestPending(int npcId)

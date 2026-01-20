@@ -397,22 +397,26 @@ Examples:
             }
 
             output.Output("Testing TTS synthesis...");
+            Log.Out("[NPCLLMChat] TestTTS() called");
 
             // Create a test audio source at player position
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             if (player == null)
             {
                 output.Output("No player found for audio test");
+                Log.Warning("[NPCLLMChat] TestTTS: No player found");
                 return;
             }
 
             string testText = "Hey survivor, the wasteland is rough but we will make it through together.";
+            Log.Out($"[NPCLLMChat] TestTTS: Calling Synthesize with text: {testText}");
 
             tts.Synthesize(
                 testText,
                 null,
                 clip =>
                 {
+                    Log.Out($"[NPCLLMChat] TestTTS: SUCCESS! Generated clip: {clip?.length ?? 0}s");
                     output.Output($"[SUCCESS] Generated {clip.length:F1}s audio clip");
 
                     // Play at player position with 2D audio for guaranteed audibility
@@ -435,6 +439,7 @@ Examples:
                 },
                 error =>
                 {
+                    Log.Warning($"[NPCLLMChat] TestTTS: ERROR - {error}");
                     output.Output($"[ERROR] TTS failed: {error}");
                     output.Output("Make sure piper_server.py is running on port 5050");
                 }

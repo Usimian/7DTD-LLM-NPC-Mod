@@ -34,8 +34,8 @@ app = Flask(__name__)
 
 # Configuration
 MODEL_NAME = "base.en"
-DEVICE = "auto"  # "auto", "cuda", or "cpu"
-COMPUTE_TYPE = "auto"  # "auto", "float16", "int8", etc.
+DEVICE = "cpu"  # Force CPU to avoid CUDA library issues on Windows
+COMPUTE_TYPE = "int8"  # int8 for CPU efficiency
 
 # Whisper model instance (loaded on first request or startup)
 whisper_model = None

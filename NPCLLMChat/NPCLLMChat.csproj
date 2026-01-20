@@ -95,9 +95,6 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
-    
-    <!-- Windows Speech API (for built-in TTS/STT on Windows) -->
-    <Reference Include="System.Speech" Condition="'$(OS)' == 'Windows_NT'" />
   </ItemGroup>
 
   <!-- Source files are auto-included by SDK -->
