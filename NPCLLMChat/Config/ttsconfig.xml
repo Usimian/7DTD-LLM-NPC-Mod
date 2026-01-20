@@ -1,77 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     NPC LLM Chat - Text-to-Speech Configuration
-
-    Requires Piper TTS server running on the specified endpoint.
-    Start server with: python piper_server.py --port 5050
+    
+    Cross-platform support:
+    - Windows 11: Uses Windows SAPI (built-in, no server needed)
+    - Ubuntu 24:  Uses Piper TTS server (requires server running)
+    
+    Provider "Auto" automatically selects based on your platform.
 -->
 <TTSConfig>
     <!-- TTS Server Configuration -->
     <Server>
         <!--
-            Enable or disable TTS entirely.
-            Set to false for text-only responses.
+            TTS Provider:
+            - Auto    : Windows SAPI on Windows, Piper on Linux (recommended)
+            - Windows : Force Windows SAPI (Windows only)
+            - Piper   : Force Piper server (requires server running)
         -->
+        <Provider>Auto</Provider>
+
+        <!-- Enable or disable TTS entirely -->
         <Enabled>true</Enabled>
 
         <!--
-            Piper TTS server endpoint.
-            Default port is 5050 for our custom server.
+            Piper TTS server endpoint (used on Linux or when Provider=Piper)
+            Start server: python piper_server.py --port 5050
         -->
         <Endpoint>http://localhost:5050/synthesize</Endpoint>
 
-        <!--
-            Request timeout in seconds.
-            TTS usually completes in under 500ms.
-        -->
+        <!-- Request timeout in seconds -->
         <TimeoutSeconds>10</TimeoutSeconds>
     </Server>
 
     <!-- Audio Playback Settings -->
     <Audio>
-        <!--
-            Master volume for NPC speech (0.0 to 1.0)
-        -->
+        <!-- Master volume (0.0 to 1.0) -->
         <Volume>0.8</Volume>
 
-        <!--
-            3D spatial audio settings.
-            MaxDistance: How far away you can hear NPCs (in meters)
-            MinDistance: Distance at which audio is at full volume
-        -->
+        <!-- 3D spatial audio: distance in meters -->
         <MaxDistance>20</MaxDistance>
         <MinDistance>2</MinDistance>
 
-        <!--
-            Speech rate multiplier.
-            1.0 = normal speed
-            1.2 = 20% faster
-            0.8 = 20% slower
-        -->
+        <!-- Speech rate (1.0 = normal, 1.2 = faster, 0.8 = slower) -->
         <SpeechRate>1.0</SpeechRate>
     </Audio>
 
     <!--
         Voice Configuration
-
-        Available voices (download more from huggingface.co/rhasspy/piper-voices):
-        - en_US-lessac-medium  (neutral, clear)
-        - en_US-ryan-medium    (male, deeper)
-        - en_US-amy-medium     (female, warm)
-
-        Voice files go in: ~/.local/share/piper/voices/
+        
+        On Windows: These map to voice gender (names containing "amy"/"lessac" = female, "ryan" = male)
+        On Linux: Use Piper voice IDs (download from huggingface.co/rhasspy/piper-voices)
     -->
     <Voices>
-        <!-- Default voice for generic NPCs -->
         <DefaultVoice>en_US-lessac-medium</DefaultVoice>
-
-        <!-- Voice for trader NPCs -->
         <TraderVoice>en_US-ryan-medium</TraderVoice>
-
-        <!-- Voice for companion/hireling NPCs -->
         <CompanionVoice>en_US-amy-medium</CompanionVoice>
-
-        <!-- Voice for hostile/bandit NPCs -->
         <BanditVoice>en_US-ryan-medium</BanditVoice>
     </Voices>
 </TTSConfig>

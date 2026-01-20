@@ -8,8 +8,9 @@ using UnityEngine.Networking;
 namespace NPCLLMChat.TTS
 {
     /// <summary>
-    /// Handles communication with the Piper TTS HTTP server.
-    /// Converts text to speech and returns AudioClips for playback.
+    /// Text-to-speech service with cross-platform support.
+    /// - Windows: Uses Windows SAPI (System.Speech.Synthesis) - no server needed
+    /// - Linux: Uses Piper HTTP server
     /// </summary>
     public class TTSService : MonoBehaviour
     {
@@ -31,9 +32,10 @@ namespace NPCLLMChat.TTS
         // Configuration
         private TTSConfig _config;
         private bool _isInitialized = false;
-        private bool _serverAvailable = false;
+        private TTSProvider _activeProvider = TTSProvider.Auto;
+        private bool _piperServerAvailable = false;
 
-        // Request tracking
+        // Request tracking (for Piper)
         private Queue<TTSRequest> _requestQueue = new Queue<TTSRequest>();
         private bool _isProcessing = false;
 
@@ -43,7 +45,9 @@ namespace NPCLLMChat.TTS
         private int _requestCount = 0;
 
         public bool IsInitialized => _isInitialized;
-        public bool ServerAvailable => _serverAvailable;
+        public bool ServerAvailable => _activeProvider == TTSProvider.Windows ? 
+            WindowsTTSProvider.Instance.IsAvailable : _piperServerAvailable;
+        public TTSProvider ActiveProvider => _activeProvider;
         public float LastSynthesisTimeMs => _lastSynthesisTimeMs;
         public float AvgSynthesisTimeMs => _avgSynthesisTimeMs;
         public int RequestCount => _requestCount;
@@ -57,25 +61,65 @@ namespace NPCLLMChat.TTS
             _config = config;
             _isInitialized = true;
 
-            if (_config.Enabled)
-            {
-                Log.Out($"[NPCLLMChat] TTSService initialized - Endpoint: {_config.Endpoint}");
-                Log.Out($"[NPCLLMChat] Default voice: {_config.DefaultVoice}");
-
-                // Check if server is available
-                StartCoroutine(CheckServerHealth());
-            }
-            else
+            if (!_config.Enabled)
             {
                 Log.Out("[NPCLLMChat] TTSService disabled in config");
+                return;
+            }
+
+            Log.Out($"[NPCLLMChat] TTSService initializing on {PlatformHelper.PlatformName}");
+
+            // Determine provider based on config and platform
+            DetermineProvider();
+        }
+
+        private void DetermineProvider()
+        {
+            switch (_config.Provider)
+            {
+                case TTSProvider.Windows:
+                    _activeProvider = TTSProvider.Windows;
+                    InitializeWindows();
+                    break;
+
+                case TTSProvider.Piper:
+                    _activeProvider = TTSProvider.Piper;
+                    StartCoroutine(InitializePiper());
+                    break;
+
+                case TTSProvider.Auto:
+                default:
+                    if (PlatformHelper.IsWindows)
+                    {
+                        _activeProvider = TTSProvider.Windows;
+                        InitializeWindows();
+                    }
+                    else
+                    {
+                        _activeProvider = TTSProvider.Piper;
+                        StartCoroutine(InitializePiper());
+                    }
+                    break;
             }
         }
 
-        /// <summary>
-        /// Check if the TTS server is responding
-        /// </summary>
-        private IEnumerator CheckServerHealth()
+        private void InitializeWindows()
         {
+            if (WindowsTTSProvider.Instance.IsAvailable)
+            {
+                Log.Out($"[NPCLLMChat] TTS using Windows SAPI");
+                Log.Out($"[NPCLLMChat] {WindowsTTSProvider.Instance.GetVoiceInfo()}");
+            }
+            else
+            {
+                Log.Warning("[NPCLLMChat] Windows SAPI not available!");
+            }
+        }
+
+        private IEnumerator InitializePiper()
+        {
+            Log.Out($"[NPCLLMChat] TTS checking Piper server at {_config.Endpoint}");
+            
             string healthUrl = _config.Endpoint.Replace("/synthesize", "/health");
 
             using (UnityWebRequest request = UnityWebRequest.Get(healthUrl))
@@ -85,14 +129,14 @@ namespace NPCLLMChat.TTS
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
-                    _serverAvailable = true;
-                    Log.Out("[NPCLLMChat] TTS server is available");
+                    _piperServerAvailable = true;
+                    Log.Out("[NPCLLMChat] TTS using Piper server");
                 }
                 else
                 {
-                    _serverAvailable = false;
-                    Log.Warning($"[NPCLLMChat] TTS server not available: {request.error}");
-                    Log.Warning("[NPCLLMChat] Start piper-server with: python piper_server.py --port 5050");
+                    _piperServerAvailable = false;
+                    Log.Warning($"[NPCLLMChat] Piper TTS server not available: {request.error}");
+                    Log.Warning("[NPCLLMChat] Start with: python piper_server.py --port 5050");
                 }
             }
         }
@@ -100,23 +144,11 @@ namespace NPCLLMChat.TTS
         /// <summary>
         /// Synthesize text to speech and return an AudioClip
         /// </summary>
-        /// <param name="text">Text to convert to speech</param>
-        /// <param name="voice">Voice ID to use (optional, uses default if not specified)</param>
-        /// <param name="onSuccess">Callback with the generated AudioClip</param>
-        /// <param name="onError">Callback if synthesis fails</param>
         public void Synthesize(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
         {
             if (!_isInitialized || !_config.Enabled)
             {
                 onError?.Invoke("TTS not initialized or disabled");
-                return;
-            }
-
-            if (!_serverAvailable)
-            {
-                // Try to check again in case server started
-                StartCoroutine(CheckServerHealth());
-                onError?.Invoke("TTS server not available");
                 return;
             }
 
@@ -126,21 +158,15 @@ namespace NPCLLMChat.TTS
                 return;
             }
 
-            // Queue the request
-            var request = new TTSRequest
-            {
-                Text = text,
-                Voice = string.IsNullOrEmpty(voice) ? _config.DefaultVoice : voice,
-                OnSuccess = onSuccess,
-                OnError = onError
-            };
+            string selectedVoice = string.IsNullOrEmpty(voice) ? _config.DefaultVoice : voice;
 
-            _requestQueue.Enqueue(request);
-
-            // Process queue if not already processing
-            if (!_isProcessing)
+            if (_activeProvider == TTSProvider.Windows)
             {
-                StartCoroutine(ProcessQueue());
+                SynthesizeWithWindows(text, selectedVoice, onSuccess, onError);
+            }
+            else
+            {
+                SynthesizeWithPiper(text, selectedVoice, onSuccess, onError);
             }
         }
 
@@ -172,31 +198,76 @@ namespace NPCLLMChat.TTS
             }
         }
 
-        /// <summary>
-        /// Process queued TTS requests one at a time
-        /// </summary>
-        private IEnumerator ProcessQueue()
+        #region Windows SAPI
+
+        private void SynthesizeWithWindows(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
+        {
+            if (!WindowsTTSProvider.Instance.IsAvailable)
+            {
+                onError?.Invoke("Windows TTS not available");
+                return;
+            }
+
+            float startTime = Time.realtimeSinceStartup;
+
+            WindowsTTSProvider.Instance.Synthesize(
+                text,
+                voice,
+                _config.SpeechRate,
+                wavData =>
+                {
+                    StartCoroutine(ProcessWavResult(wavData, text, startTime, onSuccess, onError));
+                },
+                error => onError?.Invoke(error)
+            );
+        }
+
+        #endregion
+
+        #region Piper Server
+
+        private void SynthesizeWithPiper(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
+        {
+            if (!_piperServerAvailable)
+            {
+                onError?.Invoke("Piper TTS server not available");
+                return;
+            }
+
+            var request = new TTSRequest
+            {
+                Text = text,
+                Voice = voice,
+                OnSuccess = onSuccess,
+                OnError = onError
+            };
+
+            _requestQueue.Enqueue(request);
+
+            if (!_isProcessing)
+            {
+                StartCoroutine(ProcessPiperQueue());
+            }
+        }
+
+        private IEnumerator ProcessPiperQueue()
         {
             _isProcessing = true;
 
             while (_requestQueue.Count > 0)
             {
                 var request = _requestQueue.Dequeue();
-                yield return StartCoroutine(SynthesizeCoroutine(request));
+                yield return StartCoroutine(PiperSynthesizeCoroutine(request));
             }
 
             _isProcessing = false;
         }
 
-        /// <summary>
-        /// Perform actual HTTP request to TTS server
-        /// </summary>
-        private IEnumerator SynthesizeCoroutine(TTSRequest request)
+        private IEnumerator PiperSynthesizeCoroutine(TTSRequest request)
         {
             float startTime = Time.realtimeSinceStartup;
 
-            // Build request JSON
-            string jsonBody = BuildRequestJson(request.Text, request.Voice);
+            string jsonBody = BuildPiperRequestJson(request.Text, request.Voice);
 
             using (UnityWebRequest webRequest = new UnityWebRequest(_config.Endpoint, "POST"))
             {
@@ -208,24 +279,21 @@ namespace NPCLLMChat.TTS
 
                 yield return webRequest.SendWebRequest();
 
-                // Track timing
                 _lastSynthesisTimeMs = (Time.realtimeSinceStartup - startTime) * 1000f;
                 _requestCount++;
                 _avgSynthesisTimeMs = ((_avgSynthesisTimeMs * (_requestCount - 1)) + _lastSynthesisTimeMs) / _requestCount;
 
                 if (webRequest.result == UnityWebRequest.Result.Success)
                 {
-                    // Check content type
                     string contentType = webRequest.GetResponseHeader("Content-Type");
                     if (contentType != null && contentType.Contains("audio"))
                     {
-                        // Parse WAV data into AudioClip
                         byte[] wavData = webRequest.downloadHandler.data;
                         AudioClip clip = WavToAudioClip(wavData, request.Text);
 
                         if (clip != null)
                         {
-                            Log.Out($"[NPCLLMChat] TTS synthesis completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s audio)");
+                            Log.Out($"[NPCLLMChat] Piper TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
                             request.OnSuccess?.Invoke(clip);
                         }
                         else
@@ -235,27 +303,19 @@ namespace NPCLLMChat.TTS
                     }
                     else
                     {
-                        // Probably an error response in JSON
-                        string response = webRequest.downloadHandler.text;
-                        Log.Warning($"[NPCLLMChat] TTS error response: {response}");
-                        request.OnError?.Invoke($"TTS server error: {response}");
+                        request.OnError?.Invoke($"Piper error: {webRequest.downloadHandler.text}");
                     }
                 }
                 else
                 {
-                    _serverAvailable = false; // Mark as unavailable
-                    Log.Warning($"[NPCLLMChat] TTS request failed: {webRequest.error}");
-                    request.OnError?.Invoke($"TTS request failed: {webRequest.error}");
+                    _piperServerAvailable = false;
+                    request.OnError?.Invoke($"Piper request failed: {webRequest.error}");
                 }
             }
         }
 
-        /// <summary>
-        /// Build JSON request body for Piper TTS server
-        /// </summary>
-        private string BuildRequestJson(string text, string voice)
+        private string BuildPiperRequestJson(string text, string voice)
         {
-            // Escape text for JSON
             string escapedText = text
                 .Replace("\\", "\\\\")
                 .Replace("\"", "\\\"")
@@ -263,7 +323,6 @@ namespace NPCLLMChat.TTS
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
 
-            // Build JSON with optional speech rate
             StringBuilder sb = new StringBuilder();
             sb.Append("{");
             sb.Append($"\"text\": \"{escapedText}\"");
@@ -271,7 +330,6 @@ namespace NPCLLMChat.TTS
 
             if (Math.Abs(_config.SpeechRate - 1.0f) > 0.01f)
             {
-                // length_scale is inverse of speed (0.8 = faster, 1.2 = slower)
                 float lengthScale = 1.0f / _config.SpeechRate;
                 sb.Append($", \"length_scale\": {lengthScale.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
             }
@@ -280,129 +338,93 @@ namespace NPCLLMChat.TTS
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Convert WAV byte data to Unity AudioClip
-        /// </summary>
+        #endregion
+
+        #region WAV Processing
+
+        private IEnumerator ProcessWavResult(byte[] wavData, string text, float startTime, Action<AudioClip> onSuccess, Action<string> onError)
+        {
+            yield return null;
+
+            if (wavData == null || wavData.Length < 44)
+            {
+                onError?.Invoke("TTS returned invalid data");
+                yield break;
+            }
+
+            AudioClip clip = WavToAudioClip(wavData, text);
+
+            _lastSynthesisTimeMs = (Time.realtimeSinceStartup - startTime) * 1000f;
+            _requestCount++;
+            _avgSynthesisTimeMs = ((_avgSynthesisTimeMs * (_requestCount - 1)) + _lastSynthesisTimeMs) / _requestCount;
+
+            if (clip != null)
+            {
+                Log.Out($"[NPCLLMChat] TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
+                onSuccess?.Invoke(clip);
+            }
+            else
+            {
+                onError?.Invoke("Failed to parse TTS audio");
+            }
+        }
+
         private AudioClip WavToAudioClip(byte[] wavData, string clipName)
         {
             try
             {
-                // WAV header parsing
-                // RIFF header: 4 bytes "RIFF", 4 bytes size, 4 bytes "WAVE"
-                // fmt chunk: 4 bytes "fmt ", 4 bytes size, then format data
-                // data chunk: 4 bytes "data", 4 bytes size, then audio samples
+                if (wavData.Length < 44) return null;
+                if (wavData[0] != 'R' || wavData[1] != 'I' || wavData[2] != 'F' || wavData[3] != 'F') return null;
+                if (wavData[8] != 'W' || wavData[9] != 'A' || wavData[10] != 'V' || wavData[11] != 'E') return null;
 
-                if (wavData.Length < 44)
-                {
-                    Log.Error("[NPCLLMChat] WAV data too short");
-                    return null;
-                }
-
-                // Verify RIFF header
-                if (wavData[0] != 'R' || wavData[1] != 'I' || wavData[2] != 'F' || wavData[3] != 'F')
-                {
-                    Log.Error("[NPCLLMChat] Invalid WAV: missing RIFF header");
-                    return null;
-                }
-
-                // Verify WAVE format
-                if (wavData[8] != 'W' || wavData[9] != 'A' || wavData[10] != 'V' || wavData[11] != 'E')
-                {
-                    Log.Error("[NPCLLMChat] Invalid WAV: missing WAVE format");
-                    return null;
-                }
-
-                // Parse fmt chunk
                 int fmtOffset = 12;
                 while (fmtOffset < wavData.Length - 8)
                 {
                     string chunkId = System.Text.Encoding.ASCII.GetString(wavData, fmtOffset, 4);
-                    int chunkSize = BitConverter.ToInt32(wavData, fmtOffset + 4);
-
-                    if (chunkId == "fmt ")
-                    {
-                        break;
-                    }
-                    fmtOffset += 8 + chunkSize;
+                    if (chunkId == "fmt ") break;
+                    fmtOffset += 8 + BitConverter.ToInt32(wavData, fmtOffset + 4);
                 }
+                if (fmtOffset >= wavData.Length - 8) return null;
 
-                if (fmtOffset >= wavData.Length - 8)
-                {
-                    Log.Error("[NPCLLMChat] Invalid WAV: fmt chunk not found");
-                    return null;
-                }
-
-                // Read format data
-                int audioFormat = BitConverter.ToInt16(wavData, fmtOffset + 8);
                 int channels = BitConverter.ToInt16(wavData, fmtOffset + 10);
                 int sampleRate = BitConverter.ToInt32(wavData, fmtOffset + 12);
                 int bitsPerSample = BitConverter.ToInt16(wavData, fmtOffset + 22);
 
-                // Find data chunk
                 int dataOffset = fmtOffset + 8 + BitConverter.ToInt32(wavData, fmtOffset + 4);
                 while (dataOffset < wavData.Length - 8)
                 {
                     string chunkId = System.Text.Encoding.ASCII.GetString(wavData, dataOffset, 4);
-                    if (chunkId == "data")
-                    {
-                        break;
-                    }
-                    int chunkSize = BitConverter.ToInt32(wavData, dataOffset + 4);
-                    dataOffset += 8 + chunkSize;
+                    if (chunkId == "data") break;
+                    dataOffset += 8 + BitConverter.ToInt32(wavData, dataOffset + 4);
                 }
-
-                if (dataOffset >= wavData.Length - 8)
-                {
-                    Log.Error("[NPCLLMChat] Invalid WAV: data chunk not found");
-                    return null;
-                }
+                if (dataOffset >= wavData.Length - 8) return null;
 
                 int dataSize = BitConverter.ToInt32(wavData, dataOffset + 4);
                 int dataStart = dataOffset + 8;
+                int sampleCount = dataSize / (bitsPerSample / 8) / channels;
 
-                // Calculate samples
-                int bytesPerSample = bitsPerSample / 8;
-                int sampleCount = dataSize / bytesPerSample / channels;
-
-                // Create AudioClip
                 AudioClip clip = AudioClip.Create(
                     "TTS_" + clipName.Substring(0, Math.Min(20, clipName.Length)),
-                    sampleCount,
-                    channels,
-                    sampleRate,
-                    false
-                );
+                    sampleCount, channels, sampleRate, false);
 
-                // Convert samples to float
                 float[] samples = new float[sampleCount * channels];
-
                 if (bitsPerSample == 16)
                 {
                     for (int i = 0; i < sampleCount * channels; i++)
                     {
-                        int sampleIndex = dataStart + i * 2;
-                        if (sampleIndex + 1 < wavData.Length)
-                        {
-                            short sample = BitConverter.ToInt16(wavData, sampleIndex);
-                            samples[i] = sample / 32768f;
-                        }
+                        int idx = dataStart + i * 2;
+                        if (idx + 1 < wavData.Length)
+                            samples[i] = BitConverter.ToInt16(wavData, idx) / 32768f;
                     }
                 }
                 else if (bitsPerSample == 8)
                 {
                     for (int i = 0; i < sampleCount * channels; i++)
                     {
-                        int sampleIndex = dataStart + i;
-                        if (sampleIndex < wavData.Length)
-                        {
-                            samples[i] = (wavData[sampleIndex] - 128) / 128f;
-                        }
+                        int idx = dataStart + i;
+                        if (idx < wavData.Length)
+                            samples[i] = (wavData[idx] - 128) / 128f;
                     }
-                }
-                else
-                {
-                    Log.Warning($"[NPCLLMChat] Unsupported bits per sample: {bitsPerSample}");
-                    return null;
                 }
 
                 clip.SetData(samples, 0);
@@ -410,23 +432,35 @@ namespace NPCLLMChat.TTS
             }
             catch (Exception ex)
             {
-                Log.Error($"[NPCLLMChat] Error parsing WAV: {ex.Message}");
+                Log.Error($"[NPCLLMChat] WAV parse error: {ex.Message}");
                 return null;
             }
         }
 
-        /// <summary>
-        /// Refresh server availability check
-        /// </summary>
+        #endregion
+
         public void RefreshServerStatus()
         {
-            StartCoroutine(CheckServerHealth());
+            if (_activeProvider == TTSProvider.Piper)
+                StartCoroutine(InitializePiper());
+        }
+
+        public string GetStatusString()
+        {
+            if (!_isInitialized || !_config.Enabled) return "Disabled";
+
+            switch (_activeProvider)
+            {
+                case TTSProvider.Windows:
+                    return $"Windows SAPI ({WindowsTTSProvider.Instance.AvailableVoices?.Length ?? 0} voices)";
+                case TTSProvider.Piper:
+                    return _piperServerAvailable ? $"Piper Server ({_config.Endpoint})" : "Piper (not connected)";
+                default:
+                    return "Unknown";
+            }
         }
     }
 
-    /// <summary>
-    /// Internal class to track pending TTS requests
-    /// </summary>
     internal class TTSRequest
     {
         public string Text { get; set; }

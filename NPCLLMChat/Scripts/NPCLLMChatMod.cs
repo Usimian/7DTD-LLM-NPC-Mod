@@ -330,6 +330,13 @@ namespace NPCLLMChat
                 var serverNode = doc.SelectSingleNode("//Server");
                 if (serverNode != null)
                 {
+                    // Parse provider (Auto, Windows, Piper)
+                    string providerStr = GetNodeValue(serverNode, "Provider", "Auto");
+                    if (Enum.TryParse<TTS.TTSProvider>(providerStr, true, out var provider))
+                    {
+                        config.Provider = provider;
+                    }
+                    
                     config.Enabled = bool.Parse(GetNodeValue(serverNode, "Enabled", "true"));
                     config.Endpoint = GetNodeValue(serverNode, "Endpoint", "http://localhost:5050/synthesize");
                     config.TimeoutSeconds = int.Parse(GetNodeValue(serverNode, "TimeoutSeconds", "10"));
@@ -355,7 +362,7 @@ namespace NPCLLMChat
                     config.BanditVoice = GetNodeValue(voicesNode, "BanditVoice", "en_US-ryan-medium");
                 }
 
-                Log.Out($"TTS configuration loaded - Enabled: {config.Enabled}, Default voice: {config.DefaultVoice}");
+                Log.Out($"TTS configuration loaded - Provider: {config.Provider}, Enabled: {config.Enabled}");
                 return config;
             }
             catch (Exception ex)
@@ -369,6 +376,7 @@ namespace NPCLLMChat
         {
             return new TTSConfig
             {
+                Provider = TTS.TTSProvider.Auto,  // Auto: Windows on Windows, Piper on Linux
                 Enabled = true,
                 Endpoint = "http://localhost:5050/synthesize",
                 TimeoutSeconds = 10,
@@ -404,6 +412,13 @@ namespace NPCLLMChat
                 var serverNode = doc.SelectSingleNode("//Server");
                 if (serverNode != null)
                 {
+                    // Parse provider (Auto, Windows, Whisper)
+                    string providerStr = GetNodeValue(serverNode, "Provider", "Auto");
+                    if (Enum.TryParse<STT.STTProvider>(providerStr, true, out var provider))
+                    {
+                        config.Provider = provider;
+                    }
+                    
                     config.Enabled = bool.Parse(GetNodeValue(serverNode, "Enabled", "true"));
                     config.Endpoint = GetNodeValue(serverNode, "Endpoint", "http://localhost:5051/transcribe");
                     config.TimeoutSeconds = int.Parse(GetNodeValue(serverNode, "TimeoutSeconds", "10"));
@@ -432,7 +447,7 @@ namespace NPCLLMChat
                     config.Language = GetNodeValue(whisperNode, "Language", "en");
                 }
 
-                Log.Out($"STT configuration loaded - Enabled: {config.Enabled}, Push-to-talk: {config.PushToTalkKey}");
+                Log.Out($"STT configuration loaded - Provider: {config.Provider}, Enabled: {config.Enabled}");
                 return config;
             }
             catch (Exception ex)
@@ -446,6 +461,7 @@ namespace NPCLLMChat
         {
             return new STTConfig
             {
+                Provider = STT.STTProvider.Auto,  // Auto: Windows on Windows, Whisper on Linux
                 Enabled = true,
                 Endpoint = "http://localhost:5051/transcribe",
                 TimeoutSeconds = 10,

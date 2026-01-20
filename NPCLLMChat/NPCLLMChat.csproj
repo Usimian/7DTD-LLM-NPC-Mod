@@ -14,12 +14,25 @@
 
     <!-- Suppress warnings about missing XML docs -->
     <NoWarn>CS1591;CS0436</NoWarn>
+    
+    <!-- Define UNITY_STANDALONE_WIN for Windows builds -->
+    <DefineConstants>$(DefineConstants);UNITY_STANDALONE_WIN</DefineConstants>
   </PropertyGroup>
 
   <!--
-    Paths configured for marc's system
+    Platform-specific paths - uncomment the appropriate section for your system
   -->
-  <PropertyGroup>
+  
+  <!-- Windows paths -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+    <GamePath>C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die</GamePath>
+    <ManagedPath>$(GamePath)\7DaysToDie_Data\Managed</ManagedPath>
+    <SCorePath>$(GamePath)\Mods\0-SCore</SCorePath>
+    <HarmonyPath>$(GamePath)\Mods\0_TFP_Harmony</HarmonyPath>
+  </PropertyGroup>
+
+  <!-- Linux paths -->
+  <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
     <GamePath>/home/marc/.steam/steam/steamapps/common/7 Days To Die</GamePath>
     <ManagedPath>$(GamePath)/7DaysToDie_Data/Managed</ManagedPath>
     <SCorePath>$(GamePath)/Mods/0-SCore-2.5.35.841</SCorePath>
@@ -82,6 +95,9 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml" />
+    
+    <!-- Windows Speech API (for built-in TTS/STT on Windows) -->
+    <Reference Include="System.Speech" Condition="'$(OS)' == 'Windows_NT'" />
   </ItemGroup>
 
   <!-- Source files are auto-included by SDK -->
