@@ -101,10 +101,6 @@ Press **F1** in-game:
 - In-game: `llmchat tts status`
 - Check volume in ttsconfig.xml
 
-### Red errors in console
-- "SleeperVolume" errors are normal game bugs, ignore them
-- Only worry about `[NPCLLMChat]` errors
-
 ## 📋 System Requirements
 
 **Minimum**:
