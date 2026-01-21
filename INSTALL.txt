@@ -52,4 +52,8 @@ Launch 7 Days to Die normally. Find an NPC and:
 
 **That's it!** The mod auto-starts everything.
 
+Note: If you have a slow computer it is possible that the mod will timeout
+      waiting for one of the servers (piper, whisper, ollama).
+      Restarting the game from scratch may help.
+
 **User skill required: Can extract a zip file and run a .bat file**

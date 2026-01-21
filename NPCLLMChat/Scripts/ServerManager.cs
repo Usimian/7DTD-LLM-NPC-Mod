@@ -151,7 +151,7 @@ namespace NPCLLMChat
                 using (var client = new System.Net.Sockets.TcpClient())
                 {
                     var result = client.BeginConnect("127.0.0.1", 11434, null, null);
-                    var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+                    var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2));
                     
                     if (success && client.Connected)
                     {
@@ -170,34 +170,77 @@ namespace NPCLLMChat
             {
                 Log.Out("[NPCLLMChat] ServerManager: Starting Ollama...");
                 
+                // Start Ollama via PowerShell in a completely detached way
+                // This ensures it runs with proper environment and doesn't get blocked by I/O redirection
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = "ollama",
-                    Arguments = "serve",
+                    FileName = "powershell.exe",
+                    Arguments = "-WindowStyle Hidden -Command \"Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -PassThru\"",
                     UseShellExecute = false,
                     CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 };
 
-                ollamaProcess = Process.Start(startInfo);
+                var psProcess = Process.Start(startInfo);
+                if (psProcess != null)
+                {
+                    // Wait for PowerShell to complete starting Ollama
+                    psProcess.WaitForExit(3000);
+                    Log.Out("[NPCLLMChat] ServerManager: Ollama start command executed");
+                }
                 
-                if (ollamaProcess != null)
+                // Wait for Ollama to initialize - be generous with time
+                Log.Out("[NPCLLMChat] ServerManager: Waiting for Ollama to initialize...");
+                System.Threading.Thread.Sleep(10000);  // 10 second initial wait
+                
+                // Verify it's actually responding to port connections
+                bool connected = false;
+                for (int attempt = 0; attempt < 20 && !connected; attempt++)
                 {
-                    Log.Out($"[NPCLLMChat] ServerManager: Ollama started (PID: {ollamaProcess.Id})");
+                    try
+                    {
+                        using (var client = new System.Net.Sockets.TcpClient())
+                        {
+                            var result = client.BeginConnect("127.0.0.1", 11434, null, null);
+                            var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+                            
+                            if (success && client.Connected)
+                            {
+                                connected = true;
+                                client.Close();
+                                Log.Out("[NPCLLMChat] ServerManager: Ollama is accepting connections!");
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Not ready yet
+                    }
                     
-                    // Wait a moment for it to initialize
-                    System.Threading.Thread.Sleep(2000);
+                    if (!connected && attempt < 19)
+                    {
+                        System.Threading.Thread.Sleep(1000);
+                    }
                 }
-                else
+                
+                if (!connected)
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: Failed to start Ollama process");
+                    Log.Warning("[NPCLLMChat] ServerManager: Ollama failed to start properly");
+                    Log.Warning("[NPCLLMChat] ServerManager: Please ensure Ollama is installed and in your PATH");
+                    return;
                 }
+                
+                // Additional wait to let Ollama fully initialize its model loading capability
+                Log.Out("[NPCLLMChat] ServerManager: Allowing Ollama time to fully initialize...");
+                System.Threading.Thread.Sleep(5000);
+                
+                Log.Out("[NPCLLMChat] ServerManager: Ollama startup complete!");
             }
             catch (Exception ex)
             {
                 Log.Warning($"[NPCLLMChat] ServerManager: Could not auto-start Ollama: {ex.Message}");
-                Log.Warning("[NPCLLMChat] ServerManager: Please ensure Ollama is installed and in your PATH");
+                Log.Warning("[NPCLLMChat] ServerManager: Please start Ollama manually: ollama serve");
             }
         }
 
