@@ -24,7 +24,7 @@
 
         <!--
             Piper TTS server endpoint (used on Linux or when Provider=Piper)
-            Start server: python piper_server.py --port 5050
+            Start server: python piper_server.py -port 5050
         -->
         <Endpoint>http://localhost:5050/synthesize</Endpoint>
 

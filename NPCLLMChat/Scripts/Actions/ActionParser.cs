@@ -93,8 +93,13 @@ namespace NPCLLMChat.Actions
 
             // Try JSON parsing first (structured response)
             var jsonAction = TryParseJson(llmResponse);
-            if (jsonAction != null && jsonAction.Type != NPCActionType.None)
-                return jsonAction;
+            if (jsonAction != null)
+            {
+                // Return JSON action even if Type is None, as long as we extracted dialogue
+                // This handles cases like {"action": "dialogue", "dialogue": "text"}
+                if (jsonAction.Type != NPCActionType.None || !string.IsNullOrEmpty(jsonAction.DialogueBefore))
+                    return jsonAction;
+            }
 
             // Fall back to natural language parsing
             return ParseNaturalLanguage(llmResponse);
@@ -276,7 +281,9 @@ namespace NPCLLMChat.Actions
                 { "location", NPCActionType.ShareInfo },
                 { "none", NPCActionType.None },
                 { "talk", NPCActionType.None },
-                { "chat", NPCActionType.None }
+                { "chat", NPCActionType.None },
+                { "dialogue", NPCActionType.None },  // LLM sometimes uses this for pure dialogue
+                { "dialog", NPCActionType.None }     // Alternative spelling
             };
 
             actionStr = actionStr.ToLower().Trim();

@@ -148,6 +148,12 @@ namespace NPCLLMChat
             chatComponent.ProcessPlayerMessage(text, player, response =>
             {
                 Log.Out($"[NPCLLMChat] {chatComponent.NPCName} responded: {response}");
+                
+                // Show NPC response as tooltip
+                if (!string.IsNullOrWhiteSpace(response))
+                {
+                    GameManager.ShowTooltip(player, $"{chatComponent.NPCName}: {response}", false);
+                }
             });
         }
 

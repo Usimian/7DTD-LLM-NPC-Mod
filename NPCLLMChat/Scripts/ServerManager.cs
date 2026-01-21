@@ -12,6 +12,7 @@ namespace NPCLLMChat
     {
         private static Process piperProcess;
         private static Process whisperProcess;
+        private static Process ollamaProcess;
         private static bool serversStarted = false;
 
         public static void StartServers()
@@ -34,6 +35,9 @@ namespace NPCLLMChat
             }
 
             Log.Out($"[NPCLLMChat] ServerManager: Mod path = {modPath}");
+
+            // Start Ollama if not already running
+            StartOllamaIfNeeded();
 
             // Kill any existing servers on our ports
             KillProcessOnPort(5050, "Piper TTS");
@@ -139,6 +143,64 @@ namespace NPCLLMChat
             }
         }
 
+        private static void StartOllamaIfNeeded()
+        {
+            try
+            {
+                // Check if Ollama is already running by trying to connect
+                using (var client = new System.Net.Sockets.TcpClient())
+                {
+                    var result = client.BeginConnect("127.0.0.1", 11434, null, null);
+                    var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+                    
+                    if (success && client.Connected)
+                    {
+                        Log.Out("[NPCLLMChat] ServerManager: Ollama is already running");
+                        client.Close();
+                        return;
+                    }
+                }
+            }
+            catch
+            {
+                // Ollama is not running, we'll start it
+            }
+
+            try
+            {
+                Log.Out("[NPCLLMChat] ServerManager: Starting Ollama...");
+                
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "ollama",
+                    Arguments = "serve",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                ollamaProcess = Process.Start(startInfo);
+                
+                if (ollamaProcess != null)
+                {
+                    Log.Out($"[NPCLLMChat] ServerManager: Ollama started (PID: {ollamaProcess.Id})");
+                    
+                    // Wait a moment for it to initialize
+                    System.Threading.Thread.Sleep(2000);
+                }
+                else
+                {
+                    Log.Warning("[NPCLLMChat] ServerManager: Failed to start Ollama process");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] ServerManager: Could not auto-start Ollama: {ex.Message}");
+                Log.Warning("[NPCLLMChat] ServerManager: Please ensure Ollama is installed and in your PATH");
+            }
+        }
+
         public static void StopServers()
         {
             if (piperProcess != null && !piperProcess.HasExited)
@@ -168,6 +230,9 @@ namespace NPCLLMChat
                     Log.Warning($"[NPCLLMChat] ServerManager: Error stopping Whisper: {ex.Message}");
                 }
             }
+
+            // Note: We intentionally don't stop Ollama as it may be used by other applications
+            // and is typically meant to run as a system service
 
             serversStarted = false;
         }

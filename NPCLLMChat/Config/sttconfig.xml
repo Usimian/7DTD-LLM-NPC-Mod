@@ -24,7 +24,7 @@
 
         <!--
             Whisper STT server endpoint (used on Linux or when Provider=Whisper)
-            Start server: python whisper_server.py --port 5051 --preload
+            Start server: python whisper_server.py -port 5051 -preload
         -->
         <Endpoint>http://localhost:5051/transcribe</Endpoint>
 
