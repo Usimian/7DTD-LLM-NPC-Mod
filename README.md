@@ -1,371 +1,164 @@
-# 7 Days to Die - LLM NPC Chat Mod
+# NPCLLMChat - AI-Powered NPC Conversations
 
-Transform your 7 Days to Die NPCs into intelligent, voice-enabled companions powered by AI! This mod adds realistic conversations, voice chat, and dynamic NPC actions using local LLM technology.
-
-[![Platform](https://img.shields.io/badge/platform-Windows%2011%20%7C%20Ubuntu%2024-blue)]()
-[![7DTD](https://img.shields.io/badge/7%20Days%20to%20Die-A21%2B-green)]()
-[![License](https://img.shields.io/badge/license-MIT-orange)]()
+Talk to NPCs in 7 Days to Die using AI! Voice or text chat with NPCs that remember your conversations.
 
 ## ✨ Features
 
-### 🤖 **AI-Powered Conversations**
-- Natural, context-aware dialogue with NPCs
-- Persistent conversation history
-- Personality-driven responses
-- Multiple NPC types (traders, companions, bandits)
+- 🗣️ **Voice Chat** - Hold V to talk to NPCs
+- 💬 **Text Chat** - Type `@message` in chat
+- 🧠 **Memory** - NPCs remember your conversations
+- 🎭 **Personality System** - Different NPC personalities
+- 🔊 **Natural Voice** - NPCs respond with speech
+- 🌐 **Fully Local** - No internet needed after setup
 
-### 🎤 **Voice Input (Speech-to-Text)**
-- Push-to-talk voice chat (`V` key by default)
-- Powered by Whisper AI for accurate transcription
-- Automatic microphone detection
+## 📦 Installation
 
-### 🔊 **Voice Output (Text-to-Speech)**
-- NPCs speak their responses with natural voices
-- Multiple voice options per NPC type
-- Powered by Piper TTS for high-quality speech
-- Adjustable volume and speech rate
+### Prerequisites
 
-### 🎮 **NPC Actions**
-- NPCs can follow, guard, wait, and trade
-- Context-aware action execution
-- Natural language commands ("Come with me!", "Guard this area")
+1. **Required Mods** (install first):
+   - [0-SCore](https://www.nexusmods.com/7daystodie/mods/6176) - Must match game version (e.g., SCore 2.5.x for game v2.5)
+   - [0-NPCCore](https://www.nexusmods.com/7daystodie/mods/8099) - Provides NPCs
 
-### 🚀 **Seamless Experience (Windows)**
-- **Zero manual setup** - servers auto-start with the game
-- Everything runs in the background
-- Auto-cleanup on game exit
+2. **Required Software**:
+   - [Ollama](https://ollama.com/download) - AI language model
+   - [Python 3.9+](https://www.python.org/downloads/) - Check "Add to PATH" during install
 
-## 📋 Requirements
+### Install Steps
 
-### All Platforms
+1. **Extract** the mod to your game's Mods folder:
+   ```
+   <Game>\Mods\NPCLLMChat\
+   ```
 
-#### Required Mods
-- **7 Days to Die** (Alpha 21+)
-- **[0-SCore](https://gitlab.com/sphereii/SCore)** - Core mod framework (v21.0+)
-- **[0-NPCCore](https://gitlab.com/sphereii/NPCCore)** - NPC functionality framework (v21.0+)
+2. **Run setup** (one time only):
+   ```bash
+   cd Mods\NPCLLMChat
+   setup_servers.bat
+   ```
 
-#### Required Software
-- **[Ollama](https://ollama.ai)** - Local LLM server (runs the AI brain)
-- **Python 3.10+** - For TTS/STT servers
+3. **Download AI model**:
+   ```bash
+   ollama pull gemma3:4b
+   ```
 
-### Windows Additional Requirements
-- **.NET SDK 6.0+** (for building from source only)
+4. **Launch game** - Everything auto-starts!
 
-### Ubuntu Additional Requirements
-- **Build tools**: `sudo apt install build-essential` (for building from source only)
+## 🎮 Usage
 
-## 🎯 Quick Start
+**Text Chat**: `@Hello there!`  
+**Voice Chat**: Hold **V** key, speak, release
 
-### Windows 11
-
-#### 1. Install Ollama
-```batch
-# Download and install from https://ollama.ai
-# Or use winget:
-winget install Ollama.Ollama
-
-# Pull an AI model (recommended: gemma3:4b for fast responses)
-ollama pull gemma3:4b
-```
-
-#### 2. Install Python Dependencies
-```batch
-# Install piper-tts globally
-pip install piper-tts flask numpy
-
-# Install whisper in the mod's venv (done automatically by install script)
-```
-
-#### 3. Install Required Mods
-```batch
-# Download and install these mods to your 7DTD\Mods folder:
-# 1. 0-SCore: https://gitlab.com/sphereii/SCore/-/releases
-# 2. 0-NPCCore: https://gitlab.com/sphereii/NPCCore/-/releases
-
-# Extract both to: <Your Steam Installation>\steamapps\common\7 Days To Die\Mods\
-# Common locations:
-#   C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\
-#   C:\Program Files\Steam\steamapps\common\7 Days To Die\Mods\
-#   D:\SteamLibrary\steamapps\common\7 Days To Die\Mods\
-```
-
-#### 4. Install NPCLLMChat Mod
-```batch
-# Clone this repository
-git clone https://github.com/Usimian/7DTD-LLM-NPC-Mod.git
-cd 7DTD-LLM-NPC-Mod
-
-# Run the Windows installer
-install_mod_windows.bat
-```
-
-#### 5. Download a Voice (First Time Only)
-```batch
-# Run this once to download a TTS voice model (~60MB)
-setup_piper_voice.bat
-```
-
-#### 6. Play!
-Just launch 7 Days to Die normally. The mod will:
-- ✅ Auto-start Piper TTS server
-- ✅ Auto-start Whisper STT server  
-- ✅ Connect to Ollama (already running as Windows service)
-
-**That's it!** Everything runs automatically in the background.
-
----
-
-### Ubuntu 24
-
-#### 1. Install Ollama
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull an AI model
-ollama pull gemma3:4b
-
-# Start Ollama service
-sudo systemctl enable ollama
-sudo systemctl start ollama
-```
-
-#### 2. Set Up Python Servers
-```bash
-# Install Piper TTS
-pip install piper-tts flask numpy
-
-# Set up Whisper STT
-cd whisper-server
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-deactivate
-cd ..
-```
-
-#### 3. Install Required Mods
-```bash
-# Download and install these mods to your 7DTD Mods folder:
-# 1. 0-SCore: https://gitlab.com/sphereii/SCore/-/releases
-# 2. 0-NPCCore: https://gitlab.com/sphereii/NPCCore/-/releases
-
-# Extract both to: ~/.local/share/7DaysToDie/Mods/
-# Or your custom Mods folder location
-```
-
-#### 4. Install NPCLLMChat Mod
-```bash
-# Clone the repo
-git clone https://github.com/Usimian/7DTD-LLM-NPC-Mod.git
-cd 7DTD-LLM-NPC-Mod
-
-# Build the mod
-cd NPCLLMChat
-dotnet build -c Release
-
-# Copy to your 7DTD Mods folder
-cp -r bin/Release/* ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
-cp -r Config ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
-cp ModInfo.xml ~/.local/share/7DaysToDie/Mods/NPCLLMChat/
-```
-
-#### 5. Start Servers (Each Game Session)
-```bash
-# Terminal 1 - Piper TTS
-./start_tts_server.sh
-
-# Terminal 2 - Whisper STT  
-./start_stt_server.sh
-```
-
-#### 6. Play!
-Launch 7 Days to Die and enjoy AI-powered NPCs!
-
----
-
-## 🎮 In-Game Usage
-
-### Text Chat
-Press `T` to open chat, then:
-```
-@Hello there!
-@What supplies do you have?
-@Can you come with me?
-```
-
-The `@` prefix sends messages to the nearest NPC.
-
-### Voice Chat
-1. **Hold `V`** to record
-2. **Speak** your message
-3. **Release `V`** 
-4. NPC responds with voice!
-
-### Console Commands
-Press `F1` to open console:
-
-```bash
-# Status
-llmchat status              # Show all services status
-
-# TTS (Text-to-Speech)
-llmchat tts on              # Enable voice output
-llmchat tts off             # Disable voice output
-llmchat tts test            # Test TTS with sample audio
-llmchat tts voices          # List available voices
-
-# STT (Speech-to-Text)
-llmchat stt on              # Enable voice input
-llmchat stt off             # Disable voice input
-llmchat stt test            # Test microphone recording
-llmchat stt refresh         # Reconnect to Whisper server
-llmchat stt devices         # List available microphones
-
-# Configuration
-llmchat config              # Open in-game config UI
-```
+NPCs will respond with voice and text!
 
 ## ⚙️ Configuration
 
-### In-Game Config UI
-Press `ESC` → `Mod Settings` → `NPCLLMChat`
+Edit files in `Mods\NPCLLMChat\Config\`:
 
-Configure:
-- AI model selection
-- Voice settings
-- Microphone input
-- NPC personalities
-
-### Config Files
-Located in `Mods/NPCLLMChat/Config/`:
-
-- **`llmconfig.xml`** - LLM/AI settings (model, temperature, context)
-- **`ttsconfig.xml`** - Text-to-speech settings (voices, volume)
-- **`sttconfig.xml`** - Speech-to-text settings (microphone, sensitivity)
-- **`personalities.xml`** - NPC personality templates
-
-## 🎭 Recommended AI Models
-
-| Model | VRAM | Response Time | Quality | Best For |
-|-------|------|---------------|---------|----------|
-| `gemma3:4b` | 4GB | < 1s | Good | Fast gameplay, low-end GPUs |
-| `llama3:8b` | 8GB | 1-2s | Great | Balanced performance |
-| `mixtral:8x7b` | 24GB | 2-3s | Excellent | High-end GPUs, best dialogue |
-| `llama3:70b` | 48GB+ | 3-5s | Best | RTX 6000/A100, max immersion |
-
-**Default:** `gemma3:4b` (fast and works on most systems)
-
-## 🔧 Troubleshooting
-
-### Missing Dependencies Error
-```
-Error: Could not find 0-SCore or 0-NPCCore
+### Change AI Model (`llmconfig.xml`)
+```xml
+<Model>gemma3:4b</Model>
 ```
 
-**Solution:**
-1. Download [0-SCore](https://gitlab.com/sphereii/SCore/-/releases) (v21.0+)
-2. Download [0-NPCCore](https://gitlab.com/sphereii/NPCCore/-/releases) (v21.0+)
-3. Extract both to your `7 Days To Die\Mods\` folder
-4. Ensure folder names start with `0-` (e.g., `0-SCore`, `0-NPCCore`)
-5. Restart the game
+Other models:
+- `gemma2:9b` - Better quality
+- `llama3.2:3b` - Faster
+- `mistral:7b` - Balanced
 
-### "LLM not available"
+### Adjust Voice (`ttsconfig.xml`)
+```xml
+<Volume>0.8</Volume>          <!-- 0.0 to 1.0 -->
+<SpeechRate>1.0</SpeechRate>  <!-- 0.5 to 2.0 -->
+```
+
+### Push-to-Talk Key (`sttconfig.xml`)
+```xml
+<PushToTalkKey>V</PushToTalkKey>  <!-- V, LeftAlt, Mouse3, etc -->
+```
+
+## 🔧 Console Commands
+
+Press **F1** in-game:
+
+- `llmchat status` - Show mod status
+- `llmchat test` - Test nearest NPC
+- `llmchat tts test` - Test voice
+- `llmchat stt test` - Test microphone
+- `help llmchat` - Show all commands
+
+## ❓ Troubleshooting
+
+### NPC doesn't respond
+- Check Ollama: `ollama list` in cmd
+- Verify model installed: `ollama pull gemma3:4b`
+- Use @ symbol: `@Hello` not just `Hello`
+
+### Voice chat not working
+- Run `setup_servers.bat`
+- Check Python: `python --version`
+- In-game: `llmchat stt status`
+
+### No voice from NPC
+- In-game: `llmchat tts status`
+- Check volume in ttsconfig.xml
+
+### Red errors in console
+- "SleeperVolume" errors are normal game bugs, ignore them
+- Only worry about `[NPCLLMChat]` errors
+
+## 📋 System Requirements
+
+**Minimum**:
+- 8 GB RAM
+- 5 GB disk space
+- Windows 10/11
+
+**Recommended**:
+- 16 GB RAM
+- NVIDIA GPU with 4GB+ VRAM
+- SSD
+
+## 🏗️ For Developers
+
+### Building from Source
+
+1. Clone the repo
+2. Set game path in `NPCLLMChat.csproj`:
+   ```xml
+   <GamePath>C:\...\7 Days To Die</GamePath>
+   ```
+3. Build:
+   ```bash
+   dotnet build NPCLLMChat\NPCLLMChat.csproj -c Release
+   ```
+
+### Packaging for Release
+
 ```bash
-# Check Ollama is running
-ollama ps
-
-# If no model loaded, load one:
-ollama run gemma3:4b "test"
+package_release.bat
 ```
 
-### "TTS server not available"
-```bash
-# Windows: Auto-starts, wait 5-10 seconds after launching game
-# If still failing, manually test:
-python piper_server.py --port 5050
+Creates `NPCLLMChat-v1.0.0.zip` ready for distribution.
 
-# Ubuntu: Start manually
-./start_tts_server.sh
-```
+## 📜 Credits
 
-### "STT server not available"
-```bash
-# In-game, press F1 and type:
-llmchat stt refresh
+- **sphereii** - 0-SCore and 0-NPCCore frameworks
+- **Ollama** - Local LLM inference
+- **Piper TTS** - Neural text-to-speech
+- **Faster Whisper** - Speech recognition
 
-# Or restart the server manually
-# Windows: Restart game (auto-starts fresh)
-# Ubuntu: ./start_stt_server.sh
-```
+## 📄 License
 
-### Voice Model Not Found
-```bash
-# Windows
-setup_piper_voice.bat
+MIT License - See LICENSE file
 
-# Ubuntu/Linux
-cd ~/.local/share/piper/voices
-wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
-wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
-```
+## 🐛 Issues
 
-### Performance Issues
-- Use a smaller model: `gemma3:4b` or `llama3:8b`
-- Reduce context window in `llmconfig.xml` (`<NumCtx>2048</NumCtx>`)
-- Disable TTS if you only want text: `llmchat tts off`
+Report bugs at: https://github.com/Usimian/7DTD-LLM-NPC-Mod/issues
 
-## 📁 Project Structure
-
-```
-7DTD-LLM-NPC-Mod/
-├── NPCLLMChat/              # Main mod source
-│   ├── Scripts/             # C# mod code
-│   ├── Config/              # Configuration files
-│   └── bin/Release/         # Compiled DLL
-├── piper-server/            # TTS server (Python)
-├── whisper-server/          # STT server (Python)
-├── install_mod_windows.bat  # Windows installer
-└── README.md
-```
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📝 License
-
-MIT License - see LICENSE file for details
-
-## 🙏 Credits
-
-- **Mod Framework**: [0-SCore](https://gitlab.com/sphereii/SCore) by sphereii
-- **NPC System**: [0-NPCCore](https://gitlab.com/sphereii/NPCCore) by sphereii
-- **AI Models**: [Ollama](https://ollama.ai)
-- **TTS**: [Piper](https://github.com/rhasspy/piper)
-- **STT**: [Faster Whisper](https://github.com/guillaumekln/faster-whisper)
-- **Game**: [7 Days to Die](https://7daystodie.com) by The Fun Pimps
-
-## 🐛 Known Issues
-
-- First voice response after game start may have 5-10 second delay (servers warming up)
-- Some special characters in NPC dialogue may display incorrectly
-- Requires 0-SCore and 0-NPCCore mods to function properly
-
-## 🗺️ Roadmap
-
-- [ ] Multiplayer support
-- [ ] More voice options (accents, languages)
-- [ ] Dynamic personality learning
-- [ ] Quest generation
-- [ ] Faction relationships
+Include:
+- Game version
+- Error messages
+- Log files from `%APPDATA%\7DaysToDie\logs\`
 
 ---
 
-**Made with ❤️ for the 7 Days to Die modding community**
-
-*Questions? Open an issue on GitHub!*
+Enjoy natural conversations with NPCs! 🎮🤖

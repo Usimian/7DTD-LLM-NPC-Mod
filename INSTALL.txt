@@ -1,0 +1,55 @@
+### 1. **Install Prerequisites** (one-time)
+
+Download and install:
+- **0-SCore mod** from Nexus Mods (must match game version)
+- **0-NPCCore mod** from Nexus Mods
+- **Ollama** from ollama.com (installs as Windows service)
+- **Python 3.9+** from python.org (check "Add to PATH")
+
+### 2. **Download Your Mod**
+
+Download `NPCLLMChat-v1.0.0.zip`
+
+### 3. **Extract to Mods Folder**
+
+Unzip to:
+```
+C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\
+```
+
+Result:
+```
+Mods\
+  ├── 0-SCore\
+  ├── 0-NPCCore\
+  └── NPCLLMChat\  ← New folder created by unzip
+```
+
+### 4. **Run Setup (One Time)**
+
+Open Command Prompt:
+```bash
+cd "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat"
+setup_servers.bat
+```
+
+Installs voice dependencies (~2-3 min)
+
+### 5. **Download AI Model**
+
+In Command Prompt:
+```bash
+ollama pull gemma3:4b
+```
+
+Downloads AI model (~2-3 GB, few minutes)
+
+### 6. **Play!**
+
+Launch 7 Days to Die normally. Find an NPC and:
+- Type: `@Hello!`
+- Or hold **V** key and speak
+
+**That's it!** The mod auto-starts everything.
+
+**User skill required: Can extract a zip file and run a .bat file**
