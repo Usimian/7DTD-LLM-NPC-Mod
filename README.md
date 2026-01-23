@@ -37,6 +37,14 @@ Install these first:
    ```
 
 3. **Run setup** (one time):
+   
+   **PowerShell:**
+   ```
+   cd "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat"
+   .\setup_servers.bat
+   ```
+   
+   **Command Prompt (cmd):**
    ```
    cd "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat"
    setup_servers.bat
