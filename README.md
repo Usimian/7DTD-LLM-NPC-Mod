@@ -20,6 +20,21 @@ Install these first:
    ```
    C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat\
    ```
+   
+   Your folder structure should look like:
+   ```
+   7 Days To Die\
+     └── Mods\
+         ├── 0-SCore\
+         ├── 0-NPCCore\
+         └── NPCLLMChat\
+             ├── NPCLLMChat.dll
+             ├── ModInfo.xml
+             ├── Config\
+             ├── piper-server\
+             ├── whisper-server\
+             └── setup_servers.bat
+   ```
 
 3. **Run setup** (one time):
    ```
