@@ -37,7 +37,7 @@ if exist "piper-server" (
     REM Install dependencies
     echo Installing Piper TTS dependencies...
     call venv\Scripts\activate.bat
-    pip install --upgrade pip
+    python -m pip install --upgrade pip --quiet
     pip install -r requirements.txt
     pip install piper-tts
     call deactivate
@@ -65,7 +65,7 @@ if exist "whisper-server" (
     REM Install dependencies
     echo Installing Whisper STT dependencies...
     call venv\Scripts\activate.bat
-    pip install --upgrade pip
+    python -m pip install --upgrade pip --quiet
     pip install -r requirements.txt
     call deactivate
     
