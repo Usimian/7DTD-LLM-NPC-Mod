@@ -136,6 +136,46 @@ namespace NPCLLMChat
 
                 whisperProcess.Start();
                 Log.Out($"[NPCLLMChat] ServerManager: Whisper STT started (PID: {whisperProcess.Id})");
+                
+                // Wait for Whisper server to be ready (it needs time to load the model)
+                Log.Out("[NPCLLMChat] ServerManager: Waiting for Whisper to initialize (loading model)...");
+                System.Threading.Thread.Sleep(5000);  // Initial wait for Python to start
+                
+                // Check if server is responding
+                bool whisperReady = false;
+                for (int attempt = 0; attempt < 30 && !whisperReady; attempt++)
+                {
+                    try
+                    {
+                        using (var client = new System.Net.Sockets.TcpClient())
+                        {
+                            var result = client.BeginConnect("127.0.0.1", 5051, null, null);
+                            var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+                            
+                            if (success && client.Connected)
+                            {
+                                whisperReady = true;
+                                client.Close();
+                                Log.Out("[NPCLLMChat] ServerManager: Whisper STT is accepting connections!");
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Not ready yet
+                    }
+                    
+                    if (!whisperReady && attempt < 29)
+                    {
+                        System.Threading.Thread.Sleep(1000);
+                    }
+                }
+                
+                if (!whisperReady)
+                {
+                    Log.Warning("[NPCLLMChat] ServerManager: Whisper STT failed to start - check if faster-whisper is installed");
+                    Log.Warning("[NPCLLMChat] ServerManager: Run setup_servers.bat to install dependencies");
+                }
             }
             catch (Exception ex)
             {
