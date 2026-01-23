@@ -10,20 +10,32 @@ echo Packaging NPCLLMChat v%VERSION%...
 
 REM Clean old release
 if exist "%RELEASE_NAME%.zip" del "%RELEASE_NAME%.zip"
-if exist "NPCLLMChat" rmdir /s /q "NPCLLMChat"
+if exist "release" rmdir /s /q "release"
 
-REM Create temp folder with exact name for Mods directory
-mkdir "NPCLLMChat"
+REM Create temp folder structure
+mkdir "release\NPCLLMChat"
+mkdir "release\NPCLLMChat\piper-server"
+mkdir "release\NPCLLMChat\whisper-server"
 
-REM Copy everything users need
-copy /Y "NPCLLMChat\bin\Release\NPCLLMChat.dll" "NPCLLMChat\"
-copy /Y "NPCLLMChat\ModInfo.xml" "NPCLLMChat\"
-copy /Y "setup_servers.bat" "NPCLLMChat\"
-xcopy /Y /E /I "NPCLLMChat\Config" "NPCLLMChat\Config"
-xcopy /Y /E /I "piper-server" "NPCLLMChat\piper-server"
-xcopy /Y /E /I "whisper-server" "NPCLLMChat\whisper-server"
+REM Copy mod files
+echo Copying mod files...
+copy /Y "NPCLLMChat\bin\Release\NPCLLMChat.dll" "release\NPCLLMChat\" >nul
+copy /Y "NPCLLMChat\ModInfo.xml" "release\NPCLLMChat\" >nul
+copy /Y "setup_servers.bat" "release\NPCLLMChat\" >nul
+xcopy /Y /E /I /Q "NPCLLMChat\Config" "release\NPCLLMChat\Config" >nul
+
+REM Copy piper-server (only source files, no venv)
+echo Copying piper-server...
+copy /Y "piper-server\*.py" "release\NPCLLMChat\piper-server\" >nul
+copy /Y "piper-server\requirements.txt" "release\NPCLLMChat\piper-server\" >nul
+
+REM Copy whisper-server (only source files, no venv)
+echo Copying whisper-server...
+copy /Y "whisper-server\*.py" "release\NPCLLMChat\whisper-server\" >nul
+copy /Y "whisper-server\requirements.txt" "release\NPCLLMChat\whisper-server\" >nul
 
 REM Create simple README
+echo Creating README...
 (
 echo NPCLLMChat - AI NPC Conversations
 echo.
@@ -47,15 +59,20 @@ echo.
 echo 5. Launch game and talk to NPCs!
 echo    - Text: @Hello
 echo    - Voice: Hold V key
-) > "NPCLLMChat\README.txt"
+) > "release\NPCLLMChat\README.txt"
 
 REM Zip it
-powershell Compress-Archive -Path "NPCLLMChat" -DestinationPath "%RELEASE_NAME%.zip" -Force
+echo Creating ZIP...
+powershell Compress-Archive -Path "release\NPCLLMChat" -DestinationPath "%RELEASE_NAME%.zip" -Force
 
 REM Cleanup
-rmdir /s /q "NPCLLMChat"
+rmdir /s /q "release"
 
 echo.
+echo ========================================
 echo Done! Created: %RELEASE_NAME%.zip
-echo Users extract this to their Mods folder.
+echo ========================================
+echo.
+echo Upload this file to GitHub Releases.
+echo Users extract NPCLLMChat folder to their Mods directory.
 pause
