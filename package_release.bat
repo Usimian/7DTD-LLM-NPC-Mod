@@ -18,6 +18,7 @@ mkdir "NPCLLMChat"
 REM Copy everything users need
 copy /Y "NPCLLMChat\bin\Release\NPCLLMChat.dll" "NPCLLMChat\"
 copy /Y "NPCLLMChat\ModInfo.xml" "NPCLLMChat\"
+copy /Y "setup_servers.bat" "NPCLLMChat\"
 xcopy /Y /E /I "NPCLLMChat\Config" "NPCLLMChat\Config"
 xcopy /Y /E /I "piper-server" "NPCLLMChat\piper-server"
 xcopy /Y /E /I "whisper-server" "NPCLLMChat\whisper-server"
@@ -47,22 +48,6 @@ echo 5. Launch game and talk to NPCs!
 echo    - Text: @Hello
 echo    - Voice: Hold V key
 ) > "NPCLLMChat\README.txt"
-
-REM Create simple setup script
-(
-echo @echo off
-echo echo Setting up voice servers...
-echo cd piper-server
-echo pip install -r requirements.txt
-echo cd ..\whisper-server
-echo if not exist venv python -m venv venv
-echo call venv\Scripts\activate.bat
-echo pip install -r requirements.txt
-echo deactivate
-echo cd ..
-echo echo Done! Launch the game.
-echo pause
-) > "NPCLLMChat\setup_servers.bat"
 
 REM Zip it
 powershell Compress-Archive -Path "NPCLLMChat" -DestinationPath "%RELEASE_NAME%.zip" -Force

@@ -25,23 +25,52 @@ Talk to NPCs in 7 Days to Die using AI! Voice or text chat with NPCs that rememb
 
 ### Install Steps
 
-1. **Extract** the mod to your game's Mods folder:
-   ```
-   <Game>\Mods\NPCLLMChat\
-   ```
+1. **Download** from GitHub:
+   - Download `7DTD-LLM-NPC-Mod-master.zip` from the repository
+   - Or click: Code → Download ZIP
 
-2. **Run setup** (one time only):
+2. **Extract** the downloaded file:
+   - Extract `7DTD-LLM-NPC-Mod-master.zip` to a temporary location
+   - Navigate **inside** the extracted folder
+   - You will see the NPCLLMChat, piper-server andwhisper-server folders
+
+3. **Run the installer**:
+   - Open Command Prompt or PowerShell in the extracted folder
+   - Run the install script with your game path:
+   
+   **If using Command Prompt (cmd):**
+   ```
+   install.bat "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die"
+   ```
+   
+   **If using PowerShell:**
+   ```
+   .\install.bat "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die"
+   ```
+   
+   - Replace the path with your actual game installation directory
+   - Common locations:
+     - Steam: `C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die`
+     - Epic: `C:\Program Files\Epic Games\7DaysToDie`
+
+   The installer will automatically copy all files to `<Game>\Mods\NPCLLMChat\`
+
+4. **Run setup** (one time only):
+   - The installer will show you the next steps
+   - Navigate to the mod folder and run:
    ```bash
-   cd Mods\NPCLLMChat
+   cd "<Game>\Mods\NPCLLMChat"
    setup_servers.bat
    ```
+   - This installs Python dependencies for voice features (~2-3 minutes)
 
-3. **Download AI model**:
+5. **Download AI model**:
    ```bash
    ollama pull gemma3:4b
    ```
+   - Downloads ~2.5 GB AI model (few minutes depending on connection)
 
-4. **Launch game** - Everything auto-starts!
+6. **Launch game** - Everything auto-starts!
 
 ## 🎮 Usage
 
@@ -60,9 +89,10 @@ Edit files in `Mods\NPCLLMChat\Config\`:
 ```
 
 Other models:
-- `gemma2:9b` - Better quality
-- `llama3.2:3b` - Faster
-- `mistral:7b` - Balanced
+- `gemma2:9b` - Better quality, larger
+- `llama3.2:3b` - Faster, good balance
+- `mistral:7b` - High quality
+- `phi3:mini` - Very fast, small
 
 ### Adjust Voice (`ttsconfig.xml`)
 ```xml
@@ -79,11 +109,25 @@ Other models:
 
 Press **F1** in-game:
 
-- `llmchat status` - Show mod status
-- `llmchat test` - Test nearest NPC
-- `llmchat tts test` - Test voice
-- `llmchat stt test` - Test microphone
-- `help llmchat` - Show all commands
+**Main Commands:**
+- `llmchat status` - Show mod status and performance
+- `llmchat test` - Test LLM connection
+- `llmchat talk <message>` - Talk to nearest NPC
+- `llmchat action <action>` - Execute NPC action (follow, stop, guard, wait)
+- `llmchat clear` - Clear all conversation history
+- `llmchat list` - List active NPC sessions
+
+**TTS Commands:**
+- `llmchat tts` - Show TTS status
+- `llmchat tts test` - Test voice synthesis
+- `llmchat tts on/off` - Enable/disable TTS
+- `llmchat tts voices` - List available voices
+
+**STT Commands:**
+- `llmchat stt` - Show STT status
+- `llmchat stt test` - Test microphone recording
+- `llmchat stt on/off` - Enable/disable voice input
+- `llmchat stt devices` - List available microphones
 
 ## ❓ Troubleshooting
 
@@ -91,11 +135,13 @@ Press **F1** in-game:
 - Check Ollama: `ollama list` in cmd
 - Verify model installed: `ollama pull gemma3:4b`
 - Use @ symbol: `@Hello` not just `Hello`
+- Check in-game: `llmchat status` and `llmchat test`
 
 ### Voice chat not working
-- Run `setup_servers.bat`
+- Run `setup_servers.bat` if not already done
 - Check Python: `python --version`
-- In-game: `llmchat stt status`
+- In-game: `llmchat stt status` and `llmchat stt devices`
+- Try `llmchat stt test` to verify microphone
 
 ### No voice from NPC
 - In-game: `llmchat tts status`
