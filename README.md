@@ -14,7 +14,7 @@ Install these first:
 
 ### Install Steps
 
-1. **Download** `NPCLLMChat-v1.0.0.zip` from the [repository](https://github.com/Usimian/7DTD-LLM-NPC-Mod)
+1. **Download** [`NPCLLMChat-v1.0.0.zip`](https://github.com/Usimian/7DTD-LLM-NPC-Mod/raw/master/NPCLLMChat-v1.0.0.zip)
 
 2. **Extract** the `NPCLLMChat` folder to your game's Mods directory:
    ```
