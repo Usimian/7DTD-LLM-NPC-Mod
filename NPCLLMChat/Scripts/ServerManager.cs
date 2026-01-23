@@ -286,13 +286,20 @@ namespace NPCLLMChat
 
         public static void StopServers()
         {
-            if (piperProcess != null && !piperProcess.HasExited)
+            Log.Out("[NPCLLMChat] ServerManager: Stopping servers...");
+            
+            // Kill Piper TTS
+            if (piperProcess != null)
             {
                 try
                 {
-                    Log.Out("[NPCLLMChat] ServerManager: Stopping Piper TTS...");
-                    piperProcess.Kill();
+                    if (!piperProcess.HasExited)
+                    {
+                        Log.Out("[NPCLLMChat] ServerManager: Stopping Piper TTS...");
+                        KillProcessTree(piperProcess.Id);
+                    }
                     piperProcess.Dispose();
+                    piperProcess = null;
                 }
                 catch (Exception ex)
                 {
@@ -300,13 +307,18 @@ namespace NPCLLMChat
                 }
             }
 
-            if (whisperProcess != null && !whisperProcess.HasExited)
+            // Kill Whisper STT
+            if (whisperProcess != null)
             {
                 try
                 {
-                    Log.Out("[NPCLLMChat] ServerManager: Stopping Whisper STT...");
-                    whisperProcess.Kill();
+                    if (!whisperProcess.HasExited)
+                    {
+                        Log.Out("[NPCLLMChat] ServerManager: Stopping Whisper STT...");
+                        KillProcessTree(whisperProcess.Id);
+                    }
                     whisperProcess.Dispose();
+                    whisperProcess = null;
                 }
                 catch (Exception ex)
                 {
@@ -318,6 +330,34 @@ namespace NPCLLMChat
             // and is typically meant to run as a system service
 
             serversStarted = false;
+            Log.Out("[NPCLLMChat] ServerManager: Servers stopped.");
+        }
+        
+        private static void KillProcessTree(int pid)
+        {
+            try
+            {
+                // Use taskkill to forcefully terminate the process and all child processes
+                var killProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "taskkill",
+                        Arguments = $"/F /T /PID {pid}",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    }
+                };
+                
+                killProcess.Start();
+                killProcess.WaitForExit(5000);  // Wait max 5 seconds
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] ServerManager: taskkill failed for PID {pid}: {ex.Message}");
+            }
         }
 
         private static void KillProcessOnPort(int port, string serverName)
