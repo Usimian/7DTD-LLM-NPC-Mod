@@ -338,6 +338,68 @@ namespace NPCLLMChat
             // Remove common LLM formatting artifacts
             string cleaned = response.Trim();
             
+            // If the response looks like JSON, try to extract dialogue from it
+            if (cleaned.StartsWith("{") && cleaned.Contains("\""))
+            {
+                // Try to extract "dialogue" field
+                int dialogueIndex = cleaned.IndexOf("\"dialogue\"", StringComparison.OrdinalIgnoreCase);
+                if (dialogueIndex >= 0)
+                {
+                    int colonIndex = cleaned.IndexOf(':', dialogueIndex);
+                    if (colonIndex > 0)
+                    {
+                        int quoteStart = cleaned.IndexOf('"', colonIndex);
+                        if (quoteStart > 0)
+                        {
+                            int quoteEnd = quoteStart + 1;
+                            while (quoteEnd < cleaned.Length)
+                            {
+                                if (cleaned[quoteEnd] == '"' && cleaned[quoteEnd - 1] != '\\')
+                                    break;
+                                quoteEnd++;
+                            }
+                            if (quoteEnd > quoteStart + 1)
+                            {
+                                cleaned = cleaned.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+                                cleaned = UnescapeJson(cleaned);
+                            }
+                        }
+                    }
+                }
+                // Try to extract "text" or "content" field as fallback
+                else
+                {
+                    foreach (string field in new[] { "\"text\"", "\"content\"", "\"message\"" })
+                    {
+                        int fieldIndex = cleaned.IndexOf(field, StringComparison.OrdinalIgnoreCase);
+                        if (fieldIndex >= 0)
+                        {
+                            int colonIndex = cleaned.IndexOf(':', fieldIndex);
+                            if (colonIndex > 0)
+                            {
+                                int quoteStart = cleaned.IndexOf('"', colonIndex);
+                                if (quoteStart > 0)
+                                {
+                                    int quoteEnd = quoteStart + 1;
+                                    while (quoteEnd < cleaned.Length)
+                                    {
+                                        if (cleaned[quoteEnd] == '"' && cleaned[quoteEnd - 1] != '\\')
+                                            break;
+                                        quoteEnd++;
+                                    }
+                                    if (quoteEnd > quoteStart + 1)
+                                    {
+                                        cleaned = cleaned.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+                                        cleaned = UnescapeJson(cleaned);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Remove "Response:" prefix (case insensitive)
             if (cleaned.StartsWith("Response:", System.StringComparison.OrdinalIgnoreCase))
             {
