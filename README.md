@@ -10,16 +10,15 @@ Install these first:
 - [0-SCore](https://www.nexusmods.com/7daystodie/mods/6176) - Must match game version
 - [0-NPCCore](https://www.nexusmods.com/7daystodie/mods/8099) - Provides NPCs
 - [Ollama](https://ollama.com/download) - AI language model
-- [Python 3.9+](https://www.python.org/downloads/) - Check "Add to PATH" during install
 
 ### Install Steps
 
-1. **Download** [`NPCLLMChat-v1.0.0.zip`](https://github.com/Usimian/7DTD-LLM-NPC-Mod/raw/master/NPCLLMChat-v1.0.0.zip)
+1. **Download** [`NPCLLMChat-v1.0.0.zip`](https://github.com/Usimian/7DTD-LLM-NPC-Mod/releases/download/v1.0.0/NPCLLMChat-v1.0.0.zip)
 
-2. **Extract** the `NPCLLMChat` folder to your game's Mods directory:
-   ```
-   C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat\
-   ```
+2. **Extract** to your game's Mods folder:
+   - Right-click the ZIP → **Extract All**
+   - Browse to: `C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods`
+   - Click **Extract**
    
    Your folder structure should look like:
    ```
@@ -32,30 +31,15 @@ Install these first:
              ├── ModInfo.xml
              ├── Config\
              ├── piper-server\
-             ├── whisper-server\
-             └── setup_servers.bat
+             └── whisper-server\
    ```
 
-3. **Run setup** (one time):
-   
-   **PowerShell:**
-   ```
-   cd "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat"
-   .\setup_servers.bat
-   ```
-   
-   **Command Prompt (cmd):**
-   ```
-   cd "C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die\Mods\NPCLLMChat"
-   setup_servers.bat
-   ```
-
-4. **Download AI model**:
+3. **Download AI model**:
    ```
    ollama pull gemma3:4b
    ```
 
-5. **Launch game** - Everything auto-starts!
+4. **Launch game** - Everything auto-starts!
 
 ### Usage
 
@@ -112,7 +96,7 @@ Creates `NPCLLMChat-v1.0.0.zip` for distribution. Upload to GitHub Releases.
 ## Troubleshooting
 
 - **NPC doesn't respond**: Check `ollama list` in cmd, verify model is installed
-- **Voice not working**: Run `setup_servers.bat`, check `python --version`
+- **Voice not working**: Check that piper-server and whisper-server folders contain `venv` directories
 - **In-game diagnostics**: Press F1, type `llmchat status`
 
 ## Credits

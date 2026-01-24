@@ -15,4 +15,8 @@ Thumbs.db
 # Debug
 *.pdb
 whisper-server/venv/
+piper-server/venv/
 .vscode/
+
+# Release packages (uploaded to GitHub Releases)
+NPCLLMChat-v*.zip
