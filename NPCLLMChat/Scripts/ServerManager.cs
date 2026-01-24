@@ -12,7 +12,6 @@ namespace NPCLLMChat
     {
         private static Process piperProcess;
         private static Process whisperProcess;
-        private static Process ollamaProcess;
         private static bool serversStarted = false;
 
         public static void StartServers()
@@ -36,8 +35,8 @@ namespace NPCLLMChat
 
             Log.Out($"[NPCLLMChat] ServerManager: Mod path = {modPath}");
 
-            // Start Ollama if not already running
-            StartOllamaIfNeeded();
+            // Check if Ollama is running (don't auto-start - causes Steam hang issues)
+            CheckOllamaStatus();
 
             // Kill any existing servers on our ports
             KillProcessOnPort(5050, "Piper TTS");
@@ -69,24 +68,36 @@ namespace NPCLLMChat
                     return;
                 }
 
-                Log.Out("[NPCLLMChat] ServerManager: Starting Piper TTS server...");
-
-                piperProcess = new Process
+                // Find Python executable and site-packages
+                string pythonExe;
+                string sitePackages;
+                if (!FindPythonEnvironment(piperDir, out pythonExe, out sitePackages))
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "python",
-                        Arguments = $"\"{piperScript}\" --port 5050",
-                        WorkingDirectory = piperDir,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = false,
-                        RedirectStandardError = false
-                    }
+                    Log.Warning("[NPCLLMChat] ServerManager: Python not found. Please install Python 3.9+");
+                    return;
+                }
+
+                Log.Out($"[NPCLLMChat] ServerManager: Starting Piper TTS server (using {pythonExe})...");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = pythonExe,
+                    Arguments = $"\"{piperScript}\" --port 5050",
+                    WorkingDirectory = piperDir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 };
 
-                piperProcess.Start();
-                Log.Out($"[NPCLLMChat] ServerManager: Piper TTS started (PID: {piperProcess.Id})");
+                // Add bundled packages to PYTHONPATH for portability
+                if (!string.IsNullOrEmpty(sitePackages))
+                {
+                    startInfo.EnvironmentVariables["PYTHONPATH"] = sitePackages;
+                }
+
+                piperProcess = Process.Start(startInfo);
+                Log.Out($"[NPCLLMChat] ServerManager: Piper TTS started (PID: {piperProcess?.Id})");
             }
             catch (Exception ex)
             {
@@ -107,35 +118,42 @@ namespace NPCLLMChat
                 }
 
                 string whisperScript = Path.Combine(whisperDir, "whisper_server.py");
-                string venvPython = Path.Combine(whisperDir, "venv", "Scripts", "python.exe");
-
                 if (!File.Exists(whisperScript))
                 {
                     Log.Warning($"[NPCLLMChat] ServerManager: whisper_server.py not found at {whisperScript}");
                     return;
                 }
 
-                // Use venv Python if available, otherwise system Python
-                string pythonExe = File.Exists(venvPython) ? venvPython : "python";
+                // Find Python executable and site-packages
+                string pythonExe;
+                string sitePackages;
+                if (!FindPythonEnvironment(whisperDir, out pythonExe, out sitePackages))
+                {
+                    Log.Warning("[NPCLLMChat] ServerManager: Python not found. Please install Python 3.9+");
+                    return;
+                }
 
                 Log.Out($"[NPCLLMChat] ServerManager: Starting Whisper STT server (using {pythonExe})...");
 
-                whisperProcess = new Process
+                var startInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = pythonExe,
-                        Arguments = $"\"{whisperScript}\" --port 5051 --device cpu --compute-type int8 --preload",
-                        WorkingDirectory = whisperDir,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = false,
-                        RedirectStandardError = false
-                    }
+                    FileName = pythonExe,
+                    Arguments = $"\"{whisperScript}\" --port 5051 --device cpu --compute-type int8 --preload",
+                    WorkingDirectory = whisperDir,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false
                 };
 
-                whisperProcess.Start();
-                Log.Out($"[NPCLLMChat] ServerManager: Whisper STT started (PID: {whisperProcess.Id})");
+                // Add bundled packages to PYTHONPATH for portability
+                if (!string.IsNullOrEmpty(sitePackages))
+                {
+                    startInfo.EnvironmentVariables["PYTHONPATH"] = sitePackages;
+                }
+
+                whisperProcess = Process.Start(startInfo);
+                Log.Out($"[NPCLLMChat] ServerManager: Whisper STT started (PID: {whisperProcess?.Id})");
                 
                 // Wait for Whisper server to be ready (it needs time to load the model)
                 Log.Out("[NPCLLMChat] ServerManager: Waiting for Whisper to initialize (loading model)...");
@@ -183,11 +201,11 @@ namespace NPCLLMChat
             }
         }
 
-        private static void StartOllamaIfNeeded()
+        private static void CheckOllamaStatus()
         {
             try
             {
-                // Check if Ollama is already running by trying to connect
+                // Check if Ollama is running by trying to connect
                 using (var client = new System.Net.Sockets.TcpClient())
                 {
                     var result = client.BeginConnect("127.0.0.1", 11434, null, null);
@@ -195,139 +213,53 @@ namespace NPCLLMChat
                     
                     if (success && client.Connected)
                     {
-                        Log.Out("[NPCLLMChat] ServerManager: Ollama is already running");
+                        Log.Out("[NPCLLMChat] ServerManager: Ollama is running");
                         client.Close();
                         return;
                     }
                 }
             }
-            catch
-            {
-                // Ollama is not running, we'll start it
-            }
+            catch { }
 
-            try
-            {
-                Log.Out("[NPCLLMChat] ServerManager: Starting Ollama...");
-                
-                // Start Ollama via PowerShell in a completely detached way
-                // This ensures it runs with proper environment and doesn't get blocked by I/O redirection
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = "-WindowStyle Hidden -Command \"Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden -PassThru\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = false,
-                    RedirectStandardError = false
-                };
-
-                var psProcess = Process.Start(startInfo);
-                if (psProcess != null)
-                {
-                    // Wait for PowerShell to complete starting Ollama
-                    psProcess.WaitForExit(3000);
-                    Log.Out("[NPCLLMChat] ServerManager: Ollama start command executed");
-                }
-                
-                // Wait for Ollama to initialize - be generous with time
-                Log.Out("[NPCLLMChat] ServerManager: Waiting for Ollama to initialize...");
-                System.Threading.Thread.Sleep(10000);  // 10 second initial wait
-                
-                // Verify it's actually responding to port connections
-                bool connected = false;
-                for (int attempt = 0; attempt < 20 && !connected; attempt++)
-                {
-                    try
-                    {
-                        using (var client = new System.Net.Sockets.TcpClient())
-                        {
-                            var result = client.BeginConnect("127.0.0.1", 11434, null, null);
-                            var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
-                            
-                            if (success && client.Connected)
-                            {
-                                connected = true;
-                                client.Close();
-                                Log.Out("[NPCLLMChat] ServerManager: Ollama is accepting connections!");
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        // Not ready yet
-                    }
-                    
-                    if (!connected && attempt < 19)
-                    {
-                        System.Threading.Thread.Sleep(1000);
-                    }
-                }
-                
-                if (!connected)
-                {
-                    Log.Warning("[NPCLLMChat] ServerManager: Ollama failed to start properly");
-                    Log.Warning("[NPCLLMChat] ServerManager: Please ensure Ollama is installed and in your PATH");
-                    return;
-                }
-                
-                // Additional wait to let Ollama fully initialize its model loading capability
-                Log.Out("[NPCLLMChat] ServerManager: Allowing Ollama time to fully initialize...");
-                System.Threading.Thread.Sleep(5000);
-                
-                Log.Out("[NPCLLMChat] ServerManager: Ollama startup complete!");
-            }
-            catch (Exception ex)
-            {
-                Log.Warning($"[NPCLLMChat] ServerManager: Could not auto-start Ollama: {ex.Message}");
-                Log.Warning("[NPCLLMChat] ServerManager: Please start Ollama manually: ollama serve");
-            }
+            // Ollama is not running - warn user
+            Log.Warning("[NPCLLMChat] ServerManager: Ollama is NOT running!");
+            Log.Warning("[NPCLLMChat] ServerManager: NPCs will not respond until Ollama is started.");
+            Log.Warning("[NPCLLMChat] ServerManager: Run 'ollama serve' or enable Ollama auto-start in Windows.");
         }
 
         public static void StopServers()
         {
             Log.Out("[NPCLLMChat] ServerManager: Stopping servers...");
             
-            // Kill Piper TTS
+            // Kill Piper TTS directly (no child processes)
             if (piperProcess != null)
             {
                 try
                 {
                     if (!piperProcess.HasExited)
                     {
-                        Log.Out("[NPCLLMChat] ServerManager: Stopping Piper TTS...");
-                        KillProcessTree(piperProcess.Id);
+                        piperProcess.Kill();
+                        Log.Out("[NPCLLMChat] ServerManager: Piper TTS killed");
                     }
-                    piperProcess.Dispose();
-                    piperProcess = null;
                 }
-                catch (Exception ex)
-                {
-                    Log.Warning($"[NPCLLMChat] ServerManager: Error stopping Piper: {ex.Message}");
-                }
+                catch { }
+                piperProcess = null;
             }
 
-            // Kill Whisper STT
+            // Kill Whisper STT directly (no child processes)
             if (whisperProcess != null)
             {
                 try
                 {
                     if (!whisperProcess.HasExited)
                     {
-                        Log.Out("[NPCLLMChat] ServerManager: Stopping Whisper STT...");
-                        KillProcessTree(whisperProcess.Id);
+                        whisperProcess.Kill();
+                        Log.Out("[NPCLLMChat] ServerManager: Whisper STT killed");
                     }
-                    whisperProcess.Dispose();
-                    whisperProcess = null;
                 }
-                catch (Exception ex)
-                {
-                    Log.Warning($"[NPCLLMChat] ServerManager: Error stopping Whisper: {ex.Message}");
-                }
+                catch { }
+                whisperProcess = null;
             }
-
-            // Note: We intentionally don't stop Ollama as it may be used by other applications
-            // and is typically meant to run as a system service
 
             serversStarted = false;
             Log.Out("[NPCLLMChat] ServerManager: Servers stopped.");
@@ -342,17 +274,15 @@ namespace NPCLLMChat
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "taskkill",
-                        Arguments = $"/F /T /PID {pid}",
+                        FileName = "cmd.exe",
+                        Arguments = $"/c taskkill /F /T /PID {pid}",
                         UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
+                        CreateNoWindow = true
                     }
                 };
                 
                 killProcess.Start();
-                killProcess.WaitForExit(5000);  // Wait max 5 seconds
+                // Don't wait - let taskkill run async to avoid blocking game exit
             }
             catch (Exception ex)
             {
@@ -414,6 +344,71 @@ namespace NPCLLMChat
             {
                 Log.Warning($"[NPCLLMChat] ServerManager: Error checking port {port}: {ex.Message}");
             }
+        }
+
+        private static bool FindPythonEnvironment(string serverDir, out string pythonExe, out string sitePackages)
+        {
+            pythonExe = null;
+            sitePackages = null;
+
+            // Look for bundled site-packages (portable approach)
+            string bundledSitePackages = Path.Combine(serverDir, "venv", "Lib", "site-packages");
+            if (Directory.Exists(bundledSitePackages))
+            {
+                sitePackages = bundledSitePackages;
+                Log.Out($"[NPCLLMChat] ServerManager: Found bundled packages at {sitePackages}");
+            }
+
+            // Find Python executable - try multiple locations
+            string[] pythonPaths = new[]
+            {
+                // 1. System Python (most portable - user has Python installed)
+                "python",
+                "python3",
+                // 2. Common Windows Python locations
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Python", "Python312", "python.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Python", "Python311", "python.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Python", "Python310", "python.exe"),
+                @"C:\Python312\python.exe",
+                @"C:\Python311\python.exe",
+                @"C:\Python310\python.exe",
+            };
+
+            foreach (string path in pythonPaths)
+            {
+                try
+                {
+                    // Test if this Python works
+                    var testProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = path,
+                            Arguments = "--version",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true
+                        }
+                    };
+
+                    testProcess.Start();
+                    testProcess.WaitForExit(3000);
+
+                    if (testProcess.ExitCode == 0)
+                    {
+                        pythonExe = path;
+                        Log.Out($"[NPCLLMChat] ServerManager: Found Python at {pythonExe}");
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // This path doesn't work, try next
+                }
+            }
+
+            return false;
         }
 
         private static string FindServerDirectory(string serverName, string modPath)

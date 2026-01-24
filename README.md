@@ -10,6 +10,7 @@ Install these first:
 - [0-SCore](https://www.nexusmods.com/7daystodie/mods/6176) - Must match game version
 - [0-NPCCore](https://www.nexusmods.com/7daystodie/mods/8099) - Provides NPCs
 - [Ollama](https://ollama.com/download) - AI language model
+- [Python 3.10+](https://www.python.org/downloads/) - Check "Add to PATH" during install (packages are pre-bundled)
 
 ### Install Steps
 
@@ -39,7 +40,12 @@ Install these first:
    ollama pull gemma3:4b
    ```
 
-4. **Launch game** - Everything auto-starts!
+4. **Ensure Ollama is running** before launching the game:
+   - Ollama usually auto-starts with Windows (check system tray for Ollama icon)
+   - If not running, open a terminal and run: `ollama run gemma3:4b`
+   - Recommended: Enable Ollama autostart (startup items)
+
+5. **Launch game** - TTS and STT servers auto-start!
 
 ### Usage
 
@@ -95,8 +101,11 @@ Creates `NPCLLMChat-v1.0.0.zip` for distribution. Upload to GitHub Releases.
 
 ## Troubleshooting
 
-- **NPC doesn't respond**: Check `ollama list` in cmd, verify model is installed
-- **Voice not working**: Check that piper-server and whisper-server folders contain `venv` directories
+- **NPC doesn't respond**: 
+  - Ensure Ollama is running (check system tray or run `ollama serve`)
+  - Check `ollama list` in cmd, verify model is installed
+- **Voice not working**: Verify Python is installed and in PATH (`python --version` in cmd)
+- **Game hangs on exit**: This is a known Steam issue, not the mod - just wait or click Stop in Steam
 - **In-game diagnostics**: Press F1, type `llmchat status`
 
 ## Credits

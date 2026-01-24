@@ -33,6 +33,7 @@ echo 1. Install prerequisites:
 echo    - 0-SCore mod ^(must match game version^)
 echo    - 0-NPCCore mod
 echo    - Ollama ^(ollama.com^)
+echo    - Python 3.10+ ^(python.org^) - Check "Add to PATH"
 echo.
 echo 2. Extract to your Mods folder:
 echo    Right-click ZIP ^> Extract All ^> Browse to Mods folder
@@ -43,6 +44,8 @@ echo.
 echo 4. Launch game and talk to NPCs!
 echo    - Text: @Hello
 echo    - Voice: Hold V key
+echo.
+echo NOTE: Python packages are pre-bundled - no pip install needed!
 ) > "_package\NPCLLMChat\README.txt"
 
 REM Zip it
