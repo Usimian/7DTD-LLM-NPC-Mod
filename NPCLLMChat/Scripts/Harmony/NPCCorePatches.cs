@@ -190,11 +190,15 @@ namespace NPCLLMChat.Harmony
             }
 
             // Process the message with player reference for actions
-            // NPC response will be spoken via TTS, no visual feedback needed to avoid hiding NPC
             chatComponent.ProcessPlayerMessage(message, player, response =>
             {
-                // Response is logged and spoken via TTS in NPCChatComponent
                 Log.Out($"[NPCLLMChat] {chatComponent.NPCName}: {response}");
+
+                // Show response on screen (important when TTS unavailable)
+                if (!string.IsNullOrWhiteSpace(response) && player is EntityPlayerLocal localPlayer)
+                {
+                    GameManager.ShowTooltip(localPlayer, $"{chatComponent.NPCName}: {response}", false);
+                }
             });
         }
     }
