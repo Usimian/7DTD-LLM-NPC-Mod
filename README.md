@@ -2,6 +2,8 @@
 
 Talk to NPCs in 7 Days to Die using AI! Voice or text chat with NPCs that remember your conversations.
 
+> **Linux/Ubuntu users:** see [LINUX_SETUP.md](LINUX_SETUP.md) for the full native-Linux setup (systemd speech services, symlink deploy, Steam runtime notes).
+
 ## Installation
 
 ### Prerequisites

@@ -6,7 +6,7 @@ using UnityEngine;
 namespace NPCLLMChat
 {
     /// <summary>
-    /// Manages automatic startup of TTS and STT servers on Windows
+    /// Manages automatic startup of TTS and STT servers
     /// </summary>
     public static class ServerManager
     {
@@ -18,12 +18,6 @@ namespace NPCLLMChat
         {
             if (serversStarted) return;
             serversStarted = true;
-
-            if (!PlatformHelper.IsWindows)
-            {
-                Log.Out("[NPCLLMChat] ServerManager: Not on Windows, skipping auto-start");
-                return;
-            }
 
             // Get the mod directory
             string modPath = GetModPath();
@@ -38,15 +32,36 @@ namespace NPCLLMChat
             // Check if Ollama is running (don't auto-start - causes Steam hang issues)
             CheckOllamaStatus();
 
-            // Kill any existing servers on our ports
-            KillProcessOnPort(5050, "Piper TTS");
-            KillProcessOnPort(5051, "Whisper STT");
+            // A server already listening (e.g. run as a systemd user service, or surviving
+            // a game restart) is used as-is; only spawn our own when the port is free.
+            // Under Steam's Linux runtime the game can't exec host Python at all, so
+            // externally-managed servers are the normal case there.
+            if (IsPortListening(5050))
+                Log.Out("[NPCLLMChat] ServerManager: Piper TTS already running on port 5050, using it");
+            else
+                StartPiperServer(modPath);
 
-            // Start Piper TTS
-            StartPiperServer(modPath);
+            if (IsPortListening(5051))
+                Log.Out("[NPCLLMChat] ServerManager: Whisper STT already running on port 5051, using it");
+            else
+                StartWhisperServer(modPath);
+        }
 
-            // Start Whisper STT
-            StartWhisperServer(modPath);
+        private static bool IsPortListening(int port)
+        {
+            try
+            {
+                using (var client = new System.Net.Sockets.TcpClient())
+                {
+                    var result = client.BeginConnect("127.0.0.1", port, null, null);
+                    bool success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+                    return success && client.Connected;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static void StartPiperServer(string modPath)
@@ -224,7 +239,7 @@ namespace NPCLLMChat
             // Ollama is not running - warn user
             Log.Warning("[NPCLLMChat] ServerManager: Ollama is NOT running!");
             Log.Warning("[NPCLLMChat] ServerManager: NPCs will not respond until Ollama is started.");
-            Log.Warning("[NPCLLMChat] ServerManager: Run 'ollama serve' or enable Ollama auto-start in Windows.");
+            Log.Warning("[NPCLLMChat] ServerManager: Run 'ollama serve' or enable the Ollama service/auto-start.");
         }
 
         public static void StopServers()
@@ -265,91 +280,24 @@ namespace NPCLLMChat
             Log.Out("[NPCLLMChat] ServerManager: Servers stopped.");
         }
         
-        private static void KillProcessTree(int pid)
-        {
-            try
-            {
-                // Use taskkill to forcefully terminate the process and all child processes
-                var killProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c taskkill /F /T /PID {pid}",
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    }
-                };
-                
-                killProcess.Start();
-                // Don't wait - let taskkill run async to avoid blocking game exit
-            }
-            catch (Exception ex)
-            {
-                Log.Warning($"[NPCLLMChat] ServerManager: taskkill failed for PID {pid}: {ex.Message}");
-            }
-        }
-
-        private static void KillProcessOnPort(int port, string serverName)
-        {
-            try
-            {
-                // Use netstat to find process using the port
-                var netstatProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "netstat",
-                        Arguments = "-ano",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    }
-                };
-
-                netstatProcess.Start();
-                string output = netstatProcess.StandardOutput.ReadToEnd();
-                netstatProcess.WaitForExit();
-
-                // Parse netstat output to find PID listening on our port
-                string[] lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string line in lines)
-                {
-                    if (line.Contains($":{port}") && line.Contains("LISTENING"))
-                    {
-                        string[] parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length > 0)
-                        {
-                            string pidStr = parts[parts.Length - 1];
-                            if (int.TryParse(pidStr, out int pid) && pid > 0)
-                            {
-                                try
-                                {
-                                    Process existingProcess = Process.GetProcessById(pid);
-                                    Log.Out($"[NPCLLMChat] ServerManager: Killing existing {serverName} server (PID: {pid})");
-                                    existingProcess.Kill();
-                                    existingProcess.WaitForExit(2000); // Wait up to 2 seconds
-                                }
-                                catch (Exception ex)
-                                {
-                                    Log.Warning($"[NPCLLMChat] ServerManager: Could not kill process {pid}: {ex.Message}");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Warning($"[NPCLLMChat] ServerManager: Error checking port {port}: {ex.Message}");
-            }
-        }
-
         private static bool FindPythonEnvironment(string serverDir, out string pythonExe, out string sitePackages)
         {
             pythonExe = null;
             sitePackages = null;
+
+            // On Linux, a venv created in place (setup_servers.sh) has a working interpreter
+            // of its own — use it directly, no PYTHONPATH needed. Windows releases bundle only
+            // site-packages (a copied venv python.exe wouldn't run), so keep system Python there.
+            if (!PlatformHelper.IsWindows)
+            {
+                string venvPython = Path.Combine(serverDir, "venv", "bin", "python");
+                if (File.Exists(venvPython))
+                {
+                    pythonExe = venvPython;
+                    Log.Out($"[NPCLLMChat] ServerManager: Using venv Python at {pythonExe}");
+                    return true;
+                }
+            }
 
             // Look for bundled site-packages (portable approach)
             string bundledSitePackages = Path.Combine(serverDir, "venv", "Lib", "site-packages");
@@ -357,6 +305,24 @@ namespace NPCLLMChat
             {
                 sitePackages = bundledSitePackages;
                 Log.Out($"[NPCLLMChat] ServerManager: Found bundled packages at {sitePackages}");
+            }
+            else if (!PlatformHelper.IsWindows)
+            {
+                // Linux venv layout: venv/lib/python3.X/site-packages
+                string libDir = Path.Combine(serverDir, "venv", "lib");
+                if (Directory.Exists(libDir))
+                {
+                    foreach (string pyDir in Directory.GetDirectories(libDir, "python3*"))
+                    {
+                        string sp = Path.Combine(pyDir, "site-packages");
+                        if (Directory.Exists(sp))
+                        {
+                            sitePackages = sp;
+                            Log.Out($"[NPCLLMChat] ServerManager: Found bundled packages at {sitePackages}");
+                            break;
+                        }
+                    }
+                }
             }
 
             // Find Python executable - try multiple locations

@@ -1,0 +1,27 @@
+# Whisper STT HTTP Server - Systemd User Service
+#
+# Installation:
+#   mkdir -p ~/.config/systemd/user
+#   cp whisper-stt.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now whisper-stt
+#
+# View logs:
+#   journalctl --user -u whisper-stt -f
+#
+# Stop:
+#   systemctl --user stop whisper-stt
+
+[Unit]
+Description=Whisper STT HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/7DTD-LLM-NPC-Mod/whisper-server
+ExecStart=%h/7DTD-LLM-NPC-Mod/whisper-server/venv/bin/python %h/7DTD-LLM-NPC-Mod/whisper-server/whisper_server.py --port 5051 --device cpu --compute-type int8 --preload
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

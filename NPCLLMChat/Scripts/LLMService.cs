@@ -203,11 +203,14 @@ namespace NPCLLMChat
                 options.Append($", \"num_gpu\": {_numGpuLayers}");
             }
 
-            // Ollama /api/generate format with GPU optimizations
+            // "think": false — thinking models (qwen3 etc.) otherwise burn the whole
+            // num_predict budget on reasoning and return an empty response.
+            // Non-thinking models accept and ignore the flag.
             return $@"{{
                 ""model"": ""{_model}"",
                 ""prompt"": ""{EscapeJson(prompt.ToString())}"",
                 ""stream"": false,
+                ""think"": false,
                 ""options"": {{ {options} }}
             }}";
         }

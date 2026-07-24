@@ -36,7 +36,7 @@
             For your GPU, llama3:70b gives the best roleplay quality
             while still maintaining reasonable response times.
         -->
-        <Model>gemma3:4b</Model>
+        <Model>qwen3.6:35b</Model>
 
         <!-- Timeout - can be shorter with fast GPU -->
         <TimeoutSeconds>15</TimeoutSeconds>

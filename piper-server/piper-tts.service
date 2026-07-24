@@ -4,8 +4,7 @@
 #   mkdir -p ~/.config/systemd/user
 #   cp piper-tts.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
-#   systemctl --user enable piper-tts
-#   systemctl --user start piper-tts
+#   systemctl --user enable --now piper-tts
 #
 # View logs:
 #   journalctl --user -u piper-tts -f
@@ -20,7 +19,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/7DTD-LLM-NPC-Mod/piper-server
-ExecStart=%h/.local/share/pipx/venvs/piper-tts/bin/python %h/7DTD-LLM-NPC-Mod/piper-server/piper_server.py --port 5050
+ExecStart=%h/7DTD-LLM-NPC-Mod/piper-server/venv/bin/python %h/7DTD-LLM-NPC-Mod/piper-server/piper_server.py --port 5050
 Restart=on-failure
 RestartSec=5
 
