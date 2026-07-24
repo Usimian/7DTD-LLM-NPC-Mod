@@ -99,6 +99,16 @@ namespace NPCLLMChat
             Save(npcName, memory);
         }
 
+        public static void DeleteFile(string npcName)
+        {
+            try
+            {
+                string file = FileFor(npcName);
+                if (File.Exists(file)) File.Delete(file);
+            }
+            catch { }
+        }
+
         /// <summary>
         /// Adopt memory written by the earlier entity-id-keyed format (npc_12345.json):
         /// the newest file whose stored npcName matches becomes this NPC's memory, and

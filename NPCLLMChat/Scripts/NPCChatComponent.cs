@@ -49,8 +49,12 @@ namespace NPCLLMChat
         private bool _actionsEnabled = true;
         private EntityPlayer _lastInteractingPlayer;
 
-        // Persistent memory (conversation + travel journal), saved per NPC per save-game
+        // Persistent memory (conversation + travel journal), saved per NPC per save-game.
+        // Hired companions all share one memory key, so THE companion keeps a single
+        // continuous history across renames, deaths, respawns and re-hires.
         private NPCMemory _memory;
+        private string _memoryKey;
+        private const string CompanionMemoryKey = "companion";
         private string _currentPlace;
         private float _nextPlaceCheck;
         private const float PlaceCheckIntervalSeconds = 5f;
@@ -67,7 +71,8 @@ namespace NPCLLMChat
             _npcName = GetNPCName();
 
             // Restore persisted memory from the save folder, if this NPC has any
-            _memory = NPCMemoryStore.Load(_npcName) ?? new NPCMemory { npcName = _npcName };
+            _memoryKey = IsHiredCompanion() ? CompanionMemoryKey : _npcName;
+            _memory = LoadMemoryForKey();
             foreach (var msg in _memory.messages)
             {
                 _conversationHistory.Add(new ChatMessage(msg.role, msg.content));
@@ -361,7 +366,7 @@ Stay in character. Only perform actions that make sense for your personality.";
             _conversationHistory.Clear();
             if (_memory != null)
             {
-                NPCMemoryStore.DeleteMessages(_npcName, _memory);
+                NPCMemoryStore.DeleteMessages(_memoryKey, _memory);
             }
         }
 
@@ -375,7 +380,89 @@ Stay in character. Only perform actions that make sense for your personality.";
             {
                 _memory.messages.Add(new SavedMessage { role = msg.Role, content = msg.Content });
             }
-            NPCMemoryStore.Save(_npcName, _memory);
+            NPCMemoryStore.Save(_memoryKey, _memory);
+        }
+
+        /// <summary>
+        /// True when this NPC has been hired by a player (SCore stores the hiring
+        /// player's entity id in the Leader/Owner cvars).
+        /// </summary>
+        private bool IsHiredCompanion()
+        {
+            try
+            {
+                if (_npcEntity?.Buffs == null) return false;
+                foreach (string cvar in new[] { "Leader", "Owner" })
+                {
+                    if (_npcEntity.Buffs.HasCustomVar(cvar) && _npcEntity.Buffs.GetCustomVar(cvar) > 0f)
+                        return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private NPCMemory LoadMemoryForKey()
+        {
+            var memory = NPCMemoryStore.Load(_memoryKey);
+            if (_memoryKey == CompanionMemoryKey)
+            {
+                // Fold in anything recorded under this NPC's name before it was hired
+                var named = NPCMemoryStore.Load(_npcName);
+                if (named != null)
+                {
+                    memory = MergeMemories(memory, named);
+                    NPCMemoryStore.DeleteFile(_npcName);
+                    NPCMemoryStore.Save(CompanionMemoryKey, memory);
+                    Log.Out($"[NPCLLMChat] Folded {_npcName}'s memory into the companion memory");
+                }
+            }
+            return memory ?? new NPCMemory { npcName = _npcName };
+        }
+
+        /// <summary>
+        /// Hired mid-session: switch this NPC onto the shared companion memory,
+        /// keeping both the prior companion history and the current conversation.
+        /// </summary>
+        private void RefreshMemoryKey()
+        {
+            if (_memoryKey == CompanionMemoryKey || !IsHiredCompanion()) return;
+
+            Log.Out($"[NPCLLMChat] {_npcName} is now the player's companion - unifying memory");
+            string oldKey = _memoryKey;
+            _memoryKey = CompanionMemoryKey;
+
+            var existing = NPCMemoryStore.Load(CompanionMemoryKey);
+            if (existing != null)
+            {
+                _memory = MergeMemories(existing, _memory);
+                _conversationHistory.Clear();
+                foreach (var msg in _memory.messages)
+                {
+                    _conversationHistory.Add(new ChatMessage(msg.role, msg.content));
+                }
+                TrimHistory();
+            }
+            NPCMemoryStore.DeleteFile(oldKey);
+            PersistMemory();
+        }
+
+        /// <summary>
+        /// Append newer memory onto older; the newer side wins on journal revisits.
+        /// </summary>
+        private static NPCMemory MergeMemories(NPCMemory older, NPCMemory newer)
+        {
+            if (older == null) return newer;
+            if (newer == null) return older;
+
+            older.messages.AddRange(newer.messages);
+            foreach (var visit in newer.placesVisited)
+            {
+                older.placesVisited.RemoveAll(p => p.place == visit.place);
+                older.placesVisited.Add(visit);
+            }
+            older.npcName = newer.npcName ?? older.npcName;
+            return older;
         }
 
         // ========== Travel journal + world context ==========
@@ -388,6 +475,7 @@ Stay in character. Only perform actions that make sense for your personality.";
 
             try
             {
+                RefreshMemoryKey();
                 CheckCurrentPlace();
             }
             catch (Exception ex)
@@ -433,7 +521,7 @@ Stay in character. Only perform actions that make sense for your personality.";
                 }
                 Log.Out($"[NPCLLMChat] {_npcName} travel journal: arrived at {place} (Day {day} {time})");
             }
-            NPCMemoryStore.Save(_npcName, _memory);
+            NPCMemoryStore.Save(_memoryKey, _memory);
         }
 
         private string BuildWorldContext()
