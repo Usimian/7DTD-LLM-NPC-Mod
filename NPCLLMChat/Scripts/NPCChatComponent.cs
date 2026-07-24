@@ -217,6 +217,7 @@ Available actions and when to use them:
 - trade: Player wants to trade, buy, sell, or see your items
 - give: You decide to give the player an item
 - heal: Player asks for healing or medical help (if you're capable)
+- remember: Player asks you to remember/mark/note the current location (include a ""label"" field naming it)
 - refuse: You decline a request (dangerous, unreasonable, out of character)
 
 Response format when taking action:
@@ -234,6 +235,9 @@ Response: It's rough. Every day is a fight for survival, but we manage.
 
 Player: ""Can you give me some bandages?""
 Response: {""action"": ""give"", ""dialogue"": ""Here, take these. Stay safe out there."", ""item"": ""bandage"", ""amount"": 2}
+
+Player: ""Remember this spot"" or ""Mark this place: bandits""
+Response: {""action"": ""remember"", ""dialogue"": ""Got it. I'll remember this place."", ""label"": ""bandits""}
 
 Stay in character. Only perform actions that make sense for your personality.";
         }
@@ -272,13 +276,22 @@ Stay in character. Only perform actions that make sense for your personality.";
             _conversationHistory.Add(new ChatMessage("NPC", dialogueResponse));
             TrimHistory();
             PersistMemory();
+            MaybeSummarize();
 
             // Execute action if parsed
             if (action != null && action.Type != NPCActionType.None && _npcEntity != null)
             {
                 try
                 {
-                    ActionExecutor.Instance.ExecuteAction(_npcEntity, _lastInteractingPlayer, action);
+                    if (action.Type == NPCActionType.Remember)
+                    {
+                        // Memory action - handled here, not by the world-action executor
+                        RememberPlace(action.GetParam("label", action.GetParam("name", "this spot")));
+                    }
+                    else
+                    {
+                        ActionExecutor.Instance.ExecuteAction(_npcEntity, _lastInteractingPlayer, action);
+                    }
                     OnActionExecuted?.Invoke(action);
                 }
                 catch (Exception ex)
@@ -351,10 +364,17 @@ Stay in character. Only perform actions that make sense for your personality.";
 
         private void TrimHistory()
         {
-            // Keep conversation history within limits
+            // Expired messages queue for long-term summarization instead of vanishing
             while (_conversationHistory.Count > _maxHistoryLength * 2) // *2 for player + NPC pairs
             {
+                var expired = _conversationHistory[0];
                 _conversationHistory.RemoveAt(0);
+                _memory?.pendingSummary.Add(new SavedMessage { role = expired.Role, content = expired.Content });
+            }
+            // Bound the queue if summarization keeps failing
+            while (_memory != null && _memory.pendingSummary.Count > 60)
+            {
+                _memory.pendingSummary.RemoveAt(0);
             }
         }
 
@@ -366,6 +386,9 @@ Stay in character. Only perform actions that make sense for your personality.";
             _conversationHistory.Clear();
             if (_memory != null)
             {
+                // Full conversational amnesia; travel journal and marked places survive
+                _memory.longTermMemory = null;
+                _memory.pendingSummary.Clear();
                 NPCMemoryStore.DeleteMessages(_memoryKey, _memory);
             }
         }
@@ -461,8 +484,93 @@ Stay in character. Only perform actions that make sense for your personality.";
                 older.placesVisited.RemoveAll(p => p.place == visit.place);
                 older.placesVisited.Add(visit);
             }
+            foreach (var mark in newer.markedPlaces)
+            {
+                older.markedPlaces.RemoveAll(m => m.label == mark.label);
+                older.markedPlaces.Add(mark);
+            }
+            older.pendingSummary.AddRange(newer.pendingSummary);
+            if (!string.IsNullOrEmpty(newer.longTermMemory))
+            {
+                older.longTermMemory = string.IsNullOrEmpty(older.longTermMemory)
+                    ? newer.longTermMemory
+                    : older.longTermMemory + "\n" + newer.longTermMemory;
+            }
             older.npcName = newer.npcName ?? older.npcName;
             return older;
+        }
+
+        /// <summary>
+        /// Store the NPC's current location under a player-given label.
+        /// </summary>
+        private void RememberPlace(string label)
+        {
+            if (_memory == null || _npcEntity == null || string.IsNullOrWhiteSpace(label)) return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+
+            _memory.markedPlaces.RemoveAll(m => m.label == label);
+            _memory.markedPlaces.Add(new MarkedPlace
+            {
+                label = label,
+                poi = WorldContextHelper.GetPOINameAt(_npcEntity.position),
+                day = day,
+                time = time,
+                x = (int)_npcEntity.position.x,
+                z = (int)_npcEntity.position.z
+            });
+            while (_memory.markedPlaces.Count > 30)
+            {
+                _memory.markedPlaces.RemoveAt(0);
+            }
+            NPCMemoryStore.Save(_memoryKey, _memory);
+            Log.Out($"[NPCLLMChat] {_npcName} marked place '{label}' at ({(int)_npcEntity.position.x}, {(int)_npcEntity.position.z})");
+        }
+
+        // ========== Long-term memory summarization ==========
+
+        private bool _isSummarizing;
+        private const int SummarizeBatchSize = 10; // messages (5 exchanges) per summarization pass
+
+        private void MaybeSummarize()
+        {
+            if (_isSummarizing || _memory == null || _memory.pendingSummary.Count < SummarizeBatchSize) return;
+
+            _isSummarizing = true;
+            int batchCount = _memory.pendingSummary.Count;
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"You maintain the private long-term memory of {_npcName}, an NPC companion in a post-apocalyptic survival game.");
+            sb.AppendLine();
+            sb.AppendLine("Current long-term memory:");
+            sb.AppendLine(string.IsNullOrEmpty(_memory.longTermMemory) ? "(empty)" : _memory.longTermMemory);
+            sb.AppendLine();
+            sb.AppendLine("Conversation excerpts that are about to be forgotten:");
+            foreach (var msg in _memory.pendingSummary)
+            {
+                sb.AppendLine($"{(msg.role == "NPC" ? _npcName : "Player")}: {msg.content}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Rewrite the long-term memory, merging in anything from the excerpts worth keeping: facts about the player, promises made, shared events, plans, opinions formed. Keep it under 150 words of plain prose. Output only the memory text, no preamble.");
+
+            LLMService.Instance.SendCompletionRequest(
+                sb.ToString(),
+                0.3f,
+                summary =>
+                {
+                    _isSummarizing = false;
+                    if (_memory == null || string.IsNullOrWhiteSpace(summary)) return;
+                    _memory.longTermMemory = summary.Trim();
+                    _memory.pendingSummary.RemoveRange(0, Math.Min(batchCount, _memory.pendingSummary.Count));
+                    NPCMemoryStore.Save(_memoryKey, _memory);
+                    Log.Out($"[NPCLLMChat] {_npcName} long-term memory updated ({_memory.longTermMemory.Length} chars)");
+                },
+                error =>
+                {
+                    _isSummarizing = false;
+                    Log.Warning($"[NPCLLMChat] Summarization failed (will retry later): {error}");
+                });
         }
 
         // ========== Travel journal + world context ==========
@@ -540,6 +648,22 @@ Stay in character. Only perform actions that make sense for your personality.";
                 if (!string.IsNullOrEmpty(_currentPlace))
                 {
                     sb.AppendLine($"You are currently at: {_currentPlace}.");
+                }
+
+                if (_memory != null && !string.IsNullOrEmpty(_memory.longTermMemory))
+                {
+                    sb.AppendLine("Things you remember from your shared history with the player:");
+                    sb.AppendLine(_memory.longTermMemory);
+                }
+
+                if (_memory != null && _memory.markedPlaces.Count > 0)
+                {
+                    sb.AppendLine("Locations the player asked you to remember:");
+                    foreach (var mark in _memory.markedPlaces)
+                    {
+                        string at = string.IsNullOrEmpty(mark.poi) ? "" : $" at {mark.poi},";
+                        sb.AppendLine($"- \"{mark.label}\" (marked Day {mark.day} {mark.time},{at} map position {mark.x} E/W, {mark.z} N/S)");
+                    }
                 }
 
                 string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);

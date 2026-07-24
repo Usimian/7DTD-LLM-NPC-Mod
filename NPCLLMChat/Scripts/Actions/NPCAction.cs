@@ -28,6 +28,7 @@ namespace NPCLLMChat.Actions
         ShareInfo,      // Share map marker or quest info
         Refuse,         // Refuse the request
         Barter,         // Negotiate price/terms
+        Remember,       // Memorize the current location under a player-given label
     }
 
     /// <summary>

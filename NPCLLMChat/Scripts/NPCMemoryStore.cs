@@ -24,11 +24,29 @@ namespace NPCLLMChat
     }
 
     [Serializable]
+    public class MarkedPlace
+    {
+        public string label;
+        public string poi;
+        public int day;
+        public string time;
+        public int x;
+        public int z;
+    }
+
+    [Serializable]
     public class NPCMemory
     {
         public string npcName;
         public List<SavedMessage> messages = new List<SavedMessage>();
         public List<PlaceVisit> placesVisited = new List<PlaceVisit>();
+
+        // Distilled facts from conversation that scrolled out of the context window
+        public string longTermMemory;
+        // Expired messages awaiting the next summarization pass
+        public List<SavedMessage> pendingSummary = new List<SavedMessage>();
+        // Locations the player explicitly asked the NPC to remember
+        public List<MarkedPlace> markedPlaces = new List<MarkedPlace>();
     }
 
     /// <summary>

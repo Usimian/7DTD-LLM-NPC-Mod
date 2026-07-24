@@ -178,6 +178,54 @@ namespace NPCLLMChat
             }
         }
 
+        /// <summary>
+        /// Send a bare completion request (no NPC conversation framing) - used for
+        /// background tasks like memory summarization. Ollama endpoints only.
+        /// </summary>
+        public void SendCompletionRequest(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
+        {
+            if (!_endpoint.Contains("/api/generate"))
+            {
+                onError?.Invoke("Completion requests require an Ollama /api/generate endpoint");
+                return;
+            }
+            StartCoroutine(SendCompletionCoroutine(prompt, temperature, onResponse, onError));
+        }
+
+        private IEnumerator SendCompletionCoroutine(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
+        {
+            string requestBody = $@"{{
+                ""model"": ""{_model}"",
+                ""prompt"": ""{EscapeJson(prompt)}"",
+                ""stream"": false,
+                ""think"": false,
+                ""options"": {{ ""temperature"": {temperature.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ""num_predict"": 300, ""num_ctx"": {_numCtx} }}
+            }}";
+
+            using (UnityWebRequest request = new UnityWebRequest(_endpoint, "POST"))
+            {
+                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(requestBody));
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.timeout = 60; // background task, latency doesn't matter
+
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    string response = ParseResponse(request.downloadHandler.text);
+                    if (!string.IsNullOrEmpty(response))
+                        onResponse?.Invoke(response);
+                    else
+                        onError?.Invoke("Empty completion response");
+                }
+                else
+                {
+                    onError?.Invoke($"Completion request failed: {request.error}");
+                }
+            }
+        }
+
         private string BuildOllamaRequest(string systemPrompt, List<ChatMessage> history, string playerMessage)
         {
             // Build conversation context
