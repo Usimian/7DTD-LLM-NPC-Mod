@@ -61,7 +61,9 @@
                     <!-- Companion Voice Row: dropdown listing every voice installed on the TTS server -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Companion Voice" font_size="16" style="label_outline"/>
-                        <combobox depth="3" name="cbxCompanionVoice" pos="180,0" width="450" height="31"
+                        <!-- height must be EVEN: the combobox template centers an internal
+                             button at height/2 and the game's Vector2i parser rejects .5 -->
+                        <combobox depth="3" name="cbxCompanionVoice" pos="180,0" width="450" height="30"
                                   type="ComboBoxList`1[System.String]" value_wrap="true"/>
                     </panel>
 
