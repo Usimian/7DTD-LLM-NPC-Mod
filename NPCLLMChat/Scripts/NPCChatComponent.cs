@@ -490,6 +490,7 @@ Stay in character. Only perform actions that make sense for your personality.";
                 older.markedPlaces.Add(mark);
             }
             older.pendingSummary.AddRange(newer.pendingSummary);
+            older.persona = string.IsNullOrEmpty(older.persona) ? newer.persona : older.persona;
             if (!string.IsNullOrEmpty(newer.longTermMemory))
             {
                 older.longTermMemory = string.IsNullOrEmpty(older.longTermMemory)
@@ -648,6 +649,12 @@ Stay in character. Only perform actions that make sense for your personality.";
                 if (!string.IsNullOrEmpty(_currentPlace))
                 {
                     sb.AppendLine($"You are currently at: {_currentPlace}.");
+                }
+
+                if (_memory != null && !string.IsNullOrEmpty(_memory.persona))
+                {
+                    sb.AppendLine("Who you are - your character, always stay true to this:");
+                    sb.AppendLine(_memory.persona);
                 }
 
                 if (_memory != null && !string.IsNullOrEmpty(_memory.longTermMemory))

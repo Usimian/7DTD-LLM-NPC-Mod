@@ -41,6 +41,9 @@ namespace NPCLLMChat
         public List<SavedMessage> messages = new List<SavedMessage>();
         public List<PlaceVisit> placesVisited = new List<PlaceVisit>();
 
+        // Hand-written character sheet (backstory, mannerisms, fears). The mod only
+        // READS this - edit it directly in the JSON file; the summarizer never touches it.
+        public string persona;
         // Distilled facts from conversation that scrolled out of the context window
         public string longTermMemory;
         // Expired messages awaiting the next summarization pass
