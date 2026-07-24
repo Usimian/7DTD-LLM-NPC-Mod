@@ -69,6 +69,13 @@ namespace NPCLLMChat.TTS
         {
             if (_config == null) return "en_US-lessac-medium";
 
+            // A hired companion outranks class-name heuristics - class names like
+            // "npcNursePistol" carry no role hint, so hired NPCs fell to DefaultVoice
+            if (IsHired(npc))
+            {
+                return _config.CompanionVoice;
+            }
+
             // Check entity class name for type hints
             string entityClass = npc.EntityClass?.entityClassName?.ToLower() ?? "";
 
@@ -87,6 +94,31 @@ namespace NPCLLMChat.TTS
 
             // Default voice
             return _config.DefaultVoice;
+        }
+
+        private static bool IsHired(EntityAlive npc)
+        {
+            try
+            {
+                if (npc?.Buffs == null) return false;
+                foreach (string cvar in new[] { "Leader", "Owner" })
+                {
+                    if (npc.Buffs.HasCustomVar(cvar) && npc.Buffs.GetCustomVar(cvar) > 0f)
+                        return true;
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// Re-evaluate this NPC's voice (e.g. after the player changes voice settings)
+        /// </summary>
+        public void RefreshVoice()
+        {
+            if (_npcEntity == null) return;
+            _voiceId = DetermineVoice(_npcEntity);
+            Log.Out($"[NPCLLMChat] Voice for NPC {_npcEntity.entityId} is now {_voiceId}");
         }
 
         /// <summary>

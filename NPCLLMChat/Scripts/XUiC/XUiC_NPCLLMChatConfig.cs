@@ -30,34 +30,12 @@ public class XUiC_NPCLLMChatConfig : XUiController
         private XUiC_Slider sliderChatDistance;
         private XUiC_Slider sliderVoiceDistance;
 
-        // Default voice radio buttons
-        private XUiC_ToggleButton radioDefaultLessac;
-        private XUiC_ToggleButton radioDefaultAmy;
-        private XUiC_ToggleButton radioDefaultRyan;
-
-        // Companion voice radio buttons
-        private XUiC_ToggleButton radioCompanionLessac;
-        private XUiC_ToggleButton radioCompanionAmy;
-        private XUiC_ToggleButton radioCompanionRyan;
-
-        // Trader voice radio buttons
-        private XUiC_ToggleButton radioTraderLessac;
-        private XUiC_ToggleButton radioTraderAmy;
-        private XUiC_ToggleButton radioTraderRyan;
+        // Companion voice dropdown, populated from the TTS server's installed voices
+        private XUiC_ComboBoxList<string> cbxCompanionVoice;
 
         private XUiC_TextInput txtModel;
 
         private EntityPlayerLocal _entityPlayerLocal;
-
-        // Available voices (should match TTS config)
-        private readonly string[] _availableVoices = new[]
-        {
-            "en_US-lessac-medium",
-            "en_US-amy-medium",
-            "en_US-ryan-medium",
-            "en_US-joe-medium",
-            "en_GB-alan-medium"
-        };
 
         // CVar names for persistence
         private const string CVAR_TTS_ENABLED = "NPCLLMChat_TTSEnabled";
@@ -67,9 +45,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
         private const string CVAR_MAX_HISTORY = "NPCLLMChat_MaxHistory";
         private const string CVAR_CHAT_DISTANCE = "NPCLLMChat_ChatDistance";
         private const string CVAR_VOICE_DISTANCE = "NPCLLMChat_VoiceDistance";
-        private const string CVAR_DEFAULT_VOICE = "NPCLLMChat_DefaultVoice";
         private const string CVAR_COMPANION_VOICE = "NPCLLMChat_CompanionVoice";
-        private const string CVAR_TRADER_VOICE = "NPCLLMChat_TraderVoice";
         private const string CVAR_MODEL = "NPCLLMChat_Model";
 
         public override void Init()
@@ -102,18 +78,8 @@ public class XUiC_NPCLLMChatConfig : XUiController
             UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderVoiceDistance = {(sliderVoiceDistance != null ? "found" : "NULL")}");
 
 
-            // Get radio buttons for voice selection
-            radioDefaultLessac = GetChildById("radioDefaultLessac") as XUiC_ToggleButton;
-            radioDefaultAmy = GetChildById("radioDefaultAmy") as XUiC_ToggleButton;
-            radioDefaultRyan = GetChildById("radioDefaultRyan") as XUiC_ToggleButton;
-
-            radioCompanionLessac = GetChildById("radioCompanionLessac") as XUiC_ToggleButton;
-            radioCompanionAmy = GetChildById("radioCompanionAmy") as XUiC_ToggleButton;
-            radioCompanionRyan = GetChildById("radioCompanionRyan") as XUiC_ToggleButton;
-
-            radioTraderLessac = GetChildById("radioTraderLessac") as XUiC_ToggleButton;
-            radioTraderAmy = GetChildById("radioTraderAmy") as XUiC_ToggleButton;
-            radioTraderRyan = GetChildById("radioTraderRyan") as XUiC_ToggleButton;
+            cbxCompanionVoice = GetChildById("cbxCompanionVoice") as XUiC_ComboBoxList<string>;
+            UnityEngine.Debug.Log($"[NPCLLMChat] Init: cbxCompanionVoice = {(cbxCompanionVoice != null ? "found" : "NULL")}");
 
             txtModel = GetChildById("txtModel") as XUiC_TextInput;
 
@@ -177,23 +143,20 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 UnityEngine.Debug.Log($"[NPCLLMChat] LoadSettings: Speech rate={speechRate}, setting slider to normalized {sliderNormalized}");
             }
 
-            // Load default voice radio buttons
-            var defaultVoice = GetStringCVar(CVAR_DEFAULT_VOICE, TTSService.Instance?.Config?.DefaultVoice ?? "en_US-lessac-medium");
-            if (radioDefaultLessac != null) radioDefaultLessac.Value = (defaultVoice == "en_US-lessac-medium");
-            if (radioDefaultAmy != null) radioDefaultAmy.Value = (defaultVoice == "en_US-amy-medium");
-            if (radioDefaultRyan != null) radioDefaultRyan.Value = (defaultVoice == "en_US-ryan-medium");
-
-            // Load companion voice radio buttons
-            var companionVoice = GetStringCVar(CVAR_COMPANION_VOICE, TTSService.Instance?.Config?.CompanionVoice ?? "en_US-amy-medium");
-            if (radioCompanionLessac != null) radioCompanionLessac.Value = (companionVoice == "en_US-lessac-medium");
-            if (radioCompanionAmy != null) radioCompanionAmy.Value = (companionVoice == "en_US-amy-medium");
-            if (radioCompanionRyan != null) radioCompanionRyan.Value = (companionVoice == "en_US-ryan-medium");
-
-            // Load trader voice radio buttons
-            var traderVoice = GetStringCVar(CVAR_TRADER_VOICE, TTSService.Instance?.Config?.TraderVoice ?? "en_US-ryan-medium");
-            if (radioTraderLessac != null) radioTraderLessac.Value = (traderVoice == "en_US-lessac-medium");
-            if (radioTraderAmy != null) radioTraderAmy.Value = (traderVoice == "en_US-amy-medium");
-            if (radioTraderRyan != null) radioTraderRyan.Value = (traderVoice == "en_US-ryan-medium");
+            // Companion voice dropdown: show the saved choice immediately, then swap in
+            // the server's full installed-voice list when it answers
+            if (cbxCompanionVoice != null)
+            {
+                string companionVoice = GetStringCVar(CVAR_COMPANION_VOICE, TTSService.Instance?.Config?.CompanionVoice ?? "en_US-amy-medium");
+                PopulateVoiceList(new List<string> { companionVoice }, companionVoice);
+                TTSService.Instance?.FetchAvailableVoices(voices =>
+                {
+                    if (voices != null && voices.Count > 0)
+                    {
+                        PopulateVoiceList(voices, companionVoice);
+                    }
+                });
+            }
 
             // Load STT settings
             if (toggleSTT != null)
@@ -280,34 +243,17 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 }
             }
 
-            // Save default voice based on radio button selection
-            string defaultVoice = "en_US-lessac-medium";
-            if (radioDefaultAmy != null && radioDefaultAmy.Value) defaultVoice = "en_US-amy-medium";
-            else if (radioDefaultRyan != null && radioDefaultRyan.Value) defaultVoice = "en_US-ryan-medium";
-            SetStringCVar(CVAR_DEFAULT_VOICE, defaultVoice);
-            if (TTSService.Instance != null)
+            // Save companion voice from the dropdown and apply it to active NPCs
+            if (cbxCompanionVoice != null && !string.IsNullOrEmpty(cbxCompanionVoice.Value))
             {
-                TTSService.Instance.Config.DefaultVoice = defaultVoice;
-            }
-
-            // Save companion voice based on radio button selection
-            string companionVoice = "en_US-lessac-medium";
-            if (radioCompanionAmy != null && radioCompanionAmy.Value) companionVoice = "en_US-amy-medium";
-            else if (radioCompanionRyan != null && radioCompanionRyan.Value) companionVoice = "en_US-ryan-medium";
-            SetStringCVar(CVAR_COMPANION_VOICE, companionVoice);
-            if (TTSService.Instance != null)
-            {
-                TTSService.Instance.Config.CompanionVoice = companionVoice;
-            }
-
-            // Save trader voice based on radio button selection
-            string traderVoice = "en_US-lessac-medium";
-            if (radioTraderAmy != null && radioTraderAmy.Value) traderVoice = "en_US-amy-medium";
-            else if (radioTraderRyan != null && radioTraderRyan.Value) traderVoice = "en_US-ryan-medium";
-            SetStringCVar(CVAR_TRADER_VOICE, traderVoice);
-            if (TTSService.Instance != null)
-            {
-                TTSService.Instance.Config.TraderVoice = traderVoice;
+                string companionVoice = cbxCompanionVoice.Value;
+                SetStringCVar(CVAR_COMPANION_VOICE, companionVoice);
+                if (TTSService.Instance != null)
+                {
+                    TTSService.Instance.Config.CompanionVoice = companionVoice;
+                }
+                RefreshActiveVoices();
+                UnityEngine.Debug.Log($"[NPCLLMChat] Companion voice set to: {companionVoice}");
             }
 
             // Save STT settings
@@ -364,6 +310,36 @@ public class XUiC_NPCLLMChatConfig : XUiController
             }
 
             GameManager.ShowTooltip(_entityPlayerLocal, "Settings saved successfully", false);
+        }
+
+        private void PopulateVoiceList(List<string> voices, string selected)
+        {
+            if (cbxCompanionVoice == null) return;
+
+            if (!string.IsNullOrEmpty(selected) && !voices.Contains(selected))
+            {
+                voices.Insert(0, selected);
+            }
+            cbxCompanionVoice.Elements.Clear();
+            foreach (string voice in voices)
+            {
+                cbxCompanionVoice.Elements.Add(voice);
+            }
+            int index = voices.IndexOf(selected);
+            cbxCompanionVoice.SelectedIndex = index >= 0 ? index : 0;
+        }
+
+        private void RefreshActiveVoices()
+        {
+            var world = GameManager.Instance?.World;
+            if (world == null) return;
+            foreach (var entity in world.Entities.list)
+            {
+                if (entity is EntityAlive alive)
+                {
+                    alive.GetComponent<NPCAudioPlayer>()?.RefreshVoice();
+                }
+            }
         }
 
         // CVar helper methods
@@ -434,10 +410,10 @@ public class XUiC_NPCLLMChatConfig : XUiController
             }
 
             string testText = "Hello! This is a test of the text to speech system.";
-            // Get selected default voice from radio buttons
-            string voice = "en_US-lessac-medium";
-            if (radioDefaultAmy != null && radioDefaultAmy.Value) voice = "en_US-amy-medium";
-            else if (radioDefaultRyan != null && radioDefaultRyan.Value) voice = "en_US-ryan-medium";
+            // Preview whatever companion voice is currently selected in the dropdown
+            string voice = !string.IsNullOrEmpty(cbxCompanionVoice?.Value)
+                ? cbxCompanionVoice.Value
+                : TTSService.Instance.Config?.CompanionVoice ?? "en_US-lessac-medium";
 
             GameManager.ShowTooltip(_entityPlayerLocal, "Generating test audio...", false);
 

@@ -377,6 +377,49 @@ namespace NPCLLMChat.TTS
                 StartCoroutine(InitializePiper());
         }
 
+        /// <summary>
+        /// Ask the Piper server which voices are installed. Calls back with null on failure.
+        /// </summary>
+        public void FetchAvailableVoices(Action<List<string>> onResult)
+        {
+            StartCoroutine(FetchVoicesCoroutine(onResult));
+        }
+
+        private IEnumerator FetchVoicesCoroutine(Action<List<string>> onResult)
+        {
+            string url = _config.Endpoint.Replace("/synthesize", "/voices");
+            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            {
+                request.timeout = 5;
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    onResult?.Invoke(null);
+                    yield break;
+                }
+
+                List<string> ids = null;
+                try
+                {
+                    var parsed = Newtonsoft.Json.Linq.JObject.Parse(request.downloadHandler.text);
+                    ids = new List<string>();
+                    foreach (var voice in parsed["voices"])
+                    {
+                        string id = (string)voice["id"];
+                        if (!string.IsNullOrEmpty(id)) ids.Add(id);
+                    }
+                    ids.Sort();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning($"[NPCLLMChat] Could not parse voice list: {ex.Message}");
+                    ids = null;
+                }
+                onResult?.Invoke(ids);
+            }
+        }
+
         public string GetStatusString()
         {
             if (!_isInitialized || !_config.Enabled) return "Disabled";

@@ -372,6 +372,14 @@ namespace NPCLLMChat
                     config.BanditVoice = GetNodeValue(voicesNode, "BanditVoice", "en_US-ryan-medium");
                 }
 
+                // Companion voice chosen in the in-game settings overrides the XML default
+                string savedCompanionVoice = UnityEngine.PlayerPrefs.GetString("NPCLLMChat_CompanionVoice", "");
+                if (!string.IsNullOrEmpty(savedCompanionVoice))
+                {
+                    config.CompanionVoice = savedCompanionVoice;
+                    Log.Out($"[NPCLLMChat] Using player-configured companion voice: {savedCompanionVoice}");
+                }
+
                 Log.Out($"TTS configuration loaded - Provider: {config.Provider}, Enabled: {config.Enabled}");
                 return config;
             }
