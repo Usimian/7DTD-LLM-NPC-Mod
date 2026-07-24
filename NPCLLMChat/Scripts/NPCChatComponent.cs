@@ -67,7 +67,7 @@ namespace NPCLLMChat
             _npcName = GetNPCName();
 
             // Restore persisted memory from the save folder, if this NPC has any
-            _memory = NPCMemoryStore.Load(_entityId) ?? new NPCMemory { npcName = _npcName };
+            _memory = NPCMemoryStore.Load(_npcName) ?? new NPCMemory { npcName = _npcName };
             foreach (var msg in _memory.messages)
             {
                 _conversationHistory.Add(new ChatMessage(msg.role, msg.content));
@@ -361,7 +361,7 @@ Stay in character. Only perform actions that make sense for your personality.";
             _conversationHistory.Clear();
             if (_memory != null)
             {
-                NPCMemoryStore.DeleteMessages(_entityId, _memory);
+                NPCMemoryStore.DeleteMessages(_npcName, _memory);
             }
         }
 
@@ -375,7 +375,7 @@ Stay in character. Only perform actions that make sense for your personality.";
             {
                 _memory.messages.Add(new SavedMessage { role = msg.Role, content = msg.Content });
             }
-            NPCMemoryStore.Save(_entityId, _memory);
+            NPCMemoryStore.Save(_npcName, _memory);
         }
 
         // ========== Travel journal + world context ==========
@@ -433,7 +433,7 @@ Stay in character. Only perform actions that make sense for your personality.";
                 }
                 Log.Out($"[NPCLLMChat] {_npcName} travel journal: arrived at {place} (Day {day} {time})");
             }
-            NPCMemoryStore.Save(_entityId, _memory);
+            NPCMemoryStore.Save(_npcName, _memory);
         }
 
         private string BuildWorldContext()

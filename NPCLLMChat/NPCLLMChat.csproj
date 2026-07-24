@@ -90,6 +90,12 @@
       <Private>false</Private>
     </Reference>
 
+    <!-- Ships with the game; Unity's JsonUtility silently drops List fields for mod types -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ManagedPath)/Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+
     <!-- Harmony (from TFP_Harmony) -->
     <Reference Include="0Harmony">
       <HintPath>$(HarmonyPath)/0Harmony.dll</HintPath>
