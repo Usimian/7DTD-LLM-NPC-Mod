@@ -49,6 +49,13 @@ namespace NPCLLMChat
         private bool _actionsEnabled = true;
         private EntityPlayer _lastInteractingPlayer;
 
+        // Persistent memory (conversation + travel journal), saved per NPC per save-game
+        private NPCMemory _memory;
+        private string _currentPlace;
+        private float _nextPlaceCheck;
+        private const float PlaceCheckIntervalSeconds = 5f;
+        private const int MaxJournalEntries = 40;
+
         public void Initialize(EntityAlive npcEntity, LLMConfig config)
         {
             _npcEntity = npcEntity;
@@ -58,6 +65,14 @@ namespace NPCLLMChat
 
             // Extract NPC name from entity if available
             _npcName = GetNPCName();
+
+            // Restore persisted memory from the save folder, if this NPC has any
+            _memory = NPCMemoryStore.Load(_entityId) ?? new NPCMemory { npcName = _npcName };
+            foreach (var msg in _memory.messages)
+            {
+                _conversationHistory.Add(new ChatMessage(msg.role, msg.content));
+            }
+            TrimHistory();
 
             // Build personality-specific system prompt
             _systemPrompt = BuildSystemPrompt();
@@ -165,8 +180,9 @@ namespace NPCLLMChat
             _conversationHistory.Add(new ChatMessage("Player", playerMessage));
             TrimHistory();
 
-            // Build action-aware system prompt
+            // Build action-aware system prompt, with current world state appended
             string actionPrompt = _actionsEnabled ? BuildActionSystemPrompt() : _systemPrompt;
+            actionPrompt += BuildWorldContext();
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
@@ -250,6 +266,7 @@ Stay in character. Only perform actions that make sense for your personality.";
             // Add NPC response to history (store original for context)
             _conversationHistory.Add(new ChatMessage("NPC", dialogueResponse));
             TrimHistory();
+            PersistMemory();
 
             // Execute action if parsed
             if (action != null && action.Type != NPCActionType.None && _npcEntity != null)
@@ -342,6 +359,124 @@ Stay in character. Only perform actions that make sense for your personality.";
         public void ClearHistory()
         {
             _conversationHistory.Clear();
+            if (_memory != null)
+            {
+                NPCMemoryStore.DeleteMessages(_entityId, _memory);
+            }
+        }
+
+        private void PersistMemory()
+        {
+            if (_memory == null) return;
+
+            _memory.npcName = _npcName;
+            _memory.messages.Clear();
+            foreach (var msg in _conversationHistory)
+            {
+                _memory.messages.Add(new SavedMessage { role = msg.Role, content = msg.Content });
+            }
+            NPCMemoryStore.Save(_entityId, _memory);
+        }
+
+        // ========== Travel journal + world context ==========
+
+        private void Update()
+        {
+            if (_memory == null || _npcEntity == null) return;
+            if (Time.unscaledTime < _nextPlaceCheck) return;
+            _nextPlaceCheck = Time.unscaledTime + PlaceCheckIntervalSeconds;
+
+            try
+            {
+                CheckCurrentPlace();
+            }
+            catch (Exception ex)
+            {
+                // World/POI APIs can be touchy during load/unload; never break the NPC over the journal
+                Log.Warning($"[NPCLLMChat] Travel journal update failed: {ex.Message}");
+                _nextPlaceCheck = Time.unscaledTime + 60f;
+            }
+        }
+
+        private void CheckCurrentPlace()
+        {
+            string place = WorldContextHelper.GetPOINameAt(_npcEntity.position);
+            if (place == _currentPlace) return;
+            _currentPlace = place;
+            if (string.IsNullOrEmpty(place)) return;
+
+            // Revisiting a known place just updates its timestamp; new places append
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+
+            var existing = _memory.placesVisited.Find(p => p.place == place);
+            if (existing != null)
+            {
+                existing.day = day;
+                existing.time = time;
+                _memory.placesVisited.Remove(existing);
+                _memory.placesVisited.Add(existing);
+            }
+            else
+            {
+                _memory.placesVisited.Add(new PlaceVisit
+                {
+                    place = place,
+                    day = day,
+                    time = time,
+                    x = (int)_npcEntity.position.x,
+                    z = (int)_npcEntity.position.z
+                });
+                while (_memory.placesVisited.Count > MaxJournalEntries)
+                {
+                    _memory.placesVisited.RemoveAt(0);
+                }
+                Log.Out($"[NPCLLMChat] {_npcName} travel journal: arrived at {place} (Day {day} {time})");
+            }
+            NPCMemoryStore.Save(_entityId, _memory);
+        }
+
+        private string BuildWorldContext()
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine();
+                sb.AppendLine("[Current world state - facts you know:]");
+
+                int day; string time;
+                WorldContextHelper.GetGameDayTime(out day, out time);
+                sb.AppendLine($"It is Day {day}, around {time}.");
+
+                if (!string.IsNullOrEmpty(_currentPlace))
+                {
+                    sb.AppendLine($"You are currently at: {_currentPlace}.");
+                }
+
+                string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);
+                if (!string.IsNullOrEmpty(nearby))
+                {
+                    sb.AppendLine($"Locations you know of nearby: {nearby}.");
+                }
+
+                if (_memory != null && _memory.placesVisited.Count > 0)
+                {
+                    sb.AppendLine("Places you have visited (oldest first, with when you were last there):");
+                    foreach (var visit in _memory.placesVisited)
+                    {
+                        sb.AppendLine($"- {visit.place} (Day {visit.day} {visit.time}, at map position {visit.x} E/W, {visit.z} N/S)");
+                    }
+                }
+
+                sb.AppendLine("When asked about places or directions, answer from these facts. If you don't know a place, say so honestly.");
+                return sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] World context failed: {ex.Message}");
+                return "";
+            }
         }
 
         /// <summary>

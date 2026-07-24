@@ -63,7 +63,7 @@
             Context window - how much conversation history to consider
             Larger = better memory but more VRAM
         -->
-        <NumCtx>4096</NumCtx>
+        <NumCtx>16384</NumCtx>
     </Server>
 
     <!-- NPC Personality Defaults -->
@@ -79,7 +79,7 @@
             Higher = better continuity but uses more tokens
             With 48GB VRAM, you can afford more memory
         -->
-        <ContextMemory>10</ContextMemory>
+        <ContextMemory>40</ContextMemory>
     </Personality>
 
     <!-- Response Handling -->
