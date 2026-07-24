@@ -31,6 +31,8 @@ llmchat talk <message>  - Talk to the nearest NPC
 llmchat action <action> - Execute action (follow, stop, guard, wait)
 llmchat clear           - Clear conversation history
 llmchat list            - List active NPC sessions
+llmchat persona         - Show active NPC personas
+llmchat persona reload  - Re-read personas from the memory files (after hand edits)
 
 TTS Commands:
 llmchat tts             - Show TTS status
@@ -94,6 +96,9 @@ Examples:
                     break;
                 case "list":
                     ListActiveSessions();
+                    break;
+                case "persona":
+                    HandlePersonaCommand(_params);
                     break;
                 case "tts":
                     HandleTTSCommand(_params);
@@ -306,6 +311,46 @@ Examples:
 
             if (count == 0) output.Output("  No active sessions");
             output.Output($"Total: {count}");
+        }
+
+        private void HandlePersonaCommand(List<string> _params)
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            bool reload = _params.Count > 1 && _params[1].ToLower() == "reload";
+
+            int found = 0;
+            var world = GameManager.Instance?.World;
+            if (world != null)
+            {
+                foreach (var entity in world.Entities.list)
+                {
+                    if (entity is EntityAlive alive)
+                    {
+                        var chat = alive.GetComponent<NPCChatComponent>();
+                        if (chat == null) continue;
+                        found++;
+
+                        if (reload)
+                        {
+                            bool ok = chat.ReloadPersona();
+                            output.Output($"[{chat.NPCName}] persona {(ok ? "reloaded" : "reload FAILED")}");
+                        }
+                        else
+                        {
+                            string persona = chat.PersonaText;
+                            output.Output($"=== {chat.NPCName} ===");
+                            output.Output(string.IsNullOrEmpty(persona)
+                                ? "(no persona set - edit the memory JSON in the save's NPCLLMChat folder)"
+                                : persona);
+                        }
+                    }
+                }
+            }
+
+            if (found == 0)
+            {
+                output.Output("No active NPC chat sessions (talk to an NPC first, then retry)");
+            }
         }
 
         private void HandleTTSCommand(List<string> _params)

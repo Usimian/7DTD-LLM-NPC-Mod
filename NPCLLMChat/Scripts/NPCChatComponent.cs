@@ -393,6 +393,23 @@ Stay in character. Only perform actions that make sense for your personality.";
             }
         }
 
+        /// <summary>
+        /// Re-read the persona field from the memory file on disk, so hand edits
+        /// apply without restarting the game (the mod never writes persona content,
+        /// so this cannot lose anything).
+        /// </summary>
+        public bool ReloadPersona()
+        {
+            if (_memory == null) return false;
+            var fromDisk = NPCMemoryStore.Load(_memoryKey);
+            if (fromDisk == null) return false;
+            _memory.persona = fromDisk.persona;
+            Log.Out($"[NPCLLMChat] {_npcName} persona reloaded ({_memory.persona?.Length ?? 0} chars)");
+            return true;
+        }
+
+        public string PersonaText => _memory?.persona;
+
         private void PersistMemory()
         {
             if (_memory == null) return;
