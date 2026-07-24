@@ -54,7 +54,9 @@ namespace NPCLLMChat
         // continuous history across renames, deaths, respawns and re-hires.
         private NPCMemory _memory;
         private string _memoryKey;
-        private const string CompanionMemoryKey = "companion";
+        public const string CompanionMemoryKey = "companion";
+
+        public bool IsCompanion => _memoryKey == CompanionMemoryKey;
         private string _currentPlace;
         private float _nextPlaceCheck;
         private const float PlaceCheckIntervalSeconds = 5f;

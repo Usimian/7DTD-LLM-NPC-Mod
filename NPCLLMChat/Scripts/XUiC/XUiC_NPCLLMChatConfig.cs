@@ -35,6 +35,9 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
         private XUiC_TextInput txtModel;
 
+        private XUiC_SimpleButton btnReloadPersona;
+        private XUiV_Label lblPersona;
+
         private EntityPlayerLocal _entityPlayerLocal;
 
         // CVar names for persistence
@@ -83,6 +86,10 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             txtModel = GetChildById("txtModel") as XUiC_TextInput;
 
+            btnReloadPersona = GetChildById("btnReloadPersona") as XUiC_SimpleButton;
+            lblPersona = GetChildById("lblPersona")?.ViewComponent as XUiV_Label;
+            if (btnReloadPersona != null) btnReloadPersona.OnPressed += BtnReloadPersona_OnPressed;
+
             // Wire up button events
             if (btnClose != null) btnClose.OnPressed += BtnClose_OnPressed;
             if (btnSave != null) btnSave.OnPressed += BtnSave_OnPressed;
@@ -103,6 +110,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             // Load current settings from player buffs (or defaults from config)
             LoadSettings();
+            RefreshPersonaDisplay();
 
             // Log the actual slider values after loading
             if (sliderVolume != null)
@@ -310,6 +318,43 @@ public class XUiC_NPCLLMChatConfig : XUiController
             }
 
             GameManager.ShowTooltip(_entityPlayerLocal, "Settings saved successfully", false);
+        }
+
+        private void BtnReloadPersona_OnPressed(XUiController _sender, int _mouseButton)
+        {
+            // Push the on-disk persona into any live companion, then refresh the preview
+            int reloaded = 0;
+            var world = GameManager.Instance?.World;
+            if (world != null)
+            {
+                foreach (var entity in world.Entities.list)
+                {
+                    if (entity is EntityAlive alive)
+                    {
+                        var chat = alive.GetComponent<NPCChatComponent>();
+                        if (chat != null && chat.IsCompanion && chat.ReloadPersona())
+                        {
+                            reloaded++;
+                        }
+                    }
+                }
+            }
+            RefreshPersonaDisplay();
+            GameManager.ShowTooltip(_entityPlayerLocal,
+                reloaded > 0 ? "Persona reloaded and applied to companion" : "Persona reloaded (companion not active yet)", false);
+        }
+
+        private void RefreshPersonaDisplay()
+        {
+            if (lblPersona == null) return;
+            string persona = NPCMemoryStore.Load(NPCChatComponent.CompanionMemoryKey)?.persona;
+            if (string.IsNullOrEmpty(persona))
+            {
+                lblPersona.Text = "(no persona set)";
+                return;
+            }
+            const int previewLimit = 700;
+            lblPersona.Text = persona.Length <= previewLimit ? persona : persona.Substring(0, previewLimit) + " ...";
         }
 
         private void PopulateVoiceList(List<string> voices, string selected)

@@ -19,11 +19,11 @@
 
     <!-- Main configuration window -->
     <append xpath="/windows">
-        <window name="windowNPCLLMChatConfig" depth="99" width="700" height="650"
-                pos="-350,325" anchor="CenterCenter" cursor_area="true" controller="XUiC_NPCLLMChatConfig, NPCLLMChat">
+        <window name="windowNPCLLMChatConfig" depth="99" width="700" height="850"
+                pos="-350,425" anchor="CenterCenter" cursor_area="true" controller="XUiC_NPCLLMChatConfig, NPCLLMChat">
 
             <!-- Main content panel -->
-            <panel depth="3" name="content" pos="0,0" width="700" height="650" backgroundcolor="0,0,0,200">
+            <panel depth="3" name="content" pos="0,0" width="700" height="850" backgroundcolor="0,0,0,200">
 
                 <!-- Header -->
                 <label depth="2" pos="20,15" width="660" height="32" text="NPC AI Chat Configuration"
@@ -133,6 +133,14 @@
                                   font_size="18" caption="Cancel"/>
 
                 </grid>
+
+                <!-- Companion Persona section (below the settings grid) -->
+                <label depth="4" pos="30,645" width="640" height="20" font_size="14" style="label_outline"
+                       text="Companion Persona (edit npc_companion.json in the save's NPCLLMChat folder, then reload):"/>
+                <label depth="4" name="lblPersona" pos="30,668" width="640" height="120" font_size="12"
+                       color="210,210,210,255" text=""/>
+                <simplebutton enabled="true" name="btnReloadPersona" pos="40,795" width="620" height="40" depth="4"
+                              font_size="16" caption="Reload Persona From File"/>
             </panel>
         </window>
     </append>
