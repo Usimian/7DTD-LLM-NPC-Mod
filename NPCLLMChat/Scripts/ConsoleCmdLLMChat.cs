@@ -33,6 +33,8 @@ llmchat clear           - Clear conversation history
 llmchat list            - List active NPC sessions
 llmchat persona         - Show active NPC personas
 llmchat persona reload  - Re-read personas from the memory files (after hand edits)
+llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
+llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
 
 TTS Commands:
 llmchat tts             - Show TTS status
@@ -99,6 +101,9 @@ Examples:
                     break;
                 case "persona":
                     HandlePersonaCommand(_params);
+                    break;
+                case "hire":
+                    HandleHireCommand(_params);
                     break;
                 case "tts":
                     HandleTTSCommand(_params);
@@ -311,6 +316,42 @@ Examples:
 
             if (count == 0) output.Output("  No active sessions");
             output.Output($"Total: {count}");
+        }
+
+        private void HandleHireCommand(List<string> _params)
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                output.Output("No player found");
+                return;
+            }
+
+            float hireCount = player.Buffs.HasCustomVar("CurrentHireCount") ? player.Buffs.GetCustomVar("CurrentHireCount") : 0f;
+            output.Output($"Player CurrentHireCount = {hireCount}");
+
+            if (_params.Count > 1 && _params[1].ToLower() == "reset")
+            {
+                player.Buffs.SetCustomVar("CurrentHireCount", 0f);
+                output.Output("CurrentHireCount reset to 0 - talk to the NPC again to hire");
+            }
+
+            // Hire-related state of the nearest NPC, for diagnosis
+            EntityAlive npc = FindNearestNPC(player, 15f);
+            if (npc != null)
+            {
+                output.Output($"Nearest NPC: {npc.EntityName} ({npc.EntityClass?.entityClassName})");
+                foreach (string cvar in new[] { "Leader", "Owner", "Hired" })
+                {
+                    string value = npc.Buffs.HasCustomVar(cvar) ? npc.Buffs.GetCustomVar(cvar).ToString() : "(unset)";
+                    output.Output($"  {cvar} = {value}");
+                }
+            }
+            else
+            {
+                output.Output("No NPC within 15m");
+            }
         }
 
         private void HandlePersonaCommand(List<string> _params)
