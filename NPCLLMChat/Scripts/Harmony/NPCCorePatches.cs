@@ -53,7 +53,10 @@ namespace NPCLLMChat.Harmony
 
             int entityId = npc.entityId;
 
-            if (!_npcChatComponents.TryGetValue(entityId, out NPCChatComponent chatComponent))
+            // A cache hit can hold a component whose GameObject was destroyed (world
+            // reload, despawn) - Unity's overloaded == flags those as null. Treat that
+            // as a miss and rebuild on the live entity.
+            if (!_npcChatComponents.TryGetValue(entityId, out NPCChatComponent chatComponent) || chatComponent == null)
             {
                 chatComponent = npc.gameObject.GetComponent<NPCChatComponent>();
 
