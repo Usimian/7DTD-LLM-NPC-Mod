@@ -143,6 +143,49 @@ namespace NPCLLMChat
         }
 
         /// <summary>
+        /// The player's condition as a companion reads it at a glance: health/food/water
+        /// bands (no exact HUD numbers) plus visible status effects by name.
+        /// </summary>
+        public static string DescribePlayerCondition(EntityPlayer player)
+        {
+            if (player == null || player.Stats == null) return null;
+
+            var parts = new List<string>
+            {
+                Band(player.Stats.Health, "looking healthy", "a bit banged up", "in rough shape", "critically hurt"),
+                Band(player.Stats.Food, "well fed", "could use a meal", "properly hungry", "starving"),
+                Band(player.Stats.Water, "well hydrated", "could use a drink", "properly thirsty", "badly dehydrated")
+            };
+
+            var ailments = new List<string>();
+            if (player.Buffs?.ActiveBuffs != null)
+            {
+                foreach (var buff in player.Buffs.ActiveBuffs)
+                {
+                    var buffClass = buff.BuffClass;
+                    if (buffClass == null || buffClass.Hidden || !buffClass.ShowOnHUD) continue;
+                    ailments.Add(string.IsNullOrEmpty(buffClass.LocalizedName) ? buffClass.Name : buffClass.LocalizedName);
+                }
+            }
+
+            string condition = string.Join(", ", parts);
+            if (ailments.Count > 0)
+            {
+                condition += ". Conditions you can see on them: " + string.Join(", ", ailments);
+            }
+            return condition;
+        }
+
+        private static string Band(Stat stat, string high, string mid, string low, string critical)
+        {
+            float pct = stat != null ? stat.ValuePercentUI : 1f;
+            if (pct >= 0.85f) return high;
+            if (pct >= 0.55f) return mid;
+            if (pct >= 0.25f) return low;
+            return critical;
+        }
+
+        /// <summary>
         /// Distance and compass direction from an observer to a point, phrased for the
         /// prompt: "about 420m NE of you", or "right here" when on top of it.
         /// </summary>

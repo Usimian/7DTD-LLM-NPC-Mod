@@ -858,6 +858,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
                 sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask.");
 
+                string condition = WorldContextHelper.DescribePlayerCondition(GameManager.Instance?.World?.GetPrimaryPlayer());
+                if (!string.IsNullOrEmpty(condition))
+                {
+                    sb.AppendLine($"How the player looks to you right now, at a glance: {condition}.");
+                }
+
                 string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);
                 if (!string.IsNullOrEmpty(nearby))
                 {
