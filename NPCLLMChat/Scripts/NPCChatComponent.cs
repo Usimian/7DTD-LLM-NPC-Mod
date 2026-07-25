@@ -856,7 +856,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         sb.AppendLine($"- {snap.name} (last checked Day {snap.day} {snap.time}): {snap.summary}");
                     }
                 }
-                sb.AppendLine("You do NOT know what the player is carrying in their pack - if it matters, ask them (bandages? ammo? food and water?).");
+                sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask.");
 
                 string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);
                 if (!string.IsNullOrEmpty(nearby))
