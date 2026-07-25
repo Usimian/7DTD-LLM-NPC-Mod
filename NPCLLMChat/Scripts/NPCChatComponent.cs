@@ -314,11 +314,13 @@ Stay in character. Only perform actions that make sense for your personality.";
                 onComplete?.Invoke(dialogueResponse);
             }
 
-            // Trigger TTS if enabled
-            if (_ttsEnabled && _audioPlayer != null && TTSService.Instance.ServerAvailable)
+            // Trigger TTS if enabled. Stage directions (*clicks tongue*, (sighs), [looks
+            // away]) stay in the displayed text but must not be read aloud.
+            string speech = StripStageDirections(dialogueResponse);
+            if (_ttsEnabled && _audioPlayer != null && TTSService.Instance.ServerAvailable && !string.IsNullOrWhiteSpace(speech))
             {
-                OnSpeechStarted?.Invoke(dialogueResponse);
-                _audioPlayer.Speak(dialogueResponse, () => OnSpeechComplete?.Invoke());
+                OnSpeechStarted?.Invoke(speech);
+                _audioPlayer.Speak(speech, () => OnSpeechComplete?.Invoke());
             }
         }
 
@@ -349,6 +351,17 @@ Stay in character. Only perform actions that make sense for your personality.";
             OnResponseComplete?.Invoke(fallback);
 
             Log.Warning($"[NPCLLMChat] Error for NPC {_npcName}: {error}. Using fallback.");
+        }
+
+        private static string StripStageDirections(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            string cleaned = text;
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\*[^*]*\*", " ");
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\([^)]*\)", " ");
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\[[^\]]*\]", " ");
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
+            return cleaned;
         }
 
         private string GetFallbackResponse()
