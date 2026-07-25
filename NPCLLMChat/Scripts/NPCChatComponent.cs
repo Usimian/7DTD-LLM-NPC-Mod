@@ -360,13 +360,38 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             Log.Warning($"[NPCLLMChat] Error for NPC {_npcName}: {error}. Using fallback.");
         }
 
-        private static string StripStageDirections(string text)
+        private string StripStageDirections(string text)
         {
             if (string.IsNullOrEmpty(text)) return text;
             string cleaned = text;
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\*[^*]*\*", " ");
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\([^)]*\)", " ");
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\[[^\]]*\]", " ");
+
+            // Unmarked third-person narration wrapping quoted speech ('Ratchet clicks her
+            // tongue. "Two kits left, hon."') - her name outside the quotes gives it away;
+            // speak only what's inside them.
+            var quoted = System.Text.RegularExpressions.Regex.Matches(cleaned, "[\"“]([^\"“”]+)[\"”]");
+            if (quoted.Count > 0 && !string.IsNullOrEmpty(_npcName))
+            {
+                string outside = System.Text.RegularExpressions.Regex.Replace(cleaned, "[\"“][^\"“”]*[\"”]", " ");
+                bool nameOutside = false;
+                foreach (string word in _npcName.Split(' '))
+                {
+                    if (word.Length > 2 && outside.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        nameOutside = true;
+                        break;
+                    }
+                }
+                if (nameOutside)
+                {
+                    var parts = new List<string>();
+                    foreach (System.Text.RegularExpressions.Match m in quoted) parts.Add(m.Groups[1].Value);
+                    cleaned = string.Join(" ", parts);
+                }
+            }
+
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
             return cleaned;
         }
@@ -529,6 +554,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 older.markedPlaces.Add(mark);
             }
             older.pendingSummary.AddRange(newer.pendingSummary);
+            foreach (var snap in newer.cargoSnapshots)
+            {
+                older.cargoSnapshots.RemoveAll(s => s.name == snap.name);
+                older.cargoSnapshots.Add(snap);
+            }
             older.persona = string.IsNullOrEmpty(older.persona) ? newer.persona : older.persona;
             if (!string.IsNullOrEmpty(newer.longTermMemory))
             {
@@ -625,6 +655,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 RefreshMemoryKey();
                 CheckCurrentPlace();
+
+                if (IsCompanion && Time.unscaledTime >= _nextCargoCheck)
+                {
+                    _nextCargoCheck = Time.unscaledTime + CargoCheckIntervalSeconds;
+                    RefreshCargoSnapshots();
+                }
             }
             catch (Exception ex)
             {
@@ -632,6 +668,93 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 Log.Warning($"[NPCLLMChat] Travel journal update failed: {ex.Message}");
                 _nextPlaceCheck = Time.unscaledTime + 60f;
             }
+        }
+
+        private const float CargoCheckIntervalSeconds = 30f;
+        private float _nextCargoCheck;
+
+        /// <summary>
+        /// The companion keeps mental notes of what's stored where: the player's vehicles,
+        /// the supply drone, and player-owned storage containers grouped by the place they
+        /// sit in. Only what's currently loaded can be seen; everything else keeps its
+        /// last-seen snapshot with the day/time she saw it.
+        /// </summary>
+        private void RefreshCargoSnapshots()
+        {
+            var world = GameManager.Instance?.World;
+            var player = world?.GetPrimaryPlayer();
+            if (world == null || player == null || _memory == null) return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            bool changed = false;
+
+            foreach (var entity in world.Entities.list)
+            {
+                if (entity is EntityDrone drone)
+                {
+                    if (drone.Owner is EntityPlayerLocal ||
+                        (drone.OwnerID != null && drone.OwnerID.Equals(Platform.PlatformManager.InternalLocalUserIdentifier)))
+                    {
+                        changed |= UpdateCargoSnapshot("the supply drone", day, time,
+                            WorldContextHelper.SummarizeStacks(drone.bag?.GetSlots()));
+                    }
+                }
+                else if (entity is EntityVehicle vehicle && vehicle.LocalPlayerIsOwner())
+                {
+                    changed |= UpdateCargoSnapshot($"the {VehicleName(vehicle)}", day, time,
+                        WorldContextHelper.SummarizeStacks(vehicle.bag?.GetSlots()));
+                }
+            }
+
+            // Player-owned storage containers, one snapshot per place ("storage at Trader Rekt")
+            var byPlace = new Dictionary<string, List<ItemStack>>();
+            foreach (var chunk in world.ChunkCache.GetChunkArrayCopySync())
+            {
+                foreach (var tileEntity in chunk.tileEntities.list)
+                {
+                    if (!(tileEntity is TileEntitySecureLootContainer container) || !container.LocalPlayerIsOwner())
+                        continue;
+                    Vector3i wp = container.ToWorldPos();
+                    string place = WorldContextHelper.GetPOINameAt(new Vector3(wp.x, wp.y, wp.z));
+                    string key = string.IsNullOrEmpty(place) ? "storage out in the wild" : $"storage at {place}";
+                    if (!byPlace.TryGetValue(key, out var stacks))
+                    {
+                        stacks = new List<ItemStack>();
+                        byPlace[key] = stacks;
+                    }
+                    if (container.items != null) stacks.AddRange(container.items);
+                }
+            }
+            foreach (var group in byPlace)
+            {
+                changed |= UpdateCargoSnapshot(group.Key, day, time, WorldContextHelper.SummarizeStacks(group.Value));
+            }
+
+            if (changed) PersistMemory();
+        }
+
+        private bool UpdateCargoSnapshot(string name, int day, string time, string summary)
+        {
+            if (string.IsNullOrEmpty(summary)) summary = "empty";
+            var snap = _memory.cargoSnapshots.Find(s => s.name == name);
+            if (snap == null)
+            {
+                _memory.cargoSnapshots.Add(new CargoSnapshot { name = name, day = day, time = time, summary = summary });
+                return true;
+            }
+            bool changed = snap.summary != summary;
+            snap.day = day;
+            snap.time = time;
+            snap.summary = summary;
+            return changed;
+        }
+
+        private static string VehicleName(EntityVehicle vehicle)
+        {
+            string name = EntityClass.list[vehicle.entityClass]?.entityClassName ?? "vehicle";
+            if (name.StartsWith("vehicle")) name = name.Substring("vehicle".Length);
+            return string.IsNullOrEmpty(name) ? "vehicle" : name.ToLowerInvariant();
         }
 
         private void CheckCurrentPlace()
@@ -724,6 +847,16 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         sb.AppendLine($"- \"{mark.label}\" (marked Day {mark.day} {mark.time},{at} map position {mark.x} E/W, {mark.z} N/S - {rel})");
                     }
                 }
+
+                if (_memory != null && _memory.cargoSnapshots.Count > 0)
+                {
+                    sb.AppendLine("Stored supplies you keep mental track of (contents as of when you last saw them - they may have changed since):");
+                    foreach (var snap in _memory.cargoSnapshots)
+                    {
+                        sb.AppendLine($"- {snap.name} (last checked Day {snap.day} {snap.time}): {snap.summary}");
+                    }
+                }
+                sb.AppendLine("You do NOT know what the player is carrying in their pack - if it matters, ask them (bandages? ammo? food and water?).");
 
                 string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);
                 if (!string.IsNullOrEmpty(nearby))

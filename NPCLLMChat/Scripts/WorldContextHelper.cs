@@ -108,6 +108,41 @@ namespace NPCLLMChat
         }
 
         /// <summary>
+        /// Human-readable inventory summary of item stacks: "120 x 9mm Round, 12 x First Aid
+        /// Bandage", biggest stacks first, truncated past maxItems. Null when everything is empty.
+        /// </summary>
+        public static string SummarizeStacks(IEnumerable<ItemStack> slots, int maxItems = 20)
+        {
+            if (slots == null) return null;
+            var totals = new Dictionary<string, int>();
+            foreach (var stack in slots)
+            {
+                if (stack == null || stack.IsEmpty()) continue;
+                var itemClass = stack.itemValue?.ItemClass;
+                if (itemClass == null) continue;
+                string name = itemClass.GetLocalizedItemName();
+                if (string.IsNullOrEmpty(name)) name = itemClass.GetItemName();
+                totals.TryGetValue(name, out int count);
+                totals[name] = count + stack.count;
+            }
+            if (totals.Count == 0) return null;
+
+            var sorted = new List<KeyValuePair<string, int>>(totals);
+            sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
+            var parts = new List<string>();
+            for (int i = 0; i < sorted.Count && i < maxItems; i++)
+            {
+                parts.Add($"{sorted[i].Value} x {sorted[i].Key}");
+            }
+            string summary = string.Join(", ", parts);
+            if (sorted.Count > maxItems)
+            {
+                summary += $" and {sorted.Count - maxItems} other kinds of item";
+            }
+            return summary;
+        }
+
+        /// <summary>
         /// Distance and compass direction from an observer to a point, phrased for the
         /// prompt: "about 420m NE of you", or "right here" when on top of it.
         /// </summary>

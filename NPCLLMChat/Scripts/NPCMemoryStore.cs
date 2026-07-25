@@ -35,6 +35,15 @@ namespace NPCLLMChat
     }
 
     [Serializable]
+    public class CargoSnapshot
+    {
+        public string name;    // "Motorcycle", "supply drone", "storage at Trader Rekt"
+        public int day;        // in-game day the contents were last seen
+        public string time;
+        public string summary; // "120 x 9mm Round, 12 x First Aid Bandage"
+    }
+
+    [Serializable]
     public class NPCMemory
     {
         public string npcName;
@@ -50,6 +59,8 @@ namespace NPCLLMChat
         public List<SavedMessage> pendingSummary = new List<SavedMessage>();
         // Locations the player explicitly asked the NPC to remember
         public List<MarkedPlace> markedPlaces = new List<MarkedPlace>();
+        // Last-seen contents of the player's vehicles, drone, and storage containers
+        public List<CargoSnapshot> cargoSnapshots = new List<CargoSnapshot>();
     }
 
     /// <summary>
