@@ -720,7 +720,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     foreach (var mark in _memory.markedPlaces)
                     {
                         string at = string.IsNullOrEmpty(mark.poi) ? "" : $" at {mark.poi},";
-                        sb.AppendLine($"- \"{mark.label}\" (marked Day {mark.day} {mark.time},{at} map position {mark.x} E/W, {mark.z} N/S)");
+                        string rel = WorldContextHelper.DescribeRelative(_npcEntity.position, mark.x, mark.z);
+                        sb.AppendLine($"- \"{mark.label}\" (marked Day {mark.day} {mark.time},{at} map position {mark.x} E/W, {mark.z} N/S - {rel})");
                     }
                 }
 
@@ -735,11 +736,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     sb.AppendLine("Places you have visited (oldest first, with when you were last there):");
                     foreach (var visit in _memory.placesVisited)
                     {
-                        sb.AppendLine($"- {visit.place} (Day {visit.day} {visit.time}, at map position {visit.x} E/W, {visit.z} N/S)");
+                        // entries from before coordinates were recorded deserialize as (0,0)
+                        string rel = (visit.x == 0 && visit.z == 0)
+                            ? ""
+                            : $" - {WorldContextHelper.DescribeRelative(_npcEntity.position, visit.x, visit.z)}";
+                        sb.AppendLine($"- {visit.place} (Day {visit.day} {visit.time}, at map position {visit.x} E/W, {visit.z} N/S{rel})");
                     }
                 }
 
-                sb.AppendLine("When asked about places or directions, answer from these facts. If you don't know a place, say so honestly.");
+                sb.AppendLine("When asked where a place is, point the player to it using the compass direction and rough distance given above (e.g. \"about 400 meters northeast of here\") and say how close it is. Answer only from these facts; if you don't know a place, say so honestly.");
                 return sb.ToString();
             }
             catch (Exception ex)

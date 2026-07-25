@@ -107,6 +107,17 @@ namespace NPCLLMChat
             }
         }
 
+        /// <summary>
+        /// Distance and compass direction from an observer to a point, phrased for the
+        /// prompt: "about 420m NE of you", or "right here" when on top of it.
+        /// </summary>
+        public static string DescribeRelative(Vector3 from, float x, float z)
+        {
+            float dist = Vector2.Distance(new Vector2(from.x, from.z), new Vector2(x, z));
+            if (dist < 40f) return "right here";
+            return $"about {Mathf.RoundToInt(dist)}m {CompassDir(x - from.x, z - from.z)} of you";
+        }
+
         // World +Z = map north, +X = map east
         private static string CompassDir(float dx, float dz)
         {
