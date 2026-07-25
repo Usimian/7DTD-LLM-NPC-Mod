@@ -137,13 +137,19 @@ namespace NPCLLMChat
                 locationContext = "You are currently surviving in the wasteland. ";
             }
 
+            // Responses are read aloud verbatim by TTS, so narration must never appear in them
+            const string speechOnlyRule = " Your response is spoken out loud, word for word. Respond ONLY with " +
+                "the words you actually say, in first person. Never narrate or describe your actions, movements, " +
+                "tone, or expressions. Never write about yourself in third person. No stage directions like " +
+                "*smiles* or (sighs). If something can't be said out loud, leave it out.";
+
             // Add any personality traits
             if (!string.IsNullOrEmpty(_personalityTraits))
             {
-                return $"{identityPrompt}{locationContext}{_personalityTraits} {basePrompt}";
+                return $"{identityPrompt}{locationContext}{_personalityTraits} {basePrompt}{speechOnlyRule}";
             }
 
-            return $"{identityPrompt}{locationContext}{basePrompt}";
+            return $"{identityPrompt}{locationContext}{basePrompt}{speechOnlyRule}";
         }
 
         /// <summary>
@@ -241,7 +247,8 @@ Response: {""action"": ""give"", ""dialogue"": ""Here, take these. Stay safe out
 Player: ""Remember this spot"" or ""Mark this place: bandits""
 Response: {""action"": ""remember"", ""dialogue"": ""Got it. I'll remember this place."", ""label"": ""bandits""}
 
-Stay in character. Only perform actions that make sense for your personality.";
+Stay in character. Only perform actions that make sense for your personality.
+The ""dialogue"" field and any plain response are spoken aloud word for word: only words you actually say, no narration, no describing your actions.";
         }
 
         private void HandleLLMResponse(string response, Action<string> onComplete)
@@ -681,6 +688,18 @@ Stay in character. Only perform actions that make sense for your personality.";
                 if (!string.IsNullOrEmpty(_currentPlace))
                 {
                     sb.AppendLine($"You are currently at: {_currentPlace}.");
+                }
+
+                Vector3 npcPos = _npcEntity.position;
+                sb.AppendLine($"Your map position: {(int)npcPos.x} E/W, {(int)npcPos.z} N/S.");
+
+                int bloodMoonDay = GameStats.GetInt(EnumGameStats.BloodMoonDay);
+                if (bloodMoonDay > 0)
+                {
+                    if (bloodMoonDay <= day)
+                        sb.AppendLine("TONIGHT is a blood moon - the horde comes at nightfall.");
+                    else
+                        sb.AppendLine($"The next blood moon horde comes on the night of Day {bloodMoonDay} ({bloodMoonDay - day} day{(bloodMoonDay - day == 1 ? "" : "s")} from now).");
                 }
 
                 if (_memory != null && !string.IsNullOrEmpty(_memory.persona))

@@ -88,6 +88,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             btnReloadPersona = GetChildById("btnReloadPersona") as XUiC_SimpleButton;
             lblPersona = GetChildById("lblPersona")?.ViewComponent as XUiV_Label;
+            UnityEngine.Debug.Log($"[NPCLLMChat] Init: lblPersona = {(lblPersona != null ? "found" : "NULL")}");
             if (btnReloadPersona != null) btnReloadPersona.OnPressed += BtnReloadPersona_OnPressed;
 
             // Wire up button events

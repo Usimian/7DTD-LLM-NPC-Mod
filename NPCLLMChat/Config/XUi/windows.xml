@@ -134,12 +134,13 @@
 
                 </grid>
 
-                <!-- Companion Persona section (below the settings grid) -->
-                <label depth="4" pos="30,645" width="640" height="20" font_size="14" style="label_outline"
+                <!-- Companion Persona section (below the settings grid).
+                     XUi y-axis is NEGATIVE going down — positive y renders above the window, off-screen. -->
+                <label depth="4" pos="30,-645" width="640" height="20" font_size="14" style="label_outline"
                        text="Companion Persona (edit npc_companion.json in the save's NPCLLMChat folder, then reload):"/>
-                <label depth="4" name="lblPersona" pos="30,668" width="640" height="120" font_size="12"
+                <label depth="4" name="lblPersona" pos="30,-668" width="640" height="120" font_size="12"
                        color="210,210,210,255" text=""/>
-                <simplebutton enabled="true" name="btnReloadPersona" pos="40,795" width="620" height="40" depth="4"
+                <simplebutton enabled="true" name="btnReloadPersona" pos="40,-795" width="620" height="40" depth="4"
                               font_size="16" caption="Reload Persona From File"/>
             </panel>
         </window>

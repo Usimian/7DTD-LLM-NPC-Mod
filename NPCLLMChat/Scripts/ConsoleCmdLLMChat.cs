@@ -459,6 +459,7 @@ Examples:
             if (config != null)
             {
                 output.Output($"Default Voice: {config.DefaultVoice}");
+                output.Output($"Companion Voice: {config.CompanionVoice}");
                 output.Output($"Volume: {config.Volume:P0}");
             }
 
@@ -501,11 +502,13 @@ Examples:
             }
 
             string testText = "Hey survivor, the wasteland is rough but we will make it through together.";
-            Log.Out($"[NPCLLMChat] TestTTS: Calling Synthesize with text: {testText}");
+            string testVoice = NPCLLMChatMod.TTSConfig?.CompanionVoice;
+            output.Output($"Testing with companion voice: {testVoice ?? "(default)"}");
+            Log.Out($"[NPCLLMChat] TestTTS: Calling Synthesize with voice {testVoice}, text: {testText}");
 
             tts.Synthesize(
                 testText,
-                null,
+                testVoice,
                 clip =>
                 {
                     Log.Out($"[NPCLLMChat] TestTTS: SUCCESS! Generated clip: {clip?.length ?? 0}s");
