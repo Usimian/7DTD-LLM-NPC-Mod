@@ -35,6 +35,7 @@ llmchat persona         - Show active NPC personas
 llmchat persona reload  - Re-read personas from the memory files (after hand edits)
 llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
 llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
+llmchat hire set <n>    - Set the hire count to match reality (e.g. 1 with one companion)
 
 TTS Commands:
 llmchat tts             - Show TTS status
@@ -335,6 +336,11 @@ Examples:
             {
                 player.Buffs.SetCustomVar("CurrentHireCount", 0f);
                 output.Output("CurrentHireCount reset to 0 - talk to the NPC again to hire");
+            }
+            else if (_params.Count > 2 && _params[1].ToLower() == "set" && int.TryParse(_params[2], out int newCount))
+            {
+                player.Buffs.SetCustomVar("CurrentHireCount", newCount);
+                output.Output($"CurrentHireCount set to {newCount}");
             }
 
             // Hire-related state of the nearest NPC, for diagnosis
