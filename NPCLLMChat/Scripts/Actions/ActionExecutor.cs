@@ -170,9 +170,25 @@ namespace NPCLLMChat.Actions
             }
         }
 
+        // Her first aid is a real heal, so it needs a supply-and-time limit or she could
+        // top the player up every other sentence. One patch-up per five minutes.
+        private const float HealCooldownSeconds = 300f;
+        private float _nextHealTime;
+
         private void ExecuteHeal(EntityAlive npc, EntityPlayer player, NPCAction action)
         {
             if (player == null) return;
+
+            if (UnityEngine.Time.unscaledTime < _nextHealTime)
+            {
+                if (player is EntityPlayerLocal waiting)
+                {
+                    int mins = Mathf.CeilToInt((_nextHealTime - UnityEngine.Time.unscaledTime) / 60f);
+                    ShowMessage(waiting, $"[{GetNPCName(npc)}] is out of clean dressings for about {mins} more minute{(mins == 1 ? "" : "s")}");
+                }
+                return;
+            }
+            _nextHealTime = UnityEngine.Time.unscaledTime + HealCooldownSeconds;
 
             int healAmount = action.GetParamInt("amount", 25);
             float currentHealth = player.Health;

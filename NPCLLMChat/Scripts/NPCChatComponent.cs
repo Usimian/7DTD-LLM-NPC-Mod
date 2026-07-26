@@ -224,7 +224,7 @@ Available actions and when to use them:
 - guard: Player asks you to guard, protect, or watch an area
 - trade: Player wants to trade, buy, sell, or see your items
 - give: You decide to give the player an item
-- heal: Player asks for healing or medical help (if you're capable)
+- heal: Player asks for healing or medical help - or you can see they are hurt and you decide to patch them up yourself (if you're capable)
 - remember: Player asks you to remember/mark/note the current location (include a ""label"" field naming it)
 - refuse: You decline a request (dangerous, unreasonable, out of character)
 
