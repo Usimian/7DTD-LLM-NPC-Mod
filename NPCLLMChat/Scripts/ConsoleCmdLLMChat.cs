@@ -392,7 +392,6 @@ Examples:
                     var seen = new Vector3(memory.lastSeenX, player.position.y, memory.lastSeenZ);
                     output($"  Last actually seen: ({memory.lastSeenX}, {memory.lastSeenZ}) on Day {memory.lastSeenDay} {memory.lastSeenTime}");
                     output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, seen))}m {Bearing(player.position, seen)} of you");
-                    output($"    teleport {memory.lastSeenX} -1 {memory.lastSeenZ}");
                 }
             }
 
@@ -405,8 +404,7 @@ Examples:
                     if (snap.x == 0 && snap.z == 0) continue;
                     var at = new Vector3(snap.x, player.position.y, snap.z);
                     output($"  {snap.name}: ({snap.x}, {snap.z}) on Day {snap.day} {snap.time}");
-                    output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, at))}m {Bearing(player.position, at)} of you" +
-                           $"  |  teleport {snap.x} -1 {snap.z}");
+                    output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, at))}m {Bearing(player.position, at)} of you");
                 }
             }
 
