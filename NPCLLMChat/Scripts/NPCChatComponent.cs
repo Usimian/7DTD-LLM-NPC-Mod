@@ -368,26 +368,40 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\([^)]*\)", " ");
             cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\[[^\]]*\]", " ");
 
-            // Unmarked third-person narration wrapping quoted speech ('Ratchet clicks her
-            // tongue. "Two kits left, hon."') - her name outside the quotes gives it away;
-            // speak only what's inside them.
+            // Unmarked narration wrapping quoted speech, first person or third:
+            // '"Click." I pinch my nose. "We aren't in Arizona, hon."' or
+            // 'Ratchet clicks her tongue. "Two kits left, hon."'
+            // Two tells: her name sits outside the quotes, or the quoted parts carry most
+            // of the text (so the quotes ARE the dialogue and the rest is stage business).
+            // An inner quotation - 'Rekt told me "get out" last week, hon.' - trips neither.
             var quoted = System.Text.RegularExpressions.Regex.Matches(cleaned, "[\"“]([^\"“”]+)[\"”]");
-            if (quoted.Count > 0 && !string.IsNullOrEmpty(_npcName))
+            if (quoted.Count > 0)
             {
                 string outside = System.Text.RegularExpressions.Regex.Replace(cleaned, "[\"“][^\"“”]*[\"”]", " ");
                 bool nameOutside = false;
-                foreach (string word in _npcName.Split(' '))
+                if (!string.IsNullOrEmpty(_npcName))
                 {
-                    if (word.Length > 2 && outside.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                    foreach (string word in _npcName.Split(' '))
                     {
-                        nameOutside = true;
-                        break;
+                        if (word.Length > 2 && outside.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            nameOutside = true;
+                            break;
+                        }
                     }
                 }
-                if (nameOutside)
+
+                int quotedChars = 0;
+                var parts = new List<string>();
+                foreach (System.Text.RegularExpressions.Match m in quoted)
                 {
-                    var parts = new List<string>();
-                    foreach (System.Text.RegularExpressions.Match m in quoted) parts.Add(m.Groups[1].Value);
+                    parts.Add(m.Groups[1].Value);
+                    quotedChars += m.Groups[1].Value.Length;
+                }
+                bool quotedIsMostOfIt = quotedChars * 2 >= cleaned.Length;
+
+                if (nameOutside || quotedIsMostOfIt)
+                {
                     cleaned = string.Join(" ", parts);
                 }
             }
@@ -622,7 +636,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 sb.AppendLine($"{(msg.role == "NPC" ? _npcName : "Player")}: {msg.content}");
             }
             sb.AppendLine();
-            sb.AppendLine("Rewrite the long-term memory, merging in anything from the excerpts worth keeping: facts about the player, promises made, shared events, plans, opinions formed. Keep it under 150 words of plain prose. Output only the memory text, no preamble.");
+            sb.AppendLine("Rewrite the long-term memory, merging in anything from the excerpts worth keeping: facts about the player, promises made, shared events, plans, things learned about each other. Keep it under 150 words of plain prose. Output only the memory text, no preamble.");
+            sb.AppendLine("Record what happened, not grievances. This memory is read back as her standing attitude every time she speaks, so do NOT write complaints about the player, demands, ultimatums, orders, or judgements of their competence - a passing irritation in one conversation must not become a permanent stance. Keep the tone that of a companion who likes and trusts the player.");
 
             LLMService.Instance.SendCompletionRequest(
                 sb.ToString(),
@@ -815,6 +830,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                 Vector3 npcPos = _npcEntity.position;
                 sb.AppendLine($"Your map position: {(int)npcPos.x} E/W, {(int)npcPos.z} N/S.");
+
+                sb.AppendLine("Dukes (casino coins) are the money everyone uses out here. Traders buy loot, crafted goods, and materials for dukes and sell supplies for them, so selling things to traders for a profit is ordinary business, not fantasy - the player knows the going rates better than you do.");
 
                 int bloodMoonDay = GameStats.GetInt(EnumGameStats.BloodMoonDay);
                 if (bloodMoonDay > 0)
