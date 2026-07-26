@@ -214,6 +214,16 @@ namespace NPCLLMChat.Harmony
     {
         static void Prefix(int _entityId)
         {
+            // Companions keep vanishing across restarts; record the moment one is removed
+            // from the world so the log distinguishes "despawned while playing/at shutdown"
+            // from "never restored at load".
+            var world = GameManager.Instance?.World;
+            var entity = world?.GetEntity(_entityId) as EntityAlive;
+            if (entity != null && entity.GetComponent<NPCChatComponent>() != null)
+            {
+                Log.Warning($"[NPCLLMChat] NPC {entity.EntityName} [id {_entityId}] removed from world at " +
+                            $"({(int)entity.position.x}, {(int)entity.position.z}), dead={entity.IsDead()}");
+            }
             NPCCorePatches.RemoveChatComponent(_entityId);
         }
     }
