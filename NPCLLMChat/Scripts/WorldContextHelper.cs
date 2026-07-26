@@ -122,6 +122,7 @@ namespace NPCLLMChat
                 if (itemClass == null) continue;
                 string name = itemClass.GetLocalizedItemName();
                 if (string.IsNullOrEmpty(name)) name = itemClass.GetItemName();
+                name = Prettify(name);
                 totals.TryGetValue(name, out int count);
                 totals[name] = count + stack.count;
             }
@@ -174,6 +175,28 @@ namespace NPCLLMChat
                 condition += ". Conditions you can see on them: " + string.Join(", ", ailments);
             }
             return condition;
+        }
+
+        /// <summary>
+        /// NPC-only items have no localization entry, so their raw ids reach the prompt
+        /// ("gunNPCM60", "ammoNPC9mmBulletBall"). Turn those into words she can say.
+        /// </summary>
+        private static string Prettify(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.IndexOf(' ') >= 0) return name;
+
+            string s = name;
+            foreach (string prefix in new[] { "gunNPC", "ammoNPC", "meleeNPC", "gun", "ammo", "melee", "food", "drink", "medical" })
+            {
+                if (s.StartsWith(prefix, StringComparison.Ordinal) && s.Length > prefix.Length)
+                {
+                    s = s.Substring(prefix.Length);
+                    break;
+                }
+            }
+            // split camelCase / digit boundaries: "9mmBulletBall" -> "9mm Bullet Ball"
+            s = System.Text.RegularExpressions.Regex.Replace(s, "(?<=[a-z0-9])(?=[A-Z])", " ");
+            return s.Trim();
         }
 
         private static string Band(Stat stat, string high, string mid, string low, string critical)

@@ -929,9 +929,17 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (ownBag != null) carried.AddRange(ownBag);
                 var belt = _npcEntity.inventory?.CloneItemStack();
                 if (belt != null) carried.AddRange(belt);
+                // SCore NPCs derive from EntityTrader, and the companion UI can route items
+                // into the trader-side inventory rather than the loot container
+                var traderStock = (_npcEntity as EntityTrader)?.TileEntityTrader?.TraderData?.PrimaryInventory;
+                if (traderStock != null) carried.AddRange(traderStock);
+
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
-                Log.Out($"[NPCLLMChat] {_npcName} inventory: lootContainer={_npcEntity.lootContainer?.items?.Length ?? -1}, " +
-                        $"bag={ownBag?.Length ?? -1}, belt={belt?.Length ?? -1} slots -> {carrying ?? "(empty)"}");
+                Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
+                        $"lootContainer: {WorldContextHelper.SummarizeStacks(_npcEntity.lootContainer?.items) ?? "(empty)"} | " +
+                        $"bag: {WorldContextHelper.SummarizeStacks(ownBag) ?? "(empty)"} | " +
+                        $"belt: {WorldContextHelper.SummarizeStacks(belt) ?? "(empty)"} | " +
+                        $"trader: {WorldContextHelper.SummarizeStacks(traderStock) ?? "(empty)"}");
 
                 string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
                 if (!string.IsNullOrEmpty(wielded) && wielded != "Air")
