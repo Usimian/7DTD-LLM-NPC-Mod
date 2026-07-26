@@ -867,8 +867,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
 
-                // Her own bag is on her person, so it's read live rather than snapshotted
-                string carrying = WorldContextHelper.SummarizeStacks(_npcEntity.bag?.GetSlots());
+                // Her own inventory is on her person, so it's read live rather than snapshotted.
+                // SCore NPCs hold what the player hands them in lootContainer (the container
+                // the hire UI opens); the vanilla bag is normally player-only, so read both.
+                var carried = new List<ItemStack>();
+                if (_npcEntity.lootContainer?.items != null) carried.AddRange(_npcEntity.lootContainer.items);
+                var ownBag = _npcEntity.bag?.GetSlots();
+                if (ownBag != null) carried.AddRange(ownBag);
+                string carrying = WorldContextHelper.SummarizeStacks(carried);
+                Log.Out($"[NPCLLMChat] {_npcName} inventory: lootContainer={_npcEntity.lootContainer?.items?.Length ?? -1} slots, bag={ownBag?.Length ?? -1} slots -> {carrying ?? "(empty)"}");
                 sb.AppendLine(string.IsNullOrEmpty(carrying)
                     ? "You are carrying nothing in your own bag right now."
                     : $"What you are carrying in your own bag right now: {carrying}.");
