@@ -695,6 +695,25 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private bool _warnedUnhired;
 
         /// <summary>
+        /// Loot containers carry the entity id of whoever owns them, which is how a modded
+        /// NPC's storage can be located without depending on the mod's own types.
+        /// </summary>
+        private static ItemStack[] FindContainerForEntity(int entityId)
+        {
+            var world = GameManager.Instance?.World;
+            if (world == null) return null;
+            foreach (var chunk in world.ChunkCache.GetChunkArrayCopySync())
+            {
+                foreach (var tileEntity in chunk.tileEntities.list)
+                {
+                    if (tileEntity.entityId != entityId) continue;
+                    if (tileEntity is TileEntityLootContainer loot && loot.items != null) return loot.items;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Keep a breadcrumb of where she actually is, so a lost companion can be found even
         /// when she strays between POIs (the travel journal only fires on POI arrival).
         /// </summary>
@@ -933,13 +952,19 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 // into the trader-side inventory rather than the loot container
                 var traderStock = (_npcEntity as EntityTrader)?.TileEntityTrader?.TraderData?.PrimaryInventory;
                 if (traderStock != null) carried.AddRange(traderStock);
+                // The companion UI's container is mod-managed and none of the entity's own
+                // fields point at it, but SCore stamps its tile entities with the owning
+                // entity id - so find the container that belongs to her.
+                var ownContainer = FindContainerForEntity(_npcEntity.entityId);
+                if (ownContainer != null) carried.AddRange(ownContainer);
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
                         $"lootContainer: {WorldContextHelper.SummarizeStacks(_npcEntity.lootContainer?.items) ?? "(empty)"} | " +
                         $"bag: {WorldContextHelper.SummarizeStacks(ownBag) ?? "(empty)"} | " +
                         $"belt: {WorldContextHelper.SummarizeStacks(belt) ?? "(empty)"} | " +
-                        $"trader: {WorldContextHelper.SummarizeStacks(traderStock) ?? "(empty)"}");
+                        $"trader: {WorldContextHelper.SummarizeStacks(traderStock) ?? "(empty)"} | " +
+                        $"own container: {WorldContextHelper.SummarizeStacks(ownContainer) ?? "(none found)"}");
 
                 string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
                 if (!string.IsNullOrEmpty(wielded) && wielded != "Air")
