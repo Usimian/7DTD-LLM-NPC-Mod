@@ -141,7 +141,9 @@ namespace NPCLLMChat
             const string speechOnlyRule = " Your response is spoken out loud, word for word. Respond ONLY with " +
                 "the words you actually say, in first person. Never narrate or describe your actions, movements, " +
                 "tone, or expressions. Never write about yourself in third person. No stage directions like " +
-                "*smiles* or (sighs). If something can't be said out loud, leave it out.";
+                "*smiles* or (sighs). Never voice a sound effect or gesture as a word either " +
+                "(no \"Click.\", no \"Sigh.\", no \"Shrug.\"). When you feel something, say it in " +
+                "plain words - \"I'm nervous about this\" - instead of acting it out.";
 
             // Add any personality traits
             if (!string.IsNullOrEmpty(_personalityTraits))
