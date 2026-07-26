@@ -678,6 +678,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     _nextCargoCheck = Time.unscaledTime + CargoCheckIntervalSeconds;
                     RefreshCargoSnapshots();
                 }
+
+                WarnIfCarryingGearUnhired();
             }
             catch (Exception ex)
             {
@@ -689,6 +691,34 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
         private const float CargoCheckIntervalSeconds = 30f;
         private float _nextCargoCheck;
+        private bool _warnedUnhired;
+
+        /// <summary>
+        /// An unhired NPC wanders off and despawns, taking anything stored on it - including
+        /// the weapon it needs in its inventory to wield. Say so once, while the gear is still
+        /// recoverable.
+        /// </summary>
+        private void WarnIfCarryingGearUnhired()
+        {
+            if (_warnedUnhired || IsHiredCompanion()) return;
+
+            var items = _npcEntity.lootContainer?.items;
+            if (items == null) return;
+            bool hasGear = false;
+            foreach (var stack in items)
+            {
+                if (stack != null && !stack.IsEmpty()) { hasGear = true; break; }
+            }
+            if (!hasGear) return;
+
+            _warnedUnhired = true;
+            Log.Warning($"[NPCLLMChat] {_npcName} is carrying gear but is NOT hired - will wander off and despawn with it");
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer() as EntityPlayerLocal;
+            if (player != null)
+            {
+                GameManager.ShowTooltip(player, $"{_npcName} is holding your gear but is NOT hired - hire her or she wanders off with it", false);
+            }
+        }
 
         /// <summary>
         /// The companion keeps mental notes of what's stored where: the player's vehicles,
@@ -876,6 +906,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (ownBag != null) carried.AddRange(ownBag);
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory: lootContainer={_npcEntity.lootContainer?.items?.Length ?? -1} slots, bag={ownBag?.Length ?? -1} slots -> {carrying ?? "(empty)"}");
+
+                string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
+                if (!string.IsNullOrEmpty(wielded) && wielded != "Air")
+                {
+                    sb.AppendLine($"The weapon you have in your hands right now: {wielded}.");
+                }
                 sb.AppendLine(string.IsNullOrEmpty(carrying)
                     ? "You are carrying nothing in your own bag right now."
                     : $"What you are carrying in your own bag right now: {carrying}.");
