@@ -197,7 +197,7 @@ namespace NPCLLMChat
         /// <summary>
         /// Check if entity is an NPC
         /// </summary>
-        private static bool IsNPC(EntityAlive entity)
+        public static bool IsNPC(EntityAlive entity)
         {
             if (entity == null) return false;
             string name = entity.GetType().Name;

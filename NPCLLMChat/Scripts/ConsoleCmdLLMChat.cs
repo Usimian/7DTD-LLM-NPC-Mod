@@ -33,6 +33,8 @@ llmchat clear           - Clear conversation history
 llmchat list            - List active NPC sessions
 llmchat persona         - Show active NPC personas
 llmchat persona reload  - Re-read personas from the memory files (after hand edits)
+llmchat find            - Locate NPCs: every loaded one with bearing + hire state,
+                          plus the companion's last known position from her journal
 llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
 llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
 llmchat hire set <n>    - Set the hire count to match reality (e.g. 1 with one companion)
@@ -102,6 +104,9 @@ Examples:
                     break;
                 case "persona":
                     HandlePersonaCommand(_params);
+                    break;
+                case "find":
+                    FindNPCs();
                     break;
                 case "hire":
                     HandleHireCommand(_params);
@@ -241,7 +246,7 @@ Examples:
 
             foreach (var entity in world.Entities.list)
             {
-                if (entity is EntityAlive alive && IsNPC(alive) && alive.entityId != player.entityId)
+                if (entity is EntityAlive alive && NPCLLMChatMod.IsNPC(alive) && alive.entityId != player.entityId)
                 {
                     float dist = Vector3.Distance(player.position, alive.position);
                     if (dist < closestDist)
@@ -252,18 +257,6 @@ Examples:
                 }
             }
             return closest;
-        }
-
-        private bool IsNPC(EntityAlive entity)
-        {
-            if (entity == null) return false;
-            string name = entity.GetType().Name;
-            if (name.Contains("NPC") || name.Contains("Trader") || name.Contains("Hired")) return true;
-            if (entity is EntityPlayer && !(entity is EntityPlayerLocal))
-            {
-                return ConnectionManager.Instance?.Clients?.ForEntityId(entity.entityId) == null;
-            }
-            return false;
         }
 
         private void ClearAllHistory()
@@ -317,6 +310,77 @@ Examples:
 
             if (count == 0) output.Output("  No active sessions");
             output.Output($"Total: {count}");
+        }
+
+        /// <summary>
+        /// Where did the companion go? Lists every loaded NPC with bearing and hire state,
+        /// then falls back to her travel journal for a last-known position when she is not
+        /// loaded (unhired NPCs wander off and despawn, hired ones reload where saved).
+        /// </summary>
+        private void FindNPCs()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var world = GameManager.Instance?.World;
+            var player = world?.GetPrimaryPlayer();
+            if (world == null || player == null)
+            {
+                output.Output("No world/player loaded");
+                return;
+            }
+
+            output.Output("=== Loaded NPCs ===");
+            int found = 0;
+            foreach (var entity in world.Entities.list)
+            {
+                if (!(entity is EntityAlive alive) || !NPCLLMChatMod.IsNPC(alive) || alive.entityId == player.entityId) continue;
+                found++;
+
+                float dist = Vector3.Distance(player.position, alive.position);
+                var hireBits = new List<string>();
+                foreach (string cvar in new[] { "Leader", "Owner" })
+                {
+                    if (alive.Buffs != null && alive.Buffs.HasCustomVar(cvar) && alive.Buffs.GetCustomVar(cvar) > 0f)
+                        hireBits.Add($"{cvar}={alive.Buffs.GetCustomVar(cvar)}");
+                }
+                string hired = hireBits.Count > 0 ? "HIRED (" + string.Join(", ", hireBits) + ")" : "not hired";
+                string state = alive.IsDead() ? "DEAD" : $"{alive.Health}hp";
+
+                output.Output($"  {alive.EntityName} [id {alive.entityId}] {alive.EntityClass?.entityClassName}");
+                output.Output($"    {Mathf.RoundToInt(dist)}m {Bearing(player.position, alive.position)}, at " +
+                              $"({(int)alive.position.x}, {(int)alive.position.z}), {state}, {hired}");
+            }
+            if (found == 0) output.Output("  (none loaded within the streamed area)");
+
+            // Last-known position from the companion's own travel journal
+            output.Output("=== Companion's last known position ===");
+            var memory = NPCMemoryStore.Load(NPCChatComponent.CompanionMemoryKey);
+            if (memory == null || memory.placesVisited.Count == 0)
+            {
+                output.Output("  No journal entries saved yet");
+            }
+            else
+            {
+                var last = memory.placesVisited[memory.placesVisited.Count - 1];
+                var there = new Vector3(last.x, player.position.y, last.z);
+                output.Output($"  {memory.npcName ?? "companion"}: {last.place} ({last.x}, {last.z}) on Day {last.day} {last.time}");
+                output.Output($"  That is {Mathf.RoundToInt(Vector3.Distance(player.position, there))}m {Bearing(player.position, there)} of you");
+            }
+
+            float hireCount = player.Buffs.HasCustomVar("CurrentHireCount") ? player.Buffs.GetCustomVar("CurrentHireCount") : 0f;
+            output.Output($"Your CurrentHireCount = {hireCount}");
+            if (found == 0 && hireCount > 0f)
+            {
+                output.Output("A companion is on the books but none is loaded - walk to the position above;");
+                output.Output("if she never turns up she despawned (unhired NPCs wander off), so run 'llmchat hire set 0'.");
+            }
+        }
+
+        private static string Bearing(Vector3 from, Vector3 to)
+        {
+            string[] dirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+            float angle = Mathf.Atan2(to.x - from.x, to.z - from.z) * Mathf.Rad2Deg;
+            if (angle < 0) angle += 360f;
+            return dirs[Mathf.RoundToInt(angle / 45f) % 8];
         }
 
         private void HandleHireCommand(List<string> _params)
