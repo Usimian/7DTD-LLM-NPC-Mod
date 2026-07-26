@@ -35,6 +35,8 @@ llmchat persona         - Show active NPC personas
 llmchat persona reload  - Re-read personas from the memory files (after hand edits)
 llmchat find            - Locate NPCs: every loaded one with bearing + hire state,
                           plus the companion's last known position from her journal
+llmchat persist         - Mark the nearest NPC savable so it survives logout
+                          (SCore only saves NPCs carrying a Leader or Persist cvar)
 llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
 llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
 llmchat hire set <n>    - Set the hire count to match reality (e.g. 1 with one companion)
@@ -107,6 +109,9 @@ Examples:
                     break;
                 case "find":
                     FindNPCs();
+                    break;
+                case "persist":
+                    MakeNearestNPCPersist();
                     break;
                 case "hire":
                     HandleHireCommand(_params);
@@ -354,9 +359,16 @@ Examples:
                 string hired = hireBits.Count > 0 ? "HIRED (" + string.Join(", ", hireBits) + ")" : "not hired";
                 string state = alive.IsDead() ? "DEAD" : $"{alive.Health}hp";
 
+                // SCore writes an NPC into the save only when it carries Leader or Persist;
+                // an Owner-only companion is silently discarded at logout.
+                bool survives = alive.Buffs != null &&
+                                (alive.Buffs.HasCustomVar("Leader") || alive.Buffs.HasCustomVar("Persist"));
+                string saveState = survives ? "survives logout" : "WILL VANISH AT LOGOUT (no Leader/Persist)";
+
                 output($"  {alive.EntityName} [id {alive.entityId}] {alive.EntityClass?.entityClassName}");
                 output($"    {Mathf.RoundToInt(dist)}m {Bearing(player.position, alive.position)}, at " +
                               $"({(int)alive.position.x}, {(int)alive.position.z}), {state}, {hired}");
+                output($"    {saveState}");
             }
             if (found == 0) output("  (none loaded within the streamed area)");
 
@@ -391,6 +403,35 @@ Examples:
                 output("A companion is on the books but none is loaded - walk to the position above;");
                 output("if she never turns up she despawned (unhired NPCs wander off), so run 'llmchat hire set 0'.");
             }
+        }
+
+        /// <summary>
+        /// SCore's EntityAliveSDX.IsSavedToFile() only writes an NPC into the save file when
+        /// it has a Leader or Persist cvar; a companion hired through the Owner-only path is
+        /// discarded at logout. Setting Persist makes it savable without touching its AI.
+        /// </summary>
+        private void MakeNearestNPCPersist()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                output.Output("No player found");
+                return;
+            }
+
+            EntityAlive npc = FindNearestNPC(player, 15f);
+            if (npc == null)
+            {
+                output.Output("No NPC within 15m - stand next to the companion and try again");
+                return;
+            }
+
+            bool already = npc.Buffs.HasCustomVar("Leader") || npc.Buffs.HasCustomVar("Persist");
+            npc.Buffs.SetCustomVar("Persist", 1f);
+            Log.Out($"[NPCLLMChat] Set Persist on {npc.EntityName} [id {npc.entityId}] (was savable: {already})");
+            output.Output($"{npc.EntityName} marked to persist{(already ? " (it already would have saved)" : " - it would NOT have survived logout before this")}");
+            output.Output("Verify with 'llmchat find' - it should now read 'survives logout'");
         }
 
         private static string Bearing(Vector3 from, Vector3 to)
