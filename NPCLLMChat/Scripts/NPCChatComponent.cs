@@ -867,6 +867,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
 
+                // Her own bag is on her person, so it's read live rather than snapshotted
+                string carrying = WorldContextHelper.SummarizeStacks(_npcEntity.bag?.GetSlots());
+                sb.AppendLine(string.IsNullOrEmpty(carrying)
+                    ? "You are carrying nothing in your own bag right now."
+                    : $"What you are carrying in your own bag right now: {carrying}.");
+
                 if (_memory != null && _memory.cargoSnapshots.Count > 0)
                 {
                     sb.AppendLine("Stored supplies you keep mental track of (contents as of when you last saw them - they may have changed since):");
