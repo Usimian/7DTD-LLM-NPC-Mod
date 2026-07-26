@@ -676,6 +676,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (IsCompanion && Time.unscaledTime >= _nextCargoCheck)
                 {
                     _nextCargoCheck = Time.unscaledTime + CargoCheckIntervalSeconds;
+                    RecordLastSeenPosition();
                     RefreshCargoSnapshots();
                 }
 
@@ -692,6 +693,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private const float CargoCheckIntervalSeconds = 30f;
         private float _nextCargoCheck;
         private bool _warnedUnhired;
+
+        /// <summary>
+        /// Keep a breadcrumb of where she actually is, so a lost companion can be found even
+        /// when she strays between POIs (the travel journal only fires on POI arrival).
+        /// </summary>
+        private void RecordLastSeenPosition()
+        {
+            if (_memory == null) return;
+            int x = (int)_npcEntity.position.x;
+            int z = (int)_npcEntity.position.z;
+            if (x == _memory.lastSeenX && z == _memory.lastSeenZ) return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            _memory.lastSeenX = x;
+            _memory.lastSeenZ = z;
+            _memory.lastSeenDay = day;
+            _memory.lastSeenTime = time;
+            PersistMemory();
+        }
 
         /// <summary>
         /// An unhired NPC wanders off and despawns, taking anything stored on it - including

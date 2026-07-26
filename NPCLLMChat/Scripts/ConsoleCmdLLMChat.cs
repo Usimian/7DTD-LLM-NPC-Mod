@@ -319,16 +319,25 @@ Examples:
         /// </summary>
         private void FindNPCs()
         {
-            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var console = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            // Console text never reaches the log file, so mirror every line into it - that is
+            // the only way this output can be read after the fact (or by someone helping).
+            System.Action<string> output = line =>
+            {
+                console.Output(line);
+                Log.Out($"[NPCLLMChat] find| {line}");
+            };
+
             var world = GameManager.Instance?.World;
             var player = world?.GetPrimaryPlayer();
             if (world == null || player == null)
             {
-                output.Output("No world/player loaded");
+                output("No world/player loaded");
                 return;
             }
 
-            output.Output("=== Loaded NPCs ===");
+            output($"Player at ({(int)player.position.x}, {(int)player.position.z})");
+            output("=== Loaded NPCs ===");
             int found = 0;
             foreach (var entity in world.Entities.list)
             {
@@ -345,33 +354,42 @@ Examples:
                 string hired = hireBits.Count > 0 ? "HIRED (" + string.Join(", ", hireBits) + ")" : "not hired";
                 string state = alive.IsDead() ? "DEAD" : $"{alive.Health}hp";
 
-                output.Output($"  {alive.EntityName} [id {alive.entityId}] {alive.EntityClass?.entityClassName}");
-                output.Output($"    {Mathf.RoundToInt(dist)}m {Bearing(player.position, alive.position)}, at " +
+                output($"  {alive.EntityName} [id {alive.entityId}] {alive.EntityClass?.entityClassName}");
+                output($"    {Mathf.RoundToInt(dist)}m {Bearing(player.position, alive.position)}, at " +
                               $"({(int)alive.position.x}, {(int)alive.position.z}), {state}, {hired}");
             }
-            if (found == 0) output.Output("  (none loaded within the streamed area)");
+            if (found == 0) output("  (none loaded within the streamed area)");
 
             // Last-known position from the companion's own travel journal
-            output.Output("=== Companion's last known position ===");
+            output("=== Companion's last known position ===");
             var memory = NPCMemoryStore.Load(NPCChatComponent.CompanionMemoryKey);
             if (memory == null || memory.placesVisited.Count == 0)
             {
-                output.Output("  No journal entries saved yet");
+                output("  No journal entries saved yet");
             }
             else
             {
                 var last = memory.placesVisited[memory.placesVisited.Count - 1];
                 var there = new Vector3(last.x, player.position.y, last.z);
-                output.Output($"  {memory.npcName ?? "companion"}: {last.place} ({last.x}, {last.z}) on Day {last.day} {last.time}");
-                output.Output($"  That is {Mathf.RoundToInt(Vector3.Distance(player.position, there))}m {Bearing(player.position, there)} of you");
+                output($"  Journal: {last.place} ({last.x}, {last.z}) on Day {last.day} {last.time}");
+                output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, there))}m {Bearing(player.position, there)} of you");
+
+                // The breadcrumb is refreshed as she moves, so it beats the journal when set
+                if (memory.lastSeenX != 0 || memory.lastSeenZ != 0)
+                {
+                    var seen = new Vector3(memory.lastSeenX, player.position.y, memory.lastSeenZ);
+                    output($"  Last actually seen: ({memory.lastSeenX}, {memory.lastSeenZ}) on Day {memory.lastSeenDay} {memory.lastSeenTime}");
+                    output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, seen))}m {Bearing(player.position, seen)} of you");
+                    output($"    teleport {memory.lastSeenX} -1 {memory.lastSeenZ}");
+                }
             }
 
             float hireCount = player.Buffs.HasCustomVar("CurrentHireCount") ? player.Buffs.GetCustomVar("CurrentHireCount") : 0f;
-            output.Output($"Your CurrentHireCount = {hireCount}");
+            output($"Your CurrentHireCount = {hireCount}");
             if (found == 0 && hireCount > 0f)
             {
-                output.Output("A companion is on the books but none is loaded - walk to the position above;");
-                output.Output("if she never turns up she despawned (unhired NPCs wander off), so run 'llmchat hire set 0'.");
+                output("A companion is on the books but none is loaded - walk to the position above;");
+                output("if she never turns up she despawned (unhired NPCs wander off), so run 'llmchat hire set 0'.");
             }
         }
 

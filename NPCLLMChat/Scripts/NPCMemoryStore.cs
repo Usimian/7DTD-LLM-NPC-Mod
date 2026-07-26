@@ -61,6 +61,12 @@ namespace NPCLLMChat
         public List<MarkedPlace> markedPlaces = new List<MarkedPlace>();
         // Last-seen contents of the player's vehicles, drone, and storage containers
         public List<CargoSnapshot> cargoSnapshots = new List<CargoSnapshot>();
+        // Where the NPC actually was the last time it was loaded, refreshed as it moves.
+        // The travel journal only records POI arrivals, which loses NPCs between landmarks.
+        public int lastSeenX;
+        public int lastSeenZ;
+        public int lastSeenDay;
+        public string lastSeenTime;
     }
 
     /// <summary>
