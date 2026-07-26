@@ -41,6 +41,8 @@ namespace NPCLLMChat
         public int day;        // in-game day the contents were last seen
         public string time;
         public string summary; // "120 x 9mm Round, 12 x First Aid Bandage"
+        public int x;          // where it was standing when last seen
+        public int z;
     }
 
     [Serializable]

@@ -784,18 +784,19 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         (drone.OwnerID != null && drone.OwnerID.Equals(Platform.PlatformManager.InternalLocalUserIdentifier)))
                     {
                         changed |= UpdateCargoSnapshot("the supply drone", day, time,
-                            WorldContextHelper.SummarizeStacks(drone.bag?.GetSlots()));
+                            WorldContextHelper.SummarizeStacks(drone.bag?.GetSlots()), drone.position);
                     }
                 }
                 else if (entity is EntityVehicle vehicle && vehicle.LocalPlayerIsOwner())
                 {
                     changed |= UpdateCargoSnapshot($"the {VehicleName(vehicle)}", day, time,
-                        WorldContextHelper.SummarizeStacks(vehicle.bag?.GetSlots()));
+                        WorldContextHelper.SummarizeStacks(vehicle.bag?.GetSlots()), vehicle.position);
                 }
             }
 
             // Player-owned storage containers, one snapshot per place ("storage at Trader Rekt")
             var byPlace = new Dictionary<string, List<ItemStack>>();
+            var placePositions = new Dictionary<string, Vector3>();
             foreach (var chunk in world.ChunkCache.GetChunkArrayCopySync())
             {
                 foreach (var tileEntity in chunk.tileEntities.list)
@@ -810,30 +811,41 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         stacks = new List<ItemStack>();
                         byPlace[key] = stacks;
                     }
+                    if (!placePositions.ContainsKey(key)) placePositions[key] = new Vector3(wp.x, wp.y, wp.z);
                     if (container.items != null) stacks.AddRange(container.items);
                 }
             }
             foreach (var group in byPlace)
             {
-                changed |= UpdateCargoSnapshot(group.Key, day, time, WorldContextHelper.SummarizeStacks(group.Value));
+                changed |= UpdateCargoSnapshot(group.Key, day, time, WorldContextHelper.SummarizeStacks(group.Value),
+                    placePositions.TryGetValue(group.Key, out var where) ? where : Vector3.zero);
             }
 
             if (changed) PersistMemory();
         }
 
-        private bool UpdateCargoSnapshot(string name, int day, string time, string summary)
+        private bool UpdateCargoSnapshot(string name, int day, string time, string summary, Vector3 position)
         {
             if (string.IsNullOrEmpty(summary)) summary = "empty";
+            int x = (int)position.x, z = (int)position.z;
             var snap = _memory.cargoSnapshots.Find(s => s.name == name);
             if (snap == null)
             {
-                _memory.cargoSnapshots.Add(new CargoSnapshot { name = name, day = day, time = time, summary = summary });
+                _memory.cargoSnapshots.Add(new CargoSnapshot
+                {
+                    name = name, day = day, time = time, summary = summary, x = x, z = z
+                });
                 return true;
             }
-            bool changed = snap.summary != summary;
+            // a vehicle that has been driven somewhere is worth persisting even when its
+            // cargo is unchanged - that position is how it gets found again
+            bool moved = Mathf.Abs(snap.x - x) + Mathf.Abs(snap.z - z) > 20;
+            bool changed = snap.summary != summary || moved;
             snap.day = day;
             snap.time = time;
             snap.summary = summary;
+            snap.x = x;
+            snap.z = z;
             return changed;
         }
 

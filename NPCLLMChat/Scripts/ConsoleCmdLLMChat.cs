@@ -396,6 +396,20 @@ Examples:
                 }
             }
 
+            // Vehicles and the drone are just as easy to lose as the companion
+            if (memory != null && memory.cargoSnapshots.Count > 0)
+            {
+                output("=== Vehicles and stores last seen ===");
+                foreach (var snap in memory.cargoSnapshots)
+                {
+                    if (snap.x == 0 && snap.z == 0) continue;
+                    var at = new Vector3(snap.x, player.position.y, snap.z);
+                    output($"  {snap.name}: ({snap.x}, {snap.z}) on Day {snap.day} {snap.time}");
+                    output($"    {Mathf.RoundToInt(Vector3.Distance(player.position, at))}m {Bearing(player.position, at)} of you" +
+                           $"  |  teleport {snap.x} -1 {snap.z}");
+                }
+            }
+
             float hireCount = player.Buffs.HasCustomVar("CurrentHireCount") ? player.Buffs.GetCustomVar("CurrentHireCount") : 0f;
             output($"Your CurrentHireCount = {hireCount}");
             if (found == 0 && hireCount > 0f)
