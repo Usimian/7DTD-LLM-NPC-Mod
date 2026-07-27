@@ -240,6 +240,7 @@ namespace NPCLLMChat
                 {
                     config.Endpoint = GetNodeValue(serverNode, "Endpoint", "http://localhost:11434/api/generate");
                     config.Model = GetNodeValue(serverNode, "Model", "llama3.3:70b");
+                    config.ApiKey = GetNodeValue(serverNode, "ApiKey", "");
                     config.TimeoutSeconds = int.Parse(GetNodeValue(serverNode, "TimeoutSeconds", "15"));
                     config.MaxTokens = int.Parse(GetNodeValue(serverNode, "MaxTokens", "200"));
                     config.Temperature = float.Parse(GetNodeValue(serverNode, "Temperature", "0.8"), System.Globalization.CultureInfo.InvariantCulture);

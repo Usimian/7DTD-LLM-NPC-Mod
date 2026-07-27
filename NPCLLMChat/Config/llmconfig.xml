@@ -38,6 +38,41 @@
         -->
         <Model>qwen3.6:35b</Model>
 
+        <!--
+            CLOUD / HOSTED MODELS (no local GPU needed)
+            ==========================================
+            Point Endpoint at any OpenAI-compatible /v1/chat/completions URL, set Model to
+            that provider's model id, and supply a key. Everything else in this mod works
+            unchanged - conversation, memory summaries and combat lines all use the same path.
+
+            Set the key with the NPCLLM_API_KEY environment variable rather than in this file,
+            so it is never shared or committed:
+                Linux   export NPCLLM_API_KEY=sk-...      (before launching Steam)
+                Windows setx NPCLLM_API_KEY sk-...
+            The <ApiKey> element below is a fallback if you cannot set an env var.
+
+            Providers with a free tier at time of writing (verify current terms and limits):
+              Google Gemini    https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+                               Model e.g. gemini-2.0-flash
+              Groq             https://api.groq.com/openai/v1/chat/completions
+                               Model e.g. llama-3.3-70b-versatile   (very fast)
+              OpenRouter       https://openrouter.ai/api/v1/chat/completions
+                               Model e.g. one of the ":free" ids
+              Mistral          https://api.mistral.ai/v1/chat/completions
+              Cerebras         https://api.cerebras.ai/v1/chat/completions
+
+            A companion turn is roughly 1-2k tokens of context, so conversation is cheap even
+            on paid tiers; free tiers are usually rate limited per minute rather than per day.
+            Note TTS (Piper) and STT (Whisper) still run locally - both are fine on CPU.
+
+            Reasoning ("thinking") models: the "think": false switch used for local Ollama does
+            not exist on the OpenAI-compatible API, and hidden reasoning is billed against
+            max_tokens - too small a budget returns an EMPTY reply. The mod therefore never
+            sends less than 512 there. Prefer a non-reasoning model for a companion anyway:
+            it is cheaper and answers in well under a second.
+        -->
+        <ApiKey></ApiKey>
+
         <!-- Timeout - can be shorter with fast GPU -->
         <TimeoutSeconds>15</TimeoutSeconds>
 

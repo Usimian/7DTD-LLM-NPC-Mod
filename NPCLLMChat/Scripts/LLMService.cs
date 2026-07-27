@@ -30,6 +30,7 @@ namespace NPCLLMChat
 
         // Configuration loaded from XML
         private string _endpoint = "http://localhost:11434/api/generate";
+        private string _apiKey = "";
         private string _model = "llama3";
         private int _timeoutSeconds = 30;
         private int _maxTokens = 150;
@@ -48,6 +49,8 @@ namespace NPCLLMChat
         public void Initialize(LLMConfig config)
         {
             _endpoint = config.Endpoint;
+            _apiKey = System.Environment.GetEnvironmentVariable("NPCLLM_API_KEY");
+            if (string.IsNullOrEmpty(_apiKey)) _apiKey = config.ApiKey ?? "";
             _model = config.Model;
             _timeoutSeconds = config.TimeoutSeconds;
             _maxTokens = config.MaxTokens;
@@ -55,7 +58,8 @@ namespace NPCLLMChat
             _numGpuLayers = config.NumGPULayers;
             _numCtx = config.NumCtx;
 
-            Log.Out($"[NPCLLMChat] LLMService initialized - Endpoint: {_endpoint}, Model: {_model}");
+            Log.Out($"[NPCLLMChat] LLMService initialized - Endpoint: {_endpoint}, Model: {_model}, " +
+                    $"auth: {(string.IsNullOrEmpty(_apiKey) ? "none (local)" : "api key set")}");
             Log.Out($"[NPCLLMChat] GPU Layers: {(_numGpuLayers > 0 ? _numGpuLayers.ToString() : "auto")}, Context: {_numCtx}");
         }
 
@@ -137,7 +141,7 @@ namespace NPCLLMChat
                 byte[] bodyRaw = Encoding.UTF8.GetBytes(requestBody);
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
+                ApplyHeaders(request);
                 request.timeout = _timeoutSeconds;
 
                 Log.Out($"[NPCLLMChat] Sending request to LLM for NPC {npcId}");
@@ -184,29 +188,35 @@ namespace NPCLLMChat
         /// </summary>
         public void SendCompletionRequest(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
         {
-            if (!_endpoint.Contains("/api/generate"))
-            {
-                onError?.Invoke("Completion requests require an Ollama /api/generate endpoint");
-                return;
-            }
             StartCoroutine(SendCompletionCoroutine(prompt, temperature, onResponse, onError));
         }
 
         private IEnumerator SendCompletionCoroutine(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
         {
-            string requestBody = $@"{{
+            string temp = temperature.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string requestBody = _endpoint.Contains("/api/generate")
+                ? $@"{{
                 ""model"": ""{_model}"",
                 ""prompt"": ""{EscapeJson(prompt)}"",
                 ""stream"": false,
                 ""think"": false,
-                ""options"": {{ ""temperature"": {temperature.ToString(System.Globalization.CultureInfo.InvariantCulture)}, ""num_predict"": 300, ""num_ctx"": {_numCtx} }}
+                ""options"": {{ ""temperature"": {temp}, ""num_predict"": 300, ""num_ctx"": {_numCtx} }}
+            }}"
+                // hosted providers speak chat/completions, so a one-off completion is just a
+                // single user turn - summaries and combat shouts work there too
+                : $@"{{
+                ""model"": ""{_model}"",
+                ""messages"": [{{ ""role"": ""user"", ""content"": ""{EscapeJson(prompt)}"" }}],
+                ""temperature"": {temp},
+                ""max_tokens"": 512,
+                ""stream"": false
             }}";
 
             using (UnityWebRequest request = new UnityWebRequest(_endpoint, "POST"))
             {
                 request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(requestBody));
                 request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
+                ApplyHeaders(request);
                 request.timeout = 60; // background task, latency doesn't matter
 
                 yield return request.SendWebRequest();
@@ -276,13 +286,29 @@ namespace NPCLLMChat
             }
             messages.Append($@", {{""role"": ""user"", ""content"": ""{EscapeJson(playerMessage)}""}}");
 
-            // OpenAI-compatible format
+            // OpenAI-compatible format. Reasoning models spend max_tokens on hidden thinking
+            // before any reply, and the Ollama-only "think": false switch does not exist here,
+            // so give the budget enough headroom that the visible answer is never squeezed out.
+            int tokenBudget = Math.Max(_maxTokens, 512);
             return $@"{{
                 ""model"": ""{_model}"",
                 ""messages"": [{messages}],
                 ""temperature"": {_temperature},
-                ""max_tokens"": {_maxTokens}
+                ""max_tokens"": {tokenBudget}
             }}";
+        }
+
+        /// <summary>
+        /// Content type plus, for hosted providers, the bearer token. Local Ollama and
+        /// LM Studio ignore the header, so it is safe to send whenever a key is configured.
+        /// </summary>
+        private void ApplyHeaders(UnityWebRequest request)
+        {
+            request.SetRequestHeader("Content-Type", "application/json");
+            if (!string.IsNullOrEmpty(_apiKey))
+            {
+                request.SetRequestHeader("Authorization", "Bearer " + _apiKey);
+            }
         }
 
         private string ParseResponse(string jsonResponse)
@@ -497,6 +523,9 @@ namespace NPCLLMChat
         // Server settings
         public string Endpoint { get; set; }
         public string Model { get; set; }
+        // Bearer token for hosted providers. Prefer the NPCLLM_API_KEY environment
+        // variable so a key never has to live in a file that gets shared or committed.
+        public string ApiKey { get; set; } = "";
         public int TimeoutSeconds { get; set; }
         public int MaxTokens { get; set; }
         public float Temperature { get; set; }
