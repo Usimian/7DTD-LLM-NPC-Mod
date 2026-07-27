@@ -681,6 +681,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
 
                 WarnIfCarryingGearUnhired();
+
+                if (IsCompanion) CheckForSomethingWorthSaying();
             }
             catch (Exception ex)
             {
@@ -711,6 +713,132 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
             }
             return null;
+        }
+
+        // ========== Unprompted remarks ==========
+
+        private const float ShoutRange = 20f;        // how close a threat has to be to matter
+        private const float WarnCooldown = 75f;      // one "behind you" per fight, not per zombie
+        private const float TriumphCooldown = 240f;
+        private float _nextWarnTime;
+        private float _nextTriumphTime;
+        private int _hostilesSeenThisFight;
+        private bool _remarkPending;
+
+        /// <summary>
+        /// She speaks up on her own for two things worth interrupting for: something closing on
+        /// the player from behind, and the quiet after a real fight. Both are rate limited, and
+        /// the line itself comes from the model so it stays in character instead of canned.
+        /// </summary>
+        private void CheckForSomethingWorthSaying()
+        {
+            if (_remarkPending || _isWaitingForResponse || _audioPlayer == null) return;
+
+            var world = GameManager.Instance?.World;
+            var player = world?.GetPrimaryPlayer();
+            if (player == null) return;
+            if (Vector3.Distance(_npcEntity.position, player.position) > ShoutRange) return;
+
+            EntityAlive sneakingUp = null;
+            int hostilesNear = 0;
+            Vector3 playerFacing = player.GetLookVector();
+
+            foreach (var entity in world.Entities.list)
+            {
+                if (!(entity is EntityEnemy hostile) || hostile.IsDead()) continue;
+                float dist = Vector3.Distance(player.position, hostile.position);
+                if (dist > ShoutRange) continue;
+                hostilesNear++;
+
+                // behind = the player is looking away from it, and it is close enough to bite
+                if (dist < 12f && sneakingUp == null)
+                {
+                    Vector3 toHostile = (hostile.position - player.position).normalized;
+                    if (Vector3.Dot(new Vector3(playerFacing.x, 0f, playerFacing.z).normalized,
+                                    new Vector3(toHostile.x, 0f, toHostile.z)) < -0.25f)
+                    {
+                        sneakingUp = hostile;
+                    }
+                }
+            }
+
+            if (hostilesNear > _hostilesSeenThisFight) _hostilesSeenThisFight = hostilesNear;
+
+            if (sneakingUp != null && Time.unscaledTime >= _nextWarnTime)
+            {
+                _nextWarnTime = Time.unscaledTime + WarnCooldown;
+                SpeakUnprompted("Something is closing on the player from BEHIND, close. Shout a warning of " +
+                                "THREE WORDS OR FEWER. No name, no advice, no sentence - just the shout.");
+                return;
+            }
+
+            // the fight is effectively won: it was a real scrap and most of them are down
+            bool mostlyCleared = _hostilesSeenThisFight >= 3 && hostilesNear <= _hostilesSeenThisFight / 3;
+            if (mostlyCleared && Time.unscaledTime >= _nextTriumphTime)
+            {
+                _nextTriumphTime = Time.unscaledTime + TriumphCooldown;
+                int killed = _hostilesSeenThisFight - hostilesNear;
+                _hostilesSeenThisFight = 0;
+                SpeakUnprompted($"The shooting just stopped - about {killed} of them down, both of you standing. " +
+                                "One pleased remark, SIX WORDS OR FEWER. No plan, no advice, no follow-up.");
+                return;
+            }
+
+            if (hostilesNear == 0) _hostilesSeenThisFight = 0;
+        }
+
+        /// <summary>
+        /// Mid-fight is no time for a paragraph: keep the first sentence, and no more than
+        /// eight words of it.
+        /// </summary>
+        private static string Shorten(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return line;
+
+            int cut = line.IndexOfAny(new[] { '.', '!', '?' });
+            string first = cut >= 0 ? line.Substring(0, cut + 1) : line;
+
+            string[] words = first.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length <= 8) return first.Trim();
+
+            // cut on the last clause break inside the limit, so it never ends mid-thought
+            for (int i = Math.Min(7, words.Length - 1); i >= 2; i--)
+            {
+                if (words[i].EndsWith(",") || words[i].EndsWith(";"))
+                {
+                    return string.Join(" ", words, 0, i + 1).TrimEnd(',', ';') + ".";
+                }
+            }
+            // no clean break: a whole short sentence beats a mangled fragment
+            if (words.Length <= 12) return first.Trim();
+            return string.Join(" ", words, 0, 8).TrimEnd(',', ';', ':') + ".";
+        }
+
+        private void SpeakUnprompted(string situation)
+        {
+            _remarkPending = true;
+            string prompt = _systemPrompt + BuildWorldContext() +
+                            "\n\n[Right now]\n" + situation +
+                            "\nOutput only the words you shout or say out loud. No narration. Keep it very short.";
+
+            LLMService.Instance.SendCompletionRequest(prompt, 0.9f,
+                line =>
+                {
+                    _remarkPending = false;
+                    string speech = Shorten(StripStageDirections(line));
+                    if (string.IsNullOrWhiteSpace(speech)) return;
+
+                    Log.Out($"[NPCLLMChat] {_npcName} speaks up: {speech}");
+                    if (_ttsEnabled) _audioPlayer.Speak(speech);
+
+                    var player = GameManager.Instance?.World?.GetPrimaryPlayer() as EntityPlayerLocal;
+                    if (player != null) GameManager.ShowTooltip(player, $"{_npcName}: {speech}", false);
+                },
+                error =>
+                {
+                    _remarkPending = false;
+                    Log.Warning($"[NPCLLMChat] Unprompted remark failed: {error}");
+                });
         }
 
         /// <summary>
@@ -794,6 +922,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
             }
 
+            // Traders she has actually stood next to: remember what they had in stock. Nothing
+            // is known until she has visited one, so this list starts empty.
+            foreach (var entity in world.Entities.list)
+            {
+                if (!(entity is EntityTrader trader)) continue;
+                if (entity.GetType().Name.Contains("SDX")) continue;      // SCore NPCs derive from EntityTrader
+                if (Vector3.Distance(_npcEntity.position, trader.position) > 20f) continue;
+
+                var stock = trader.TileEntityTrader?.TraderData?.PrimaryInventory;
+                string stockSummary = WorldContextHelper.SummarizeStacks(stock, 25);
+                if (string.IsNullOrEmpty(stockSummary)) continue;
+                changed |= UpdateCargoSnapshot($"{TraderName(trader)}'s stock", day, time, stockSummary, trader.position);
+            }
+
             // Player-owned storage containers, one snapshot per place ("storage at Trader Rekt")
             var byPlace = new Dictionary<string, List<ItemStack>>();
             var placePositions = new Dictionary<string, Vector3>();
@@ -847,6 +989,13 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             snap.x = x;
             snap.z = z;
             return changed;
+        }
+
+        private static string TraderName(EntityTrader trader)
+        {
+            string name = trader.EntityName ?? "trader";
+            if (name.StartsWith("npcTrader")) name = name.Substring("npcTrader".Length);
+            return string.IsNullOrEmpty(name) ? "the trader" : $"trader {name}";
         }
 
         private static string VehicleName(EntityVehicle vehicle)
@@ -1001,6 +1150,31 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
                 sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask.");
+
+                // She knows her own state precisely - it is her body and her ammo
+                float ownHealthPct = _npcEntity.GetMaxHealth() > 0
+                    ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
+                string ownState = ownHealthPct >= 0.95f ? "unhurt"
+                    : ownHealthPct >= 0.7f ? "scratched up but fine"
+                    : ownHealthPct >= 0.4f ? "hurt and feeling it"
+                    : "badly hurt and in trouble";
+                sb.AppendLine($"Your own condition: {ownState} ({Mathf.RoundToInt(ownHealthPct * 100)}% health). " +
+                              "Mention it yourself if it is bad - the player cannot see your health.");
+
+                string ammo = WorldContextHelper.SummarizeAmmo(carried);
+                if (!string.IsNullOrEmpty(ammo))
+                {
+                    sb.AppendLine($"Ammunition you have left: {ammo}. Say something if you are running low.");
+                }
+
+                string quests = WorldContextHelper.DescribeQuests(
+                    GameManager.Instance?.World?.GetPrimaryPlayer(), _npcEntity.position);
+                if (!string.IsNullOrEmpty(quests))
+                {
+                    sb.AppendLine("Jobs the two of you are carrying right now:");
+                    sb.AppendLine(quests);
+                    sb.AppendLine("If asked what to do next, an unstarted job is the obvious suggestion - name who it came from.");
+                }
 
                 string condition = WorldContextHelper.DescribePlayerCondition(GameManager.Instance?.World?.GetPrimaryPlayer());
                 if (!string.IsNullOrEmpty(condition))

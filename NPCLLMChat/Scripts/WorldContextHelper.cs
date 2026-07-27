@@ -144,6 +144,90 @@ namespace NPCLLMChat
         }
 
         /// <summary>
+        /// Jobs the player is carrying: accepted-but-unstarted, in progress, or ready to hand
+        /// back in, with who gave it and where it is from the NPC's position. Null when the
+        /// journal is empty, so a companion who knows of no work says nothing about work.
+        /// </summary>
+        public static string DescribeQuests(EntityPlayer player, Vector3 fromPos)
+        {
+            try
+            {
+                var journal = player?.QuestJournal;
+                if (journal?.quests == null || journal.quests.Count == 0) return null;
+
+                var lines = new List<string>();
+                foreach (var quest in journal.quests)
+                {
+                    if (quest == null) continue;
+                    if (quest.CurrentState == Quest.QuestState.Completed ||
+                        quest.CurrentState == Quest.QuestState.Failed) continue;
+
+                    string state = quest.CurrentState == Quest.QuestState.NotStarted ? "accepted but not started yet"
+                        : quest.CurrentState == Quest.QuestState.ReadyForTurnIn ? "done, just needs handing in"
+                        : "underway";
+
+                    string name = quest.QuestClass?.Name;
+                    if (string.IsNullOrEmpty(name)) name = quest.ID ?? "a job";
+
+                    string from = TraderNameById(quest.QuestGiverID);
+                    string where = "";
+                    if (quest.GetPositionData(out Vector3 pos, Quest.PositionDataTypes.POIPosition) &&
+                        (pos.x != 0f || pos.z != 0f))
+                    {
+                        string poi = GetPOINameAt(pos);
+                        where = $", at {(string.IsNullOrEmpty(poi) ? "map position " + (int)pos.x + " E/W, " + (int)pos.z + " N/S" : poi)}" +
+                                $" - {DescribeRelative(fromPos, pos.x, pos.z)}";
+                    }
+
+                    lines.Add($"- \"{name}\"{(from == null ? "" : $" from {from}")} ({state}){where}");
+                }
+                return lines.Count == 0 ? null : string.Join("\n", lines);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Quest lookup failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static string TraderNameById(int entityId)
+        {
+            if (entityId <= 0) return null;
+            var entity = GameManager.Instance?.World?.GetEntity(entityId) as EntityAlive;
+            if (entity == null) return null;
+            string name = entity.EntityName ?? "";
+            if (name.StartsWith("npcTrader")) name = name.Substring("npcTrader".Length);
+            return string.IsNullOrEmpty(name) ? null : $"trader {name}";
+        }
+
+        /// <summary>
+        /// Just the ammunition out of a pile of stacks, so she can notice she is running dry.
+        /// </summary>
+        public static string SummarizeAmmo(IEnumerable<ItemStack> slots)
+        {
+            if (slots == null) return null;
+            var totals = new Dictionary<string, int>();
+            foreach (var stack in slots)
+            {
+                if (stack == null || stack.IsEmpty()) continue;
+                var itemClass = stack.itemValue?.ItemClass;
+                if (itemClass == null) continue;
+
+                string raw = itemClass.GetItemName() ?? "";
+                if (raw.IndexOf("ammo", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                string name = Prettify(itemClass.GetLocalizedItemName() ?? raw);
+                totals.TryGetValue(name, out int count);
+                totals[name] = count + stack.count;
+            }
+            if (totals.Count == 0) return null;
+
+            var parts = new List<string>();
+            foreach (var pair in totals) parts.Add($"{pair.Value} x {pair.Key}");
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>
         /// The player's condition as a companion reads it at a glance: health/food/water
         /// bands (no exact HUD numbers) plus visible status effects by name.
         /// </summary>
