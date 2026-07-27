@@ -337,10 +337,26 @@ namespace NPCLLMChat
         private void ApplyHeaders(UnityWebRequest request)
         {
             request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("User-Agent", "NPCLLMChat/1.1 (7DaysToDie mod)");
             if (!string.IsNullOrEmpty(_apiKey))
             {
                 request.SetRequestHeader("Authorization", "Bearer " + _apiKey);
             }
+        }
+
+        /// <summary>
+        /// Some reasoning models emit their scratchpad inside the reply itself (Groq's qwen
+        /// returns a full "&lt;think&gt;..." block as content). None of that is speech.
+        /// </summary>
+        private static string StripThinking(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            string cleaned = System.Text.RegularExpressions.Regex.Replace(
+                text, @"<think>[\s\S]*?</think>", " ", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            // an unterminated block means the whole reply was thinking
+            int open = cleaned.IndexOf("<think>", StringComparison.OrdinalIgnoreCase);
+            if (open >= 0) cleaned = cleaned.Substring(0, open);
+            return cleaned.Trim();
         }
 
         private string ParseResponse(string jsonResponse)
@@ -372,8 +388,8 @@ namespace NPCLLMChat
                             response = UnescapeJson(response);
                             
                             // Clean up common LLM artifacts
-                            response = CleanResponse(response);
-                            
+                            response = CleanResponse(StripThinking(response));
+
                             return response;
                         }
                     }
@@ -396,7 +412,7 @@ namespace NPCLLMChat
                             int valueEnd = FindClosingQuote(jsonResponse, valueStart);
                             if (valueEnd > valueStart)
                             {
-                                return UnescapeJson(jsonResponse.Substring(valueStart, valueEnd - valueStart));
+                                return StripThinking(UnescapeJson(jsonResponse.Substring(valueStart, valueEnd - valueStart)));
                             }
                         }
                     }
