@@ -971,7 +971,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (ownContainer != null) carried.AddRange(ownContainer);
                 // Her real store is only ever exposed when the player opens it, so use what
                 // was captured then (the array stays live, so edits since are reflected)
-                var opened = Harmony.NPCContainerCache.Get(_npcEntity.entityId);
+                var opened = Harmony.NPCContainerCache.Get(_npcEntity.entityId, _npcName);
                 if (opened != null) carried.AddRange(opened);
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);

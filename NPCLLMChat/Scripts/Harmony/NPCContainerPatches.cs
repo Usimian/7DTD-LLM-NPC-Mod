@@ -17,29 +17,27 @@ namespace NPCLLMChat.Harmony
         {
             public ItemStack[] Items;
             public string ContainerName;
+            public string NpcName;
         }
 
+        // Keyed by entity id AND by name: picking an NPC up and setting it down again gives
+        // it a NEW entity id, which silently orphaned the cached store.
         private static readonly Dictionary<int, Entry> _byEntityId = new Dictionary<int, Entry>();
+        private static readonly Dictionary<string, Entry> _byName = new Dictionary<string, Entry>();
 
-        public static void Remember(int entityId, string containerName, ItemStack[] items)
+        public static void Remember(int entityId, string npcName, string containerName, ItemStack[] items)
         {
-            _byEntityId[entityId] = new Entry { Items = items, ContainerName = containerName };
+            var entry = new Entry { Items = items, ContainerName = containerName, NpcName = npcName };
+            _byEntityId[entityId] = entry;
+            if (!string.IsNullOrEmpty(npcName)) _byName[npcName] = entry;
         }
 
         /// <summary>Live item array for an NPC's storage, or null if never opened.</summary>
-        public static ItemStack[] Get(int entityId)
+        public static ItemStack[] Get(int entityId, string npcName)
         {
-            return _byEntityId.TryGetValue(entityId, out Entry entry) ? entry.Items : null;
-        }
-
-        public static string ContainerNameFor(int entityId)
-        {
-            return _byEntityId.TryGetValue(entityId, out Entry entry) ? entry.ContainerName : null;
-        }
-
-        public static void Forget(int entityId)
-        {
-            _byEntityId.Remove(entityId);
+            if (_byEntityId.TryGetValue(entityId, out Entry entry)) return entry.Items;
+            if (!string.IsNullOrEmpty(npcName) && _byName.TryGetValue(npcName, out entry)) return entry.Items;
+            return null;
         }
     }
 
@@ -52,25 +50,27 @@ namespace NPCLLMChat.Harmony
 
             // Containers belonging to a world block have no entity id; NPC-carried stores are
             // bound while standing next to their owner, so attribute it to the nearest NPC.
+            EntityAlive npc = NearestNPC();
             int entityId = (_te as TileEntity)?.entityId ?? -1;
             if (entityId <= 0)
             {
-                entityId = NearestNPCEntityId();
-                if (entityId <= 0) return;
+                if (npc == null) return;
+                entityId = npc.entityId;
             }
 
-            NPCContainerCache.Remember(entityId, _lootContainerName, _te.items);
-            Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for entity {entityId}: " +
+            string npcName = npc != null ? npc.EntityName : null;
+            NPCContainerCache.Remember(entityId, npcName, _lootContainerName, _te.items);
+            Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}]: " +
                     $"{WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
         }
 
-        private static int NearestNPCEntityId()
+        private static EntityAlive NearestNPC()
         {
             var world = GameManager.Instance?.World;
             var player = world?.GetPrimaryPlayer();
-            if (world == null || player == null) return -1;
+            if (world == null || player == null) return null;
 
-            int closestId = -1;
+            EntityAlive closest = null;
             float closestDist = 6f; // you have to be standing at them to open their storage
             foreach (var entity in world.Entities.list)
             {
@@ -81,10 +81,10 @@ namespace NPCLLMChat.Harmony
                 if (dist < closestDist)
                 {
                     closestDist = dist;
-                    closestId = alive.entityId;
+                    closest = alive;
                 }
             }
-            return closestId;
+            return closest;
         }
     }
 }
