@@ -61,7 +61,10 @@
               Google Gemini    https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
                                Model e.g. gemini-2.0-flash
               Groq             https://api.groq.com/openai/v1/chat/completions
-                               Model e.g. llama-3.3-70b-versatile   (very fast)
+                               Model llama-3.3-70b-versatile - TESTED, best of the three:
+                               0.4-1.4s replies, stays in character, respects short answers.
+                               Avoid qwen/qwen3.6-27b there: it returns its <think> scratchpad
+                               as the reply. gpt-oss-120b works but rate limits sooner.
               OpenRouter       https://openrouter.ai/api/v1/chat/completions
                                Model e.g. one of the ":free" ids
               Mistral          https://api.mistral.ai/v1/chat/completions
