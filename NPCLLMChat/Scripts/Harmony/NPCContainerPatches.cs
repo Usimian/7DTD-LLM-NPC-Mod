@@ -48,8 +48,13 @@ namespace NPCLLMChat.Harmony
         {
             if (_te == null || _te.items == null) return;
 
-            // Containers belonging to a world block have no entity id; NPC-carried stores are
-            // bound while standing next to their owner, so attribute it to the nearest NPC.
+            // Only an NPC's carried store may be attributed to an NPC. A placed block sits at
+            // real world coordinates, so opening a crate next to her must not make its contents
+            // hers - that briefly had her owning 278 raw meat from a storage crate.
+            var asTile = _te as TileEntity;
+            bool isPlacedBlock = asTile != null && asTile.ToWorldPos() != Vector3i.zero;
+            if (isPlacedBlock && (asTile.entityId <= 0)) return;
+
             EntityAlive npc = NearestNPC();
             int entityId = (_te as TileEntity)?.entityId ?? -1;
             if (entityId <= 0)
