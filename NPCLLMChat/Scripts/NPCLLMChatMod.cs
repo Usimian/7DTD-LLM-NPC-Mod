@@ -381,6 +381,18 @@ namespace NPCLLMChat
                     config.BanditVoice = GetNodeValue(voicesNode, "BanditVoice", "en_US-ryan-medium");
                 }
 
+                // Audio levels chosen in the in-game settings override the XML defaults
+                if (UnityEngine.PlayerPrefs.HasKey("NPCLLMChat_Volume"))
+                {
+                    config.Volume = UnityEngine.PlayerPrefs.GetFloat("NPCLLMChat_Volume");
+                    Log.Out($"[NPCLLMChat] Using player-configured volume: {config.Volume:P0}");
+                }
+                if (UnityEngine.PlayerPrefs.HasKey("NPCLLMChat_SpeechRate"))
+                {
+                    config.SpeechRate = UnityEngine.PlayerPrefs.GetFloat("NPCLLMChat_SpeechRate");
+                    Log.Out($"[NPCLLMChat] Using player-configured speech rate: {config.SpeechRate}");
+                }
+
                 // Companion voice chosen in the in-game settings overrides the XML default
                 string savedCompanionVoice = UnityEngine.PlayerPrefs.GetString("NPCLLMChat_CompanionVoice", "");
                 if (!string.IsNullOrEmpty(savedCompanionVoice))

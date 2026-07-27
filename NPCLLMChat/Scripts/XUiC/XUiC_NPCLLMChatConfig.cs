@@ -148,7 +148,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
             {
                 // Sliders work in normalized 0.0-1.0 range regardless of XML min/max
                 // TTSService also stores volume as 0.0-1.0, so use directly
-                float volumeNormalized = TTSService.Instance?.Config?.Volume ?? 0.8f;
+                float volumeNormalized = GetFloatPref(CVAR_VOLUME, TTSService.Instance?.Config?.Volume ?? 0.8f);
                 sliderVolume.Value = volumeNormalized;
                 UnityEngine.Debug.Log($"[NPCLLMChat] LoadSettings: Setting sliderVolume.Value to {volumeNormalized}");
             }
@@ -158,7 +158,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 // Sliders work in normalized 0.0-1.0 range
                 // Speech rate is 0.5-2.0, need to map to 0.0-1.0
                 // XML has min=50, max=200, so: (rate - 0.5) / (2.0 - 0.5) = (rate - 0.5) / 1.5
-                float speechRate = TTSService.Instance?.Config?.SpeechRate ?? 1.0f;
+                float speechRate = GetFloatPref(CVAR_SPEECH_RATE, TTSService.Instance?.Config?.SpeechRate ?? 1.0f);
                 float sliderNormalized = (speechRate - 0.5f) / 1.5f;  // Map 0.5-2.0 to 0.0-1.0
                 sliderSpeechRate.Value = sliderNormalized;
                 UnityEngine.Debug.Log($"[NPCLLMChat] LoadSettings: Speech rate={speechRate}, setting slider to normalized {sliderNormalized}");
@@ -261,7 +261,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 float volumeNormalized = sliderVolume.Value;
                 UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: sliderVolume.Value={volumeNormalized}");
 
-                SetFloatCVar(CVAR_VOLUME, volumeNormalized);
+                SetFloatPref(CVAR_VOLUME, volumeNormalized);
                 if (TTSService.Instance != null)
                 {
                     TTSService.Instance.Config.Volume = volumeNormalized;
@@ -276,7 +276,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 float speechRate = 0.5f + (sliderNormalized * 1.5f);  // Map 0.0-1.0 to 0.5-2.0
                 UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: sliderSpeechRate.Value={sliderNormalized}, converting to rate={speechRate}");
 
-                SetFloatCVar(CVAR_SPEECH_RATE, speechRate);
+                SetFloatPref(CVAR_SPEECH_RATE, speechRate);
                 if (TTSService.Instance != null)
                 {
                     TTSService.Instance.Config.SpeechRate = speechRate;
@@ -449,6 +449,19 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 return _entityPlayerLocal.Buffs.GetCustomVar(cvar) > 0f;
             }
             return defaultValue;
+        }
+
+        // Volume and speech rate must survive a restart, so they live in PlayerPrefs like the
+        // voice and model - buff cvars were being written but never read back.
+        private float GetFloatPref(string key, float defaultValue)
+        {
+            return PlayerPrefs.GetFloat(key, defaultValue);
+        }
+
+        private void SetFloatPref(string key, float value)
+        {
+            PlayerPrefs.SetFloat(key, value);
+            PlayerPrefs.Save();
         }
 
         private float GetFloatCVar(string cvar, float defaultValue)
