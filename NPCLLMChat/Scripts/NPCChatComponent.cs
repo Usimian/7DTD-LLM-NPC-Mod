@@ -1161,11 +1161,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 sb.AppendLine($"Your own condition: {ownState} ({Mathf.RoundToInt(ownHealthPct * 100)}% health). " +
                               "Mention it yourself if it is bad - the player cannot see your health.");
 
-                string ammo = WorldContextHelper.SummarizeAmmo(carried);
-                if (!string.IsNullOrEmpty(ammo))
-                {
-                    sb.AppendLine($"Ammunition you have left: {ammo}. Say something if you are running low.");
-                }
+                // NPC weapons are Infinite_ammo=true in XNPCCore (the token ammo stack only
+                // exists to make them fire), so she must never talk about running low.
+                sb.AppendLine("Your own weapons never run out of ammunition - never ask the player for ammo " +
+                              "and never say you are running low.");
 
                 string quests = WorldContextHelper.DescribeQuests(
                     GameManager.Instance?.World?.GetPrimaryPlayer(), _npcEntity.position);

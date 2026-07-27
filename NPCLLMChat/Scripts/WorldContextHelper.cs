@@ -201,33 +201,6 @@ namespace NPCLLMChat
         }
 
         /// <summary>
-        /// Just the ammunition out of a pile of stacks, so she can notice she is running dry.
-        /// </summary>
-        public static string SummarizeAmmo(IEnumerable<ItemStack> slots)
-        {
-            if (slots == null) return null;
-            var totals = new Dictionary<string, int>();
-            foreach (var stack in slots)
-            {
-                if (stack == null || stack.IsEmpty()) continue;
-                var itemClass = stack.itemValue?.ItemClass;
-                if (itemClass == null) continue;
-
-                string raw = itemClass.GetItemName() ?? "";
-                if (raw.IndexOf("ammo", StringComparison.OrdinalIgnoreCase) < 0) continue;
-
-                string name = Prettify(itemClass.GetLocalizedItemName() ?? raw);
-                totals.TryGetValue(name, out int count);
-                totals[name] = count + stack.count;
-            }
-            if (totals.Count == 0) return null;
-
-            var parts = new List<string>();
-            foreach (var pair in totals) parts.Add($"{pair.Value} x {pair.Key}");
-            return string.Join(", ", parts);
-        }
-
-        /// <summary>
         /// The player's condition as a companion reads it at a glance: health/food/water
         /// bands (no exact HUD numbers) plus visible status effects by name.
         /// </summary>
