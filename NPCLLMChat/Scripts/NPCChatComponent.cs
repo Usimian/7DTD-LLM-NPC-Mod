@@ -969,6 +969,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 // entity id - so find the container that belongs to her.
                 var ownContainer = FindContainerForEntity(_npcEntity.entityId);
                 if (ownContainer != null) carried.AddRange(ownContainer);
+                // Her real store is only ever exposed when the player opens it, so use what
+                // was captured then (the array stays live, so edits since are reflected)
+                var opened = Harmony.NPCContainerCache.Get(_npcEntity.entityId);
+                if (opened != null) carried.AddRange(opened);
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
@@ -976,7 +980,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         $"bag: {WorldContextHelper.SummarizeStacks(ownBag) ?? "(empty)"} | " +
                         $"belt: {WorldContextHelper.SummarizeStacks(belt) ?? "(empty)"} | " +
                         $"trader: {WorldContextHelper.SummarizeStacks(traderStock) ?? "(empty)"} | " +
-                        $"own container: {WorldContextHelper.SummarizeStacks(ownContainer) ?? "(none found)"}");
+                        $"own container: {WorldContextHelper.SummarizeStacks(ownContainer) ?? "(none found)"} | " +
+                        $"opened store: {WorldContextHelper.SummarizeStacks(opened) ?? "(never opened)"}");
 
                 string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
                 if (!string.IsNullOrEmpty(wielded) && wielded != "Air")
