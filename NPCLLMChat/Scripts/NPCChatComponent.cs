@@ -1140,6 +1140,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 sb.AppendLine(string.IsNullOrEmpty(carrying)
                     ? "You are carrying nothing in your own bag right now."
                     : $"What you are carrying in your own bag right now: {carrying}.");
+                sb.AppendLine("This list is live and correct as of this moment. The player hands you things " +
+                              "mid-conversation, so if you listed your belongings earlier and this list differs, " +
+                              "THIS list is right and what you said before is out of date - just accept the new item.");
 
                 if (_memory != null && _memory.cargoSnapshots.Count > 0)
                 {
