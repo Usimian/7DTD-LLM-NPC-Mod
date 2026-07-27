@@ -49,8 +49,7 @@ namespace NPCLLMChat
         public void Initialize(LLMConfig config)
         {
             _endpoint = config.Endpoint;
-            _apiKey = System.Environment.GetEnvironmentVariable("NPCLLM_API_KEY");
-            if (string.IsNullOrEmpty(_apiKey)) _apiKey = config.ApiKey ?? "";
+            _apiKey = ResolveApiKey(config);
             _model = config.Model;
             _timeoutSeconds = config.TimeoutSeconds;
             _maxTokens = config.MaxTokens;
@@ -296,6 +295,39 @@ namespace NPCLLMChat
                 ""temperature"": {_temperature},
                 ""max_tokens"": {tokenBudget}
             }}";
+        }
+
+        /// <summary>
+        /// Where the API key comes from, in order: the NPCLLM_API_KEY environment variable,
+        /// then a key file, then the config element. The key file exists because a desktop
+        /// launched Steam does not inherit shell exports, and llmconfig.xml is version
+        /// controlled - neither is a good home for a secret.
+        /// </summary>
+        private static string ResolveApiKey(LLMConfig config)
+        {
+            string key = System.Environment.GetEnvironmentVariable("NPCLLM_API_KEY");
+            if (!string.IsNullOrEmpty(key)) return key.Trim();
+
+            try
+            {
+                string home = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
+                string keyFile = System.IO.Path.Combine(home, ".config", "npcllm", "api_key");
+                if (System.IO.File.Exists(keyFile))
+                {
+                    key = System.IO.File.ReadAllText(keyFile).Trim();
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        Log.Out("[NPCLLMChat] API key loaded from ~/.config/npcllm/api_key");
+                        return key;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Could not read API key file: {ex.Message}");
+            }
+
+            return config.ApiKey ?? "";
         }
 
         /// <summary>
