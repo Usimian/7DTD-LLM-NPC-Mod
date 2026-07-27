@@ -14,7 +14,7 @@
             - LM Studio: http://localhost:1234/v1/chat/completions
             - Text-generation-webui: http://localhost:5000/v1/chat/completions
         -->
-        <Endpoint>http://localhost:11434/api/generate</Endpoint>
+        <Endpoint>https://api.groq.com/openai/v1/chat/completions</Endpoint>
 
         <!--
             Recommended models for RTX 6000 Pro (48GB VRAM):
@@ -36,7 +36,7 @@
             For your GPU, llama3:70b gives the best roleplay quality
             while still maintaining reasonable response times.
         -->
-        <Model>qwen3.6:35b</Model>
+        <Model>llama-3.3-70b-versatile</Model>
 
         <!--
             CLOUD / HOSTED MODELS (no local GPU needed)
