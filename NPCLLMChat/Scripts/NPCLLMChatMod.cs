@@ -41,6 +41,14 @@ namespace NPCLLMChat
             // Initialize LLM Service
             LLMService.Instance.Initialize(_config);
 
+            // Provider chosen in the in-game settings wins over the config file
+            string savedEndpoint = PlayerPrefs.GetString("NPCLLMChat_Endpoint", "");
+            if (!string.IsNullOrEmpty(savedEndpoint))
+            {
+                LLMService.Instance.SetEndpoint(savedEndpoint);
+                Log.Out($"[NPCLLMChat] Using player-configured endpoint: {savedEndpoint}");
+            }
+
             // Check if player has overridden the model in PlayerPrefs
             string savedModel = PlayerPrefs.GetString("NPCLLMChat_Model", "");
             if (!string.IsNullOrEmpty(savedModel))

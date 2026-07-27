@@ -32,11 +32,22 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
         // Companion voice dropdown, populated from the TTS server's installed voices
         private XUiC_ComboBoxList<string> cbxCompanionVoice;
+        private XUiC_ComboBoxList<string> cbxProvider;
+
+        // Label shown in the dropdown -> endpoint URL, and the model that suits it. "Custom"
+        // means "leave whatever llmconfig.xml says alone".
+        private static readonly string[] ProviderLabels = { "Local Ollama", "Groq (cloud)", "Custom (XML)" };
+        private static readonly string[] ProviderEndpoints =
+        {
+            "http://localhost:11434/api/generate",
+            "https://api.groq.com/openai/v1/chat/completions",
+            ""
+        };
+        private static readonly string[] ProviderModels = { "qwen3.6:35b", "llama-3.3-70b-versatile", "" };
 
         private XUiC_TextInput txtModel;
 
         private XUiC_SimpleButton btnReloadPersona;
-        private XUiV_Label lblPersona;
 
         private EntityPlayerLocal _entityPlayerLocal;
 
@@ -49,6 +60,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
         private const string CVAR_CHAT_DISTANCE = "NPCLLMChat_ChatDistance";
         private const string CVAR_VOICE_DISTANCE = "NPCLLMChat_VoiceDistance";
         private const string CVAR_COMPANION_VOICE = "NPCLLMChat_CompanionVoice";
+        private const string CVAR_ENDPOINT = "NPCLLMChat_Endpoint";
         private const string CVAR_MODEL = "NPCLLMChat_Model";
 
         public override void Init()
@@ -82,13 +94,14 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
 
             cbxCompanionVoice = GetChildById("cbxCompanionVoice") as XUiC_ComboBoxList<string>;
+            cbxProvider = GetChildById("cbxProvider") as XUiC_ComboBoxList<string>;
+            UnityEngine.Debug.Log($"[NPCLLMChat] Init: cbxProvider = {(cbxProvider != null ? "found" : "NULL")}");
+            if (cbxProvider != null) cbxProvider.OnValueChanged += CbxProvider_OnValueChanged;
             UnityEngine.Debug.Log($"[NPCLLMChat] Init: cbxCompanionVoice = {(cbxCompanionVoice != null ? "found" : "NULL")}");
 
             txtModel = GetChildById("txtModel") as XUiC_TextInput;
 
             btnReloadPersona = GetChildById("btnReloadPersona") as XUiC_SimpleButton;
-            lblPersona = GetChildById("lblPersona")?.ViewComponent as XUiV_Label;
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: lblPersona = {(lblPersona != null ? "found" : "NULL")}");
             if (btnReloadPersona != null) btnReloadPersona.OnPressed += BtnReloadPersona_OnPressed;
 
             // Wire up button events
@@ -111,7 +124,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             // Load current settings from player buffs (or defaults from config)
             LoadSettings();
-            RefreshPersonaDisplay();
 
             // Log the actual slider values after loading
             if (sliderVolume != null)
@@ -203,6 +215,26 @@ public class XUiC_NPCLLMChatConfig : XUiController
             {
                 txtModel.Text = GetStringCVar(CVAR_MODEL, "llama3.3:70b");
             }
+
+            // Provider follows whatever endpoint is actually in use
+            if (cbxProvider != null)
+            {
+                string endpoint = GetStringCVar(CVAR_ENDPOINT, LLMService.Instance?.Endpoint ?? "");
+                cbxProvider.Elements.Clear();
+                foreach (string label in ProviderLabels) cbxProvider.Elements.Add(label);
+
+                int index = ProviderLabels.Length - 1; // Custom unless a preset matches
+                for (int i = 0; i < ProviderEndpoints.Length - 1; i++)
+                {
+                    if (!string.IsNullOrEmpty(ProviderEndpoints[i]) &&
+                        endpoint.Equals(ProviderEndpoints[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                cbxProvider.SelectedIndex = index;
+            }
         }
 
         private void SaveSettings()
@@ -253,6 +285,22 @@ public class XUiC_NPCLLMChatConfig : XUiController
             }
 
             // Save companion voice from the dropdown and apply it to active NPCs
+            if (cbxProvider != null && !string.IsNullOrEmpty(cbxProvider.Value))
+            {
+                int index = Array.IndexOf(ProviderLabels, cbxProvider.Value);
+                if (index >= 0 && !string.IsNullOrEmpty(ProviderEndpoints[index]))
+                {
+                    SetStringCVar(CVAR_ENDPOINT, ProviderEndpoints[index]);
+                    LLMService.Instance?.SetEndpoint(ProviderEndpoints[index]);
+                }
+                else if (index == ProviderLabels.Length - 1)
+                {
+                    // "Custom" hands control back to llmconfig.xml on the next start
+                    PlayerPrefs.DeleteKey(CVAR_ENDPOINT);
+                    PlayerPrefs.Save();
+                }
+            }
+
             if (cbxCompanionVoice != null && !string.IsNullOrEmpty(cbxCompanionVoice.Value))
             {
                 string companionVoice = cbxCompanionVoice.Value;
@@ -340,22 +388,27 @@ public class XUiC_NPCLLMChatConfig : XUiController
                     }
                 }
             }
-            RefreshPersonaDisplay();
             GameManager.ShowTooltip(_entityPlayerLocal,
                 reloaded > 0 ? "Persona reloaded and applied to companion" : "Persona reloaded (companion not active yet)", false);
         }
 
-        private void RefreshPersonaDisplay()
+        /// <summary>
+        /// Picking a provider suggests the model that belongs with it - a Groq endpoint with
+        /// an Ollama tag like "qwen3.6:35b" in the model box just fails at request time.
+        /// </summary>
+        private void CbxProvider_OnValueChanged(XUiController sender, string oldValue, string newValue)
         {
-            if (lblPersona == null) return;
-            string persona = NPCMemoryStore.Load(NPCChatComponent.CompanionMemoryKey)?.persona;
-            if (string.IsNullOrEmpty(persona))
+            if (txtModel == null) return;
+            int index = Array.IndexOf(ProviderLabels, newValue);
+            if (index < 0 || string.IsNullOrEmpty(ProviderModels[index])) return;
+
+            bool modelSuitsNewProvider = index == 0
+                ? txtModel.Text.Contains(":")     // ollama tags look like name:size
+                : !txtModel.Text.Contains(":");
+            if (!modelSuitsNewProvider)
             {
-                lblPersona.Text = "(no persona set)";
-                return;
+                txtModel.Text = ProviderModels[index];
             }
-            const int previewLimit = 700;
-            lblPersona.Text = persona.Length <= previewLimit ? persona : persona.Substring(0, previewLimit) + " ...";
         }
 
         private void PopulateVoiceList(List<string> voices, string selected)

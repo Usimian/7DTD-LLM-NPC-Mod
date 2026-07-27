@@ -69,6 +69,20 @@ namespace NPCLLMChat
         /// <summary>
         /// Update the model name at runtime (e.g., from in-game settings UI)
         /// </summary>
+        public string Endpoint => _endpoint;
+
+        /// <summary>
+        /// Switch provider at runtime. The request shape follows the URL, so pointing at an
+        /// OpenAI-compatible host is all that is needed to move between local and hosted.
+        /// </summary>
+        public void SetEndpoint(string endpoint)
+        {
+            if (string.IsNullOrEmpty(endpoint)) return;
+            _endpoint = endpoint;
+            _apiKey = ResolveApiKey(new LLMConfig { ApiKey = _apiKey });
+            Log.Out($"[NPCLLMChat] LLM endpoint changed to: {_endpoint}");
+        }
+
         public void SetModel(string modelName)
         {
             if (!string.IsNullOrEmpty(modelName))

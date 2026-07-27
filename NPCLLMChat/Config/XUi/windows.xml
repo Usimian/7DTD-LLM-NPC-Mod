@@ -74,10 +74,14 @@
                                       font_size="15" caption="Enabled"/>
                     </panel>
 
-                    <!-- AI Model Row -->
+                    <!-- AI Provider + Model Row. Kept on ONE row on purpose: the grid is
+                         near capacity and an overflowing panel breaks the window layout.
+                         Combobox height must stay EVEN (see the companion voice note). -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="AI Model" font_size="16" style="label_outline"/>
-                        <textfield enabled="true" name="txtModel" pos="180,0" width="450" height="31" depth="3"
+                        <combobox depth="3" name="cbxProvider" pos="150,0" width="230" height="30"
+                                  type="ComboBoxList`1[System.String]" value_wrap="true"/>
+                        <textfield enabled="true" name="txtModel" pos="390,0" width="240" height="31" depth="3"
                                    font_size="14" text="llama3.3:70b"/>
                     </panel>
 
@@ -134,14 +138,10 @@
 
                 </grid>
 
-                <!-- Companion Persona section (below the settings grid).
-                     XUi y-axis is NEGATIVE going down — positive y renders above the window, off-screen. -->
-                <label depth="4" pos="30,-645" width="640" height="20" font_size="14" style="label_outline"
-                       text="Companion Persona (edit npc_companion.json in the save's NPCLLMChat folder, then reload):"/>
-                <label depth="4" name="lblPersona" pos="30,-668" width="640" height="120" font_size="12"
-                       color="210,210,210,255" text=""/>
-                <simplebutton enabled="true" name="btnReloadPersona" pos="40,-795" width="620" height="40" depth="4"
-                              font_size="16" caption="Reload Persona From File"/>
+                <!-- Persona is hand-edited in npc_companion.json; this just re-reads it.
+                     XUi y-axis is NEGATIVE going down - positive y renders above the window. -->
+                <simplebutton enabled="true" name="btnReloadPersona" pos="40,-660" width="620" height="40" depth="4"
+                              font_size="16" caption="Reload Companion Persona From File"/>
             </panel>
         </window>
     </append>
