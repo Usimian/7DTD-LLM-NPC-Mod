@@ -34,16 +34,14 @@ public class XUiC_NPCLLMChatConfig : XUiController
         private XUiC_ComboBoxList<string> cbxCompanionVoice;
         private XUiC_ComboBoxList<string> cbxProvider;
 
-        // Label shown in the dropdown -> endpoint URL, and the model that suits it. "Custom"
-        // means "leave whatever llmconfig.xml says alone".
-        private static readonly string[] ProviderLabels = { "Local Ollama", "Groq (cloud)", "Custom (XML)" };
+        // Label shown in the dropdown -> endpoint URL, and the model that suits it.
+        private static readonly string[] ProviderLabels = { "Local Ollama", "Groq (cloud)" };
         private static readonly string[] ProviderEndpoints =
         {
             "http://localhost:11434/api/generate",
-            "https://api.groq.com/openai/v1/chat/completions",
-            ""
+            "https://api.groq.com/openai/v1/chat/completions"
         };
-        private static readonly string[] ProviderModels = { "qwen3.6:35b", "llama-3.3-70b-versatile", "" };
+        private static readonly string[] ProviderModels = { "qwen3.6:35b", "llama-3.3-70b-versatile" };
 
         private XUiC_TextInput txtModel;
 
@@ -223,17 +221,9 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 cbxProvider.Elements.Clear();
                 foreach (string label in ProviderLabels) cbxProvider.Elements.Add(label);
 
-                int index = ProviderLabels.Length - 1; // Custom unless a preset matches
-                for (int i = 0; i < ProviderEndpoints.Length - 1; i++)
-                {
-                    if (!string.IsNullOrEmpty(ProviderEndpoints[i]) &&
-                        endpoint.Equals(ProviderEndpoints[i], StringComparison.OrdinalIgnoreCase))
-                    {
-                        index = i;
-                        break;
-                    }
-                }
-                cbxProvider.SelectedIndex = index;
+                // anything that is not the cloud endpoint is treated as the local one
+                bool isCloud = endpoint.IndexOf("groq.com", StringComparison.OrdinalIgnoreCase) >= 0;
+                cbxProvider.SelectedIndex = isCloud ? 1 : 0;
             }
         }
 
@@ -288,16 +278,10 @@ public class XUiC_NPCLLMChatConfig : XUiController
             if (cbxProvider != null && !string.IsNullOrEmpty(cbxProvider.Value))
             {
                 int index = Array.IndexOf(ProviderLabels, cbxProvider.Value);
-                if (index >= 0 && !string.IsNullOrEmpty(ProviderEndpoints[index]))
+                if (index >= 0)
                 {
                     SetStringCVar(CVAR_ENDPOINT, ProviderEndpoints[index]);
                     LLMService.Instance?.SetEndpoint(ProviderEndpoints[index]);
-                }
-                else if (index == ProviderLabels.Length - 1)
-                {
-                    // "Custom" hands control back to llmconfig.xml on the next start
-                    PlayerPrefs.DeleteKey(CVAR_ENDPOINT);
-                    PlayerPrefs.Save();
                 }
             }
 
@@ -400,7 +384,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
         {
             if (txtModel == null) return;
             int index = Array.IndexOf(ProviderLabels, newValue);
-            if (index < 0 || string.IsNullOrEmpty(ProviderModels[index])) return;
+            if (index < 0) return;
 
             bool modelSuitsNewProvider = index == 0
                 ? txtModel.Text.Contains(":")     // ollama tags look like name:size
