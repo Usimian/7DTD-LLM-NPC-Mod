@@ -200,10 +200,12 @@ namespace NPCLLMChat
             actionPrompt += BuildWorldContext();
             // Last instruction before the question carries the most weight, and the length rule
             // in the base prompt was being buried under a thousand words of persona and state.
-            actionPrompt += "\n\n[How to answer]\nOne sentence by default - answer what was asked " +
-                            "and stop, with no extra plan, no follow-up question and no second thought " +
-                            "tacked on. Only when the player actually asks for a story, an explanation " +
-                            "or directions do you get up to four sentences, and then tell it properly.";
+            actionPrompt += "\n\n[How to answer - this overrides every style note above]\n" +
+                            "HARD LIMIT: 15 words. Count them. A yes/no question gets a yes or no and a " +
+                            "few words at most.\nThe ONLY exception: the player explicitly asks for a " +
+                            "story, an explanation or directions - then up to 60 words.\nDo not add a " +
+                            "plan, a follow-up question, a joke on the end, or a second thought. Stop at " +
+                            "the answer.";
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
@@ -277,17 +279,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 Log.Out($"[NPCLLMChat] Parsed action: {action?.Type ?? NPCActionType.None}");
             }
 
-            // Trim response if too long
-            if (dialogueResponse.Length > _config.MaxResponseLength)
-            {
-                dialogueResponse = dialogueResponse.Substring(0, _config.MaxResponseLength);
-                // Try to end at a sentence
-                int lastPeriod = dialogueResponse.LastIndexOf('.');
-                if (lastPeriod > _config.MaxResponseLength / 2)
-                {
-                    dialogueResponse = dialogueResponse.Substring(0, lastPeriod + 1);
-                }
-            }
+            // Keep whole sentences within the word budget rather than cutting mid-word
+            dialogueResponse = CapLength(dialogueResponse);
 
             // Add NPC response to history (store original for context)
             _conversationHistory.Add(new ChatMessage("NPC", dialogueResponse));
@@ -366,6 +359,30 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             OnResponseComplete?.Invoke(fallback);
 
             Log.Warning($"[NPCLLMChat] Error for NPC {_npcName}: {error}. Using fallback.");
+        }
+
+        private const int MaxReplyWords = 60;
+
+        /// <summary>
+        /// Last line of defence against a rambling reply: keep whole sentences up to a word
+        /// budget. Prompting does most of the work; this stops the outliers reaching the player.
+        /// </summary>
+        private static string CapLength(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
+            if (text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length <= MaxReplyWords) return text;
+
+            var kept = new System.Text.StringBuilder();
+            int words = 0;
+            foreach (string sentence in System.Text.RegularExpressions.Regex.Split(text, @"(?<=[.!?])\s+"))
+            {
+                int length = sentence.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+                if (words > 0 && words + length > MaxReplyWords) break;
+                kept.Append(kept.Length > 0 ? " " : "").Append(sentence);
+                words += length;
+            }
+            string capped = kept.ToString().Trim();
+            return string.IsNullOrEmpty(capped) ? text : capped;
         }
 
         private string StripStageDirections(string text)
