@@ -367,7 +367,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             Log.Warning($"[NPCLLMChat] Error for NPC {_npcName}: {error}. Using fallback.");
         }
 
-        private const int MaxReplyWords = 60;
+        // Only a runaway-reply backstop. The prompt governs ordinary length; this used to sit
+        // at 60 and was clipping legitimate stories mid-telling.
+        private const int MaxReplyWords = 120;
 
         /// <summary>
         /// People are not randomly terse or chatty - they run on a mood that comes from their
@@ -412,7 +414,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                               "Even a yes or no carries a few words of your own voice the FIRST time it is asked - " +
                               "save the bare one-word answer for when the player repeats himself.");
                 sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
-                              "up to 60 words - then tell it properly.");
+                              "up to 80 words - then tell it properly, all the way to the end.");
                 sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
                 sb.AppendLine("Not everything deserves a reply. If the player is making small talk, thinking out " +
                               "loud, or saying something that asks nothing of you, a grunt is plenty - \"Mm.\", " +

@@ -271,7 +271,6 @@ namespace NPCLLMChat
                 {
                     config.ShowTypingIndicator = bool.Parse(GetNodeValue(responseNode, "ShowTypingIndicator", "false"));
                     config.TypingDelayMs = int.Parse(GetNodeValue(responseNode, "TypingDelayMs", "0"));
-                    config.MaxResponseLength = int.Parse(GetNodeValue(responseNode, "MaxResponseLength", "300"));
                 }
 
                 // Action settings
@@ -319,7 +318,6 @@ namespace NPCLLMChat
                 // Response
                 ShowTypingIndicator = false,
                 TypingDelayMs = 0,
-                MaxResponseLength = 300,
 
                 // Actions
                 ActionsEnabled = true,

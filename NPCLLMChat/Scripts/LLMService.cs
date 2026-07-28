@@ -607,7 +607,6 @@ namespace NPCLLMChat
         // Response settings
         public bool ShowTypingIndicator { get; set; }
         public int TypingDelayMs { get; set; }
-        public int MaxResponseLength { get; set; }
 
         // Action settings
         public bool ActionsEnabled { get; set; } = true;

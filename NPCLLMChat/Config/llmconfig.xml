@@ -89,7 +89,7 @@
             Token limits - higher = longer responses
             RTX 6000 Pro can handle large context easily
         -->
-        <MaxTokens>200</MaxTokens>
+        <MaxTokens>400</MaxTokens>
 
         <!--
             Temperature - controls creativity/randomness
@@ -141,11 +141,6 @@
         -->
         <TypingDelayMs>0</TypingDelayMs>
 
-        <!--
-            Maximum response length in characters
-            Longer responses are more immersive but take more time
-        -->
-        <MaxResponseLength>300</MaxResponseLength>
     </Response>
 
     <!-- Action System Settings -->
