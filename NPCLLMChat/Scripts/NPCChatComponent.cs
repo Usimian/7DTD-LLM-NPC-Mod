@@ -1025,6 +1025,16 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private int _hostilesSeenThisFight;
         private bool _remarkPending;
 
+        // Unprompted lines are the most immersive thing she does and the easiest to overdo:
+        // every trigger has its own cooldown, and nothing at all inside the global gap.
+        private const float RemarkGlobalGap = 50f;
+        private float _nextRemarkTime;
+        private readonly Dictionary<string, float> _nextByTrigger = new Dictionary<string, float>();
+        private string _lastRemarkedPlace;
+        private bool _wasBleeding;
+        private int _lastStormState;
+        private bool _saidGoodnight;
+
         /// <summary>
         /// She speaks up on her own for two things worth interrupting for: something closing on
         /// the player from behind, and the quiet after a real fight. Both are rate limited, and
@@ -1068,6 +1078,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (sneakingUp != null && Time.unscaledTime >= _nextWarnTime)
             {
                 _nextWarnTime = Time.unscaledTime + WarnCooldown;
+                _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
                 SpeakUnprompted("Something is closing on the player from BEHIND, close. Shout a warning of " +
                                 "THREE WORDS OR FEWER. No name, no advice, no sentence - just the shout.");
                 return;
@@ -1078,6 +1089,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (mostlyCleared && Time.unscaledTime >= _nextTriumphTime)
             {
                 _nextTriumphTime = Time.unscaledTime + TriumphCooldown;
+                _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
                 int killed = _hostilesSeenThisFight - hostilesNear;
                 _hostilesSeenThisFight = 0;
                 SpeakUnprompted($"The shooting just stopped - about {killed} of them down, both of you standing. " +
@@ -1086,6 +1098,131 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
 
             if (hostilesNear == 0) _hostilesSeenThisFight = 0;
+
+            // Nothing tactical to shout about, so look for something else worth saying
+            if (hostilesNear == 0) CheckForSomethingWorthMentioning(player);
+        }
+
+        /// <summary>
+        /// The quieter half of speaking up: things a companion would remark on unasked - a wound
+        /// opening, a storm gathering, arriving somewhere you both know, nightfall before a horde.
+        /// One at a time, highest priority first, and never inside the global gap.
+        /// </summary>
+        private void CheckForSomethingWorthMentioning(EntityPlayer player)
+        {
+            if (_remarkPending || Time.unscaledTime < _nextRemarkTime) return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            int hour = 12;
+            if (!string.IsNullOrEmpty(time) && time.Length >= 2) int.TryParse(time.Substring(0, 2), out hour);
+
+            // 1. she is badly hurt herself
+            float ownHealth = _npcEntity.GetMaxHealth() > 0
+                ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
+            if (ownHealth < 0.35f && Ready("own-wound", 240f))
+            {
+                Remark("own-wound", "You are badly hurt and the player has not noticed. Say so, plainly, in a few words.");
+                return;
+            }
+
+            // 2. the player has started bleeding since you last looked
+            bool bleeding = false;
+            if (player?.Buffs?.ActiveBuffs != null)
+            {
+                foreach (var buff in player.Buffs.ActiveBuffs)
+                {
+                    string name = buff.BuffClass?.Name ?? "";
+                    if (name.IndexOf("bleed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("infection", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        bleeding = true;
+                        break;
+                    }
+                }
+            }
+            if (bleeding && !_wasBleeding && Ready("player-wound", 120f))
+            {
+                _wasBleeding = true;
+                Remark("player-wound", "You have just noticed the player is bleeding or infected. Tell them, " +
+                                       "briefly, like a nurse who has seen it a thousand times.");
+                return;
+            }
+            _wasBleeding = bleeding;
+
+            // 3. a biome storm changing state is worth a word
+            var biome = GameManager.Instance?.World?.GetBiome((int)_npcEntity.position.x, (int)_npcEntity.position.z);
+            int stormState = (biome != null ? WeatherManager.Instance?.FindBiomeWeather(biome.m_BiomeType)?.stormState : 0) ?? 0;
+            if (stormState > _lastStormState && stormState >= 1 && Ready("storm", 300f))
+            {
+                _lastStormState = stormState;
+                Remark("storm", stormState >= 2
+                    ? "The biome storm has just hit. Say something short about getting under cover."
+                    : "You can feel a biome storm building. Mention it and suggest shelter, briefly.");
+                return;
+            }
+            _lastStormState = stormState;
+
+            // 4. arriving somewhere the two of you already know
+            if (!string.IsNullOrEmpty(_currentPlace) && _currentPlace != _lastRemarkedPlace && Ready("arrival", 180f))
+            {
+                _lastRemarkedPlace = _currentPlace;
+                var mark = _memory?.markedPlaces?.Find(m =>
+                    !string.IsNullOrEmpty(m.poi) && m.poi.Equals(_currentPlace, StringComparison.OrdinalIgnoreCase));
+                bool visitedBefore = _memory?.placesVisited?.Exists(v =>
+                    v.place.Equals(_currentPlace, StringComparison.OrdinalIgnoreCase)) ?? false;
+
+                if (mark != null)
+                {
+                    Remark("arrival", $"You have just walked into {_currentPlace} - the place the player asked you " +
+                                      $"to remember as \"{mark.label}\". Say so in a few words.");
+                    return;
+                }
+                if (visitedBefore)
+                {
+                    Remark("arrival", $"You have just arrived back at {_currentPlace}, somewhere you two have been " +
+                                      "before. A short line of recognition, nothing more.");
+                    return;
+                }
+            }
+
+            // 5. dusk on the eve of a horde
+            int bloodMoonDay = GameStats.GetInt(EnumGameStats.BloodMoonDay);
+            if (bloodMoonDay == day && hour >= 19 && hour < 22 && Ready("horde-dusk", 3600f))
+            {
+                Remark("horde-dusk", "The sun is going down and the blood moon horde comes TONIGHT. One short line " +
+                                     "about it - you are not making jokes now.");
+                return;
+            }
+
+            // 6. the player is running out of food or water
+            var stats = player?.Stats;
+            if (stats != null && Ready("player-empty", 900f))
+            {
+                bool starving = stats.Food != null && stats.Food.ValuePercentUI < 0.2f;
+                bool parched = stats.Water != null && stats.Water.ValuePercentUI < 0.2f;
+                if (starving || parched)
+                {
+                    Remark("player-empty", starving
+                        ? "The player is running on empty and needs to eat. Tell them, shortly."
+                        : "The player is badly dehydrated and needs water. Tell them, shortly.");
+                    return;
+                }
+            }
+        }
+
+        private bool Ready(string trigger, float cooldown)
+        {
+            float next;
+            if (_nextByTrigger.TryGetValue(trigger, out next) && Time.unscaledTime < next) return false;
+            _nextByTrigger[trigger] = Time.unscaledTime + cooldown;
+            return true;
+        }
+
+        private void Remark(string trigger, string situation)
+        {
+            _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
+            SpeakUnprompted(situation);
         }
 
         /// <summary>
