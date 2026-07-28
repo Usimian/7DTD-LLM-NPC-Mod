@@ -463,11 +463,17 @@ namespace NPCLLMChat
 
         private string UnescapeJson(string str)
         {
-            return str.Replace("\\n", "\n")
-                      .Replace("\\r", "\r")
-                      .Replace("\\t", "\t")
-                      .Replace("\\\"", "\"")
-                      .Replace("\\\\", "\\");
+            // \uXXXX has to be handled: providers escape characters like < as \u003c, which
+            // was reaching the player verbatim.
+            string unicodeDecoded = System.Text.RegularExpressions.Regex.Replace(
+                str, @"\\u([0-9a-fA-F]{4})",
+                m => ((char)Convert.ToInt32(m.Groups[1].Value, 16)).ToString());
+
+            return unicodeDecoded.Replace("\\n", "\n")
+                                 .Replace("\\r", "\r")
+                                 .Replace("\\t", "\t")
+                                 .Replace("\\\"", "\"")
+                                 .Replace("\\\\", "\\");
         }
 
         private string CleanResponse(string response)

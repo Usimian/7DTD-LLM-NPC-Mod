@@ -662,8 +662,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private static bool IsSilence(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return true;
-            string bare = text.Trim().Trim('"', '\'', '*', '.', ' ').ToLowerInvariant();
-            return bare == "<silence>" || bare == "silence";
+            string bare = text.Trim().Trim('"', '\'', '*', '.', '<', '>', ' ').ToLowerInvariant();
+            // tolerate the older marker and the escaped forms that leaked through
+            return bare == "noreply" || bare == "no reply" || bare == "silence" ||
+                   bare.Replace("\\u003c", "").Replace("\\u003e", "") == "silence";
         }
 
         private static string CapLength(string text)
