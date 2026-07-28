@@ -1325,6 +1325,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 Vector3 npcPos = _npcEntity.position;
                 sb.AppendLine($"Your map position: {(int)npcPos.x} E/W, {(int)npcPos.z} N/S.");
 
+                string surroundings = WorldContextHelper.DescribeSurroundings(npcPos);
+                if (!string.IsNullOrEmpty(surroundings))
+                {
+                    sb.AppendLine($"The ground and sky around you: {surroundings}.");
+                }
+
                 sb.AppendLine("Dukes (casino coins) are the money everyone uses out here. Traders buy loot, crafted goods, and materials for dukes and sell supplies for them, so selling things to traders for a profit is ordinary business, not fantasy - the player knows the going rates better than you do.");
 
                 int bloodMoonDay = GameStats.GetInt(EnumGameStats.BloodMoonDay);

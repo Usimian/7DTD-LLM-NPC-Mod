@@ -266,6 +266,61 @@ namespace NPCLLMChat
         }
 
         /// <summary>
+        /// Everything she can see and feel standing there: the biome, the temperature, what is
+        /// falling out of the sky and how hard the wind is blowing. Real values, so she stops
+        /// guessing at weather she is standing in.
+        /// </summary>
+        public static string DescribeSurroundings(Vector3 pos)
+        {
+            try
+            {
+                var world = GameManager.Instance?.World;
+                var biome = world?.GetBiome((int)pos.x, (int)pos.z);
+
+                var parts = new List<string>();
+                if (biome != null)
+                {
+                    string name = string.IsNullOrEmpty(biome.LocalizedName) ? biome.m_sBiomeName : biome.LocalizedName;
+                    if (!string.IsNullOrEmpty(name)) parts.Add($"{name.ToLowerInvariant()} biome");
+                }
+
+                float temperature = WeatherManager.GetTemperature();
+                string howItFeels = temperature < 32f ? "freezing"
+                    : temperature < 50f ? "cold"
+                    : temperature < 75f ? "mild"
+                    : temperature < 95f ? "hot"
+                    : "brutally hot";
+                parts.Add($"{Mathf.RoundToInt(temperature)} degrees and {howItFeels}");
+
+                float rain = WeatherManager.Instance?.GetCurrentRainfallPercent() ?? 0f;
+                float snow = WeatherManager.Instance?.GetCurrentSnowfallPercent() ?? 0f;
+                float wind = WeatherManager.GetWindSpeed();
+                float clouds = WeatherManager.GetCloudThickness();
+
+                if (snow > 0.5f) parts.Add("heavy snow falling");
+                else if (snow > 0.1f) parts.Add("light snow");
+                else if (rain > 0.5f) parts.Add("rain hammering down");
+                else if (rain > 0.1f) parts.Add("light rain");
+                else if (clouds > 0.66f) parts.Add("heavy overcast");
+                else if (clouds > 0.33f) parts.Add("cloudy");
+                else parts.Add("clear sky");
+
+                if (wind > 0.6f) parts.Add("the wind is howling");
+                else if (wind > 0.3f) parts.Add("a stiff breeze");
+
+                // a storm is worth naming outright - it is the thing she would mention first
+                bool storm = (rain > 0.5f || snow > 0.5f) && wind > 0.4f;
+                string line = string.Join(", ", parts);
+                return storm ? line + ". There is a storm on you right now" : line;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Surroundings lookup failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Distance and compass direction from an observer to a point, phrased for the
         /// prompt: "about 420m NE of you", or "right here" when on top of it.
         /// </summary>
