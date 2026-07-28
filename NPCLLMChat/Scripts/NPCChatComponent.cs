@@ -497,10 +497,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             bool playerBadlyHurt = player?.Stats?.Health != null && player.Stats.Health.ValuePercentUI < 0.4f;
 
+            float rain = WeatherManager.Instance?.GetCurrentRainfallPercent() ?? 0f;
+            float snow = WeatherManager.Instance?.GetCurrentSnowfallPercent() ?? 0f;
+
+            // A biome storm outranks ordinary weather: it is a scheduled, dangerous event
+            var biomeHere = GameManager.Instance?.World?.GetBiome((int)_npcEntity.position.x, (int)_npcEntity.position.z);
+            var biomeWeather = biomeHere != null ? WeatherManager.Instance?.FindBiomeWeather(biomeHere.m_BiomeType) : null;
+            int stormState = biomeWeather?.stormState ?? 0;
+            float fog = biomeWeather?.FogPercent() ?? 0f;
+
+            bool soaked = rain > 0.45f || snow > 0.45f;
+            bool blind = fog > 0.55f;
+
             key = health < 0.45f ? "hurt"
                 : sinceCombat < 90f ? "combat"
                 : playerBadlyHurt ? "player-hurt"
+                : stormState >= 2 ? "storm"
                 : hordeSoon ? "horde"
+                : stormState == 1 ? "storm-coming"
+                : soaked ? "soaked"
+                : blind ? "fogbound"
                 : sinceCoffee < 600f ? "coffee"
                 : (hour >= 22 || hour < 5) ? "night"
                 : (hour >= 5 && hour < 8) ? "dawn"
@@ -532,6 +548,30 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 mood = "The blood moon is almost on you.";
                 manner = "Businesslike and a little tense. No banter you do not have time for.";
+                wordLimit = 12;
+            }
+            else if (key == "storm")
+            {
+                mood = "A biome storm has caught you out in the open.";
+                manner = "Urgent. Get under cover and say so - this is not the moment for conversation.";
+                wordLimit = 12;
+            }
+            else if (key == "storm-coming")
+            {
+                mood = "You can feel a biome storm building - it lands soon.";
+                manner = "Pushing to find shelter before it arrives, brisk about it.";
+                wordLimit = 14;
+            }
+            else if (key == "soaked")
+            {
+                mood = "You are out in the wet and thoroughly sick of it.";
+                manner = "Grousing about the weather, keen to get under cover - say so.";
+                wordLimit = 15;
+            }
+            else if (key == "fogbound")
+            {
+                mood = "The fog is so thick you cannot see what is coming.";
+                manner = "Uneasy and watchful, voice down, no interest in small talk.";
                 wordLimit = 12;
             }
             else if (key == "coffee")
@@ -1329,6 +1369,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (!string.IsNullOrEmpty(surroundings))
                 {
                     sb.AppendLine($"The ground and sky around you: {surroundings}.");
+                    sb.AppendLine("You are standing out in that, not reading it off a screen - it is fair game " +
+                                  "to grumble about, and worth suggesting shelter or waiting it out when the " +
+                                  "weather turns genuinely bad.");
                 }
 
                 sb.AppendLine("Dukes (casino coins) are the money everyone uses out here. Traders buy loot, crafted goods, and materials for dukes and sell supplies for them, so selling things to traders for a profit is ordinary business, not fantasy - the player knows the going rates better than you do.");

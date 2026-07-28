@@ -297,6 +297,11 @@ namespace NPCLLMChat
                 float wind = WeatherManager.GetWindSpeed();
                 float clouds = WeatherManager.GetCloudThickness();
 
+                var biomeWeather = biome != null ? WeatherManager.Instance?.FindBiomeWeather(biome.m_BiomeType) : null;
+                float fog = biomeWeather?.FogPercent() ?? 0f;
+                if (fog > 0.55f) parts.Add("thick fog, you cannot see far at all");
+                else if (fog > 0.3f) parts.Add("hazy with fog");
+
                 if (snow > 0.5f) parts.Add("heavy snow falling");
                 else if (snow > 0.1f) parts.Add("light snow");
                 else if (rain > 0.5f) parts.Add("rain hammering down");
@@ -308,10 +313,20 @@ namespace NPCLLMChat
                 if (wind > 0.6f) parts.Add("the wind is howling");
                 else if (wind > 0.3f) parts.Add("a stiff breeze");
 
-                // a storm is worth naming outright - it is the thing she would mention first
-                bool storm = (rain > 0.5f || snow > 0.5f) && wind > 0.4f;
                 string line = string.Join(", ", parts);
-                return storm ? line + ". There is a storm on you right now" : line;
+
+                // Biome storms are their own thing: a scheduled event with a build-up phase
+                // (stormState 1) before it lands (stormState 2), not just heavy rain.
+                int stormState = biomeWeather?.stormState ?? 0;
+                if (stormState >= 2)
+                {
+                    line += ". A BIOME STORM is on you right now - this is the dangerous kind, get under cover";
+                }
+                else if (stormState == 1)
+                {
+                    line += ". A biome storm is building and will hit shortly - worth finding shelter before it does";
+                }
+                return line;
             }
             catch (Exception ex)
             {
