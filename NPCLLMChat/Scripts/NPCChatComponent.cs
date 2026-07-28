@@ -200,19 +200,7 @@ namespace NPCLLMChat
             actionPrompt += BuildWorldContext();
             // Last instruction before the question carries the most weight, and the length rule
             // in the base prompt was being buried under a thousand words of persona and state.
-            // Worked examples pin this down where a word count alone does not: told only to be
-            // brief she still answers "Yep. Stop stalling and let's go."
-            actionPrompt += "\n\n[How to answer - this overrides every style note above]\n" +
-                            "A yes/no question gets ONE WORD. Not a word plus advice, not a word plus a " +
-                            "joke. One word:\n" +
-                            "  Player: Are you ready?       You: Ready.\n" +
-                            "  Player: Are you ready?       You: Yep.\n" +
-                            "  Player: Got the pie?         You: Yep.\n" +
-                            "  Player: Anything out there?  You: Nothing.\n" +
-                            "If the player asks the SAME question again, answer even shorter than last time.\n" +
-                            "Anything else: HARD LIMIT 15 words. Only a request for a story, an explanation " +
-                            "or directions earns up to 60 words.\n" +
-                            "Never add a plan, a follow-up question, a joke on the end, or a second thought.";
+            actionPrompt += BuildAnswerLengthGuidance(playerMessage);
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
@@ -369,6 +357,154 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         }
 
         private const int MaxReplyWords = 60;
+
+        /// <summary>
+        /// People are not randomly terse or chatty - they run on a mood that comes from their
+        /// situation. Hers is derived from what is actually happening: a fight a minute ago, a
+        /// wound, the small hours, a horde due tomorrow, or a fresh cup of coffee. The mood sets
+        /// both her manner and how much she says, and repetition still overrides it.
+        /// </summary>
+        private string BuildAnswerLengthGuidance(string playerMessage)
+        {
+            int repeats = CountRecentRepeats(playerMessage);
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine();
+
+            string mood, manner;
+            int wordLimit;
+            DescribeMood(out mood, out manner, out wordLimit);
+            sb.AppendLine($"[Your state right now]\n{mood} {manner}");
+            sb.AppendLine();
+            sb.AppendLine("[How to answer - this overrides every style note above]");
+
+            if (repeats >= 2)
+            {
+                sb.AppendLine($"The player has now asked you this {repeats + 1} times in a row and you have " +
+                              "answered every single time. React the way your mood above would: call it out, " +
+                              "let the irritation show. Under 20 words.");
+            }
+            else if (repeats == 1)
+            {
+                sb.AppendLine("You answered this exact question a moment ago. Repeat yourself in ONE WORD - " +
+                              "nothing else, no explanation, no joke.");
+            }
+            else
+            {
+                sb.AppendLine($"Answer in one sentence, {wordLimit} words at most, in the manner described above. " +
+                              "Even a yes or no carries a few words of your own voice the FIRST time it is asked - " +
+                              "save the bare one-word answer for when the player repeats himself.");
+                sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
+                              "up to 60 words - then tell it properly.");
+                sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Highest-priority thing happening to her wins: pain, then danger, then duty, then
+        /// stimulants, then the hour of the night.
+        /// </summary>
+        private void DescribeMood(out string mood, out string manner, out int wordLimit)
+        {
+            float health = _npcEntity.GetMaxHealth() > 0
+                ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
+            float sinceCombat = Time.unscaledTime - _lastCombatTime;
+            float sinceCoffee = Time.unscaledTime - _lastCaffeineTime;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            int hour = 12;
+            if (!string.IsNullOrEmpty(time) && time.Length >= 2) int.TryParse(time.Substring(0, 2), out hour);
+            int bloodMoonDay = GameStats.GetInt(EnumGameStats.BloodMoonDay);
+            bool hordeSoon = bloodMoonDay > 0 && bloodMoonDay - day <= 1;
+
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            bool playerBadlyHurt = player?.Stats?.Health != null && player.Stats.Health.ValuePercentUI < 0.4f;
+
+            if (health < 0.45f)
+            {
+                mood = "You are hurt and it is wearing on you.";
+                manner = "Short, flat answers. Not much patience for chat.";
+                wordLimit = 10;
+            }
+            else if (sinceCombat < 90f)
+            {
+                mood = "You were shooting less than a minute ago and the adrenaline has not dropped.";
+                manner = "Clipped and alert, still scanning. Words come out fast and few.";
+                wordLimit = 10;
+            }
+            else if (playerBadlyHurt)
+            {
+                mood = "The player is badly hurt and you have noticed.";
+                manner = "Focused and practical, nurse first, jokes later.";
+                wordLimit = 15;
+            }
+            else if (hordeSoon)
+            {
+                mood = "The blood moon is almost on you.";
+                manner = "Businesslike and a little tense. No banter you do not have time for.";
+                wordLimit = 12;
+            }
+            else if (sinceCoffee < 600f)
+            {
+                mood = "You have just had coffee and you are enjoying it.";
+                manner = "Awake, chatty, quick with a joke - the most talkative you get.";
+                wordLimit = 25;
+            }
+            else if (hour >= 22 || hour < 5)
+            {
+                mood = "It is the middle of the night and you are tired.";
+                manner = "Low and slow, minimal words, half asleep.";
+                wordLimit = 10;
+            }
+            else if (hour >= 5 && hour < 8)
+            {
+                mood = "It is barely dawn and you are not properly awake yet.";
+                manner = "Groggy and grumbling, short answers until the day starts.";
+                wordLimit = 12;
+            }
+            else
+            {
+                mood = "Nothing pressing. An ordinary day out here.";
+                manner = "Warm and easy, in no particular hurry.";
+                wordLimit = 15;
+            }
+        }
+
+        /// <summary>
+        /// How many times the player has just asked this same thing, ignoring case, spacing and
+        /// punctuation, within the last few exchanges.
+        /// </summary>
+        private int CountRecentRepeats(string playerMessage)
+        {
+            string current = Normalize(playerMessage);
+            if (string.IsNullOrEmpty(current)) return 0;
+
+            int seen = 0, playerTurnsChecked = 0;
+            // the current message is already in history, so start from the end and skip it
+            for (int i = _conversationHistory.Count - 2; i >= 0 && playerTurnsChecked < 6; i--)
+            {
+                if (_conversationHistory[i].Role != "Player") continue;
+                playerTurnsChecked++;
+                if (Normalize(_conversationHistory[i].Content) == current) seen++;
+                else break; // only an unbroken run counts as nagging
+            }
+            return seen;
+        }
+
+        private static string Normalize(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var sb = new System.Text.StringBuilder(text.Length);
+            foreach (char c in text.ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(c)) sb.Append(c);
+                else if (c == ' ' && sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(c);
+            }
+            return sb.ToString().Trim();
+        }
 
         /// <summary>
         /// Last line of defence against a rambling reply: keep whole sentences up to a word
@@ -725,6 +861,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private const float CargoCheckIntervalSeconds = 30f;
         private float _nextCargoCheck;
         private bool _warnedUnhired;
+        private float _lastCombatTime = -9999f;
+        private float _lastCaffeineTime = -9999f;
+        private int _lastCoffeeCount = -1;
 
         /// <summary>
         /// Loot containers carry the entity id of whoever owns them, which is how a modded
@@ -792,6 +931,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
             }
 
+            if (hostilesNear > 0) _lastCombatTime = Time.unscaledTime;
             if (hostilesNear > _hostilesSeenThisFight) _hostilesSeenThisFight = hostilesNear;
 
             if (sneakingUp != null && Time.unscaledTime >= _nextWarnTime)
@@ -1152,6 +1292,17 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 // was captured then (the array stays live, so edits since are reflected)
                 var opened = Harmony.NPCContainerCache.Get(_npcEntity.entityId, _npcName);
                 if (opened != null) carried.AddRange(opened);
+
+                // A cup going missing from her pack is the only evidence that she drank it
+                int coffeeNow = 0;
+                foreach (var stack in carried)
+                {
+                    var itemClass = stack?.itemValue?.ItemClass;
+                    string name = itemClass?.GetItemName() ?? "";
+                    if (name.IndexOf("coffee", StringComparison.OrdinalIgnoreCase) >= 0) coffeeNow += stack.count;
+                }
+                if (_lastCoffeeCount >= 0 && coffeeNow < _lastCoffeeCount) _lastCaffeineTime = Time.unscaledTime;
+                _lastCoffeeCount = coffeeNow;
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
