@@ -275,6 +275,16 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 Log.Out($"[NPCLLMChat] Parsed action: {action?.Type ?? NPCActionType.None}");
             }
 
+            // She is allowed to let something pass without answering
+            if (IsSilence(dialogueResponse))
+            {
+                Log.Out($"[NPCLLMChat] {_npcName} chose not to answer");
+                _currentResponse = "";
+                onComplete?.Invoke("");
+                OnResponseComplete?.Invoke("");
+                return;
+            }
+
             // Keep whole sentences within the word budget rather than cutting mid-word
             dialogueResponse = CapLength(dialogueResponse);
 
@@ -376,6 +386,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             string mood, manner;
             int wordLimit;
             DescribeMood(out mood, out manner, out wordLimit);
+            _quietMood = _moodKey == "hurt" || _moodKey == "combat" || _moodKey == "night" ||
+                         _moodKey == "dawn" || _moodKey == "fogbound" || _moodKey == "storm";
             sb.AppendLine($"[Your state right now]\n{mood} {manner}");
             sb.AppendLine("If the player asks why you are quiet, short or chirpy, tell him plainly how you " +
                           "feel - do not pretend to be fine.");
@@ -402,6 +414,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
                               "up to 60 words - then tell it properly.");
                 sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
+                sb.AppendLine("Not everything deserves a reply. If the player is making small talk, thinking out " +
+                              "loud, or saying something that asks nothing of you, a grunt is plenty - \"Mm.\", " +
+                              "\"Yeah.\", \"Hm.\" - or say nothing at all by answering with exactly <silence> " +
+                              "and no other characters. " + (_quietMood
+                                  ? "In the state you are in, silence or a grunt is the likely answer."
+                                  : "Use it when it fits; a real answer is still the norm when you are asked something."));
             }
             return sb.ToString();
         }
@@ -637,6 +655,17 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// Last line of defence against a rambling reply: keep whole sentences up to a word
         /// budget. Prompting does most of the work; this stops the outliers reaching the player.
         /// </summary>
+        /// <summary>
+        /// The model's way of saying nothing. Anything that is only the marker counts, since it
+        /// likes to wrap it in quotes or punctuation.
+        /// </summary>
+        private static bool IsSilence(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return true;
+            string bare = text.Trim().Trim('"', '\'', '*', '.', ' ').ToLowerInvariant();
+            return bare == "<silence>" || bare == "silence";
+        }
+
         private static string CapLength(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
@@ -990,6 +1019,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private bool _warnedUnhired;
         private float _lastCombatTime = -9999f;
         private string _moodKey = "";
+        private bool _quietMood;
         private float _moodSetAt;
         private int _lastOwnHealth = -1;
         private int _lastPackCount = -1;
