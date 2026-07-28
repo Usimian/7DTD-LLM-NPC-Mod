@@ -198,6 +198,12 @@ namespace NPCLLMChat
             // Build action-aware system prompt, with current world state appended
             string actionPrompt = _actionsEnabled ? BuildActionSystemPrompt() : _systemPrompt;
             actionPrompt += BuildWorldContext();
+            // Last instruction before the question carries the most weight, and the length rule
+            // in the base prompt was being buried under a thousand words of persona and state.
+            actionPrompt += "\n\n[How to answer]\nOne sentence by default - answer what was asked " +
+                            "and stop, with no extra plan, no follow-up question and no second thought " +
+                            "tacked on. Only when the player actually asks for a story, an explanation " +
+                            "or directions do you get up to four sentences, and then tell it properly.";
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
