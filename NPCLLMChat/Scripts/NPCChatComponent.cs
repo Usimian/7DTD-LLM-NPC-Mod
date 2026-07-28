@@ -200,12 +200,19 @@ namespace NPCLLMChat
             actionPrompt += BuildWorldContext();
             // Last instruction before the question carries the most weight, and the length rule
             // in the base prompt was being buried under a thousand words of persona and state.
+            // Worked examples pin this down where a word count alone does not: told only to be
+            // brief she still answers "Yep. Stop stalling and let's go."
             actionPrompt += "\n\n[How to answer - this overrides every style note above]\n" +
-                            "HARD LIMIT: 15 words. Count them. A yes/no question gets a yes or no and a " +
-                            "few words at most.\nThe ONLY exception: the player explicitly asks for a " +
-                            "story, an explanation or directions - then up to 60 words.\nDo not add a " +
-                            "plan, a follow-up question, a joke on the end, or a second thought. Stop at " +
-                            "the answer.";
+                            "A yes/no question gets ONE WORD. Not a word plus advice, not a word plus a " +
+                            "joke. One word:\n" +
+                            "  Player: Are you ready?       You: Ready.\n" +
+                            "  Player: Are you ready?       You: Yep.\n" +
+                            "  Player: Got the pie?         You: Yep.\n" +
+                            "  Player: Anything out there?  You: Nothing.\n" +
+                            "If the player asks the SAME question again, answer even shorter than last time.\n" +
+                            "Anything else: HARD LIMIT 15 words. Only a request for a story, an explanation " +
+                            "or directions earns up to 60 words.\n" +
+                            "Never add a plan, a follow-up question, a joke on the end, or a second thought.";
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
