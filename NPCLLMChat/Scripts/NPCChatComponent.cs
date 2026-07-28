@@ -193,6 +193,7 @@ namespace NPCLLMChat
 
             // Add player message to history
             _conversationHistory.Add(new ChatMessage("Player", playerMessage));
+            NoteHowPlayerSpoke(playerMessage);
             TrimHistory();
 
             // Build action-aware system prompt, with current world state appended
@@ -376,6 +377,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             int wordLimit;
             DescribeMood(out mood, out manner, out wordLimit);
             sb.AppendLine($"[Your state right now]\n{mood} {manner}");
+            sb.AppendLine("If the player asks why you are quiet, short or chirpy, tell him plainly how you " +
+                          "feel - do not pretend to be fine.");
+            sb.AppendLine(DescribeRapport());
             sb.AppendLine();
             sb.AppendLine("[How to answer - this overrides every style note above]");
 
@@ -403,10 +407,80 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         }
 
         /// <summary>
+        /// Where the two of them stand, in her own terms. Rapport moves slowly and persists in
+        /// her memory file, so kindness and neglect both accumulate across sessions.
+        /// </summary>
+        private string DescribeRapport()
+        {
+            float r = _memory?.rapport ?? 0f;
+            if (r > 0.45f)
+                return "You are fond of this player and it shows - you give them the benefit of the doubt.";
+            if (r > 0.15f)
+                return "You get on well with this player.";
+            if (r < -0.45f)
+                return "This player has worn out your patience lately. You are short with them and slow to volunteer anything.";
+            if (r < -0.15f)
+                return "You are a little cool towards this player at the moment.";
+            return "You and this player are on ordinary working terms.";
+        }
+
+        private void AdjustRapport(float delta, string why)
+        {
+            if (_memory == null) return;
+            float before = _memory.rapport;
+            _memory.rapport = Mathf.Clamp(_memory.rapport + delta, -1f, 1f);
+            if (Mathf.Abs(_memory.rapport - before) > 0.001f)
+            {
+                Log.Out($"[NPCLLMChat] {_npcName} rapport {before:F2} -> {_memory.rapport:F2} ({why})");
+            }
+        }
+
+        private static readonly string[] KindWords =
+            { "thank", "thanks", "good job", "nice work", "well done", "appreciate", "you ok", "you alright", "sorry" };
+        private static readonly string[] UnkindWords =
+            { "shut up", "idiot", "useless", "stupid", "shut it", "worthless", "quiet" };
+
+        /// <summary>
+        /// What the player says is the loudest signal of how they treat her.
+        /// </summary>
+        private void NoteHowPlayerSpoke(string playerMessage)
+        {
+            string text = (playerMessage ?? "").ToLowerInvariant();
+            foreach (string word in KindWords)
+            {
+                if (text.Contains(word)) { AdjustRapport(0.06f, $"kind words: {word}"); return; }
+            }
+            foreach (string word in UnkindWords)
+            {
+                if (text.Contains(word)) { AdjustRapport(-0.1f, $"harsh words: {word}"); return; }
+            }
+        }
+
+        /// <summary>
         /// Highest-priority thing happening to her wins: pain, then danger, then duty, then
         /// stimulants, then the hour of the night.
         /// </summary>
         private void DescribeMood(out string mood, out string manner, out int wordLimit)
+        {
+            ResolveMood(out string key, out mood, out manner, out wordLimit);
+
+            // Moods have inertia: pain and gunfire land instantly, but calm has to be earned -
+            // she does not snap from keyed-up to cheerful the moment the shooting stops.
+            bool urgent = key == "hurt" || key == "combat" || key == "player-hurt";
+            if (key != _moodKey)
+            {
+                bool leavingUrgent = _moodKey == "hurt" || _moodKey == "combat" || _moodKey == "player-hurt";
+                if (!urgent && leavingUrgent && Time.unscaledTime - _moodSetAt < 120f)
+                {
+                    ResolveMoodByKey(_moodKey, out mood, out manner, out wordLimit);
+                    return;
+                }
+                _moodKey = key;
+                _moodSetAt = Time.unscaledTime;
+            }
+        }
+
+        private void ResolveMood(out string key, out string mood, out string manner, out int wordLimit)
         {
             float health = _npcEntity.GetMaxHealth() > 0
                 ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
@@ -423,43 +497,56 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             bool playerBadlyHurt = player?.Stats?.Health != null && player.Stats.Health.ValuePercentUI < 0.4f;
 
-            if (health < 0.45f)
+            key = health < 0.45f ? "hurt"
+                : sinceCombat < 90f ? "combat"
+                : playerBadlyHurt ? "player-hurt"
+                : hordeSoon ? "horde"
+                : sinceCoffee < 600f ? "coffee"
+                : (hour >= 22 || hour < 5) ? "night"
+                : (hour >= 5 && hour < 8) ? "dawn"
+                : "easy";
+            ResolveMoodByKey(key, out mood, out manner, out wordLimit);
+        }
+
+        private static void ResolveMoodByKey(string key, out string mood, out string manner, out int wordLimit)
+        {
+            if (key == "hurt")
             {
                 mood = "You are hurt and it is wearing on you.";
                 manner = "Short, flat answers. Not much patience for chat.";
                 wordLimit = 10;
             }
-            else if (sinceCombat < 90f)
+            else if (key == "combat")
             {
                 mood = "You were shooting less than a minute ago and the adrenaline has not dropped.";
                 manner = "Clipped and alert, still scanning. Words come out fast and few.";
                 wordLimit = 10;
             }
-            else if (playerBadlyHurt)
+            else if (key == "player-hurt")
             {
                 mood = "The player is badly hurt and you have noticed.";
                 manner = "Focused and practical, nurse first, jokes later.";
                 wordLimit = 15;
             }
-            else if (hordeSoon)
+            else if (key == "horde")
             {
                 mood = "The blood moon is almost on you.";
                 manner = "Businesslike and a little tense. No banter you do not have time for.";
                 wordLimit = 12;
             }
-            else if (sinceCoffee < 600f)
+            else if (key == "coffee")
             {
                 mood = "You have just had coffee and you are enjoying it.";
                 manner = "Awake, chatty, quick with a joke - the most talkative you get.";
                 wordLimit = 25;
             }
-            else if (hour >= 22 || hour < 5)
+            else if (key == "night")
             {
                 mood = "It is the middle of the night and you are tired.";
                 manner = "Low and slow, minimal words, half asleep.";
                 wordLimit = 10;
             }
-            else if (hour >= 5 && hour < 8)
+            else if (key == "dawn")
             {
                 mood = "It is barely dawn and you are not properly awake yet.";
                 manner = "Groggy and grumbling, short answers until the day starts.";
@@ -862,6 +949,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private float _nextCargoCheck;
         private bool _warnedUnhired;
         private float _lastCombatTime = -9999f;
+        private string _moodKey = "";
+        private float _moodSetAt;
+        private int _lastOwnHealth = -1;
+        private int _lastPackCount = -1;
         private float _lastCaffeineTime = -9999f;
         private int _lastCoffeeCount = -1;
 
@@ -1303,6 +1394,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
                 if (_lastCoffeeCount >= 0 && coffeeNow < _lastCoffeeCount) _lastCaffeineTime = Time.unscaledTime;
                 _lastCoffeeCount = coffeeNow;
+
+                // Being handed things counts as being looked after; being left wounded does not
+                int packCount = 0;
+                foreach (var stack in carried) if (stack != null && !stack.IsEmpty()) packCount += stack.count;
+                if (_lastPackCount >= 0 && packCount > _lastPackCount) AdjustRapport(0.04f, "given supplies");
+                _lastPackCount = packCount;
+
+                int ownHealth = _npcEntity.Health;
+                if (_lastOwnHealth >= 0)
+                {
+                    if (ownHealth < _lastOwnHealth - 15) AdjustRapport(-0.03f, "took a beating");
+                    else if (ownHealth > _lastOwnHealth + 5) AdjustRapport(0.05f, "patched up");
+                }
+                _lastOwnHealth = ownHealth;
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
