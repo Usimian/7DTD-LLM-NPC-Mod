@@ -48,25 +48,29 @@ namespace NPCLLMChat.Harmony
         {
             if (_te == null || _te.items == null) return;
 
-            // Only an NPC's carried store may be attributed to an NPC. A placed block sits at
-            // real world coordinates, so opening a crate next to her must not make its contents
-            // hers - that briefly had her owning 278 raw meat from a storage crate.
+            // Only a store the NPC is carrying may be attributed to her. A placed crate sits at
+            // real world coordinates AND records its owner's entity id, so checking the id alone
+            // let a storage box next to her become "her pack" - 143 ears of corn and all.
             var asTile = _te as TileEntity;
             bool isPlacedBlock = asTile != null && asTile.ToWorldPos() != Vector3i.zero;
-            if (isPlacedBlock && (asTile.entityId <= 0)) return;
+            if (isPlacedBlock && !BelongsToAnNPC(asTile.entityId)) return;
 
             EntityAlive npc = NearestNPC();
-            int entityId = (_te as TileEntity)?.entityId ?? -1;
-            if (entityId <= 0)
-            {
-                if (npc == null) return;
-                entityId = npc.entityId;
-            }
+            if (npc == null) return;
 
-            string npcName = npc != null ? npc.EntityName : null;
+            int entityId = npc.entityId;
+            string npcName = npc.EntityName;
             NPCContainerCache.Remember(entityId, npcName, _lootContainerName, _te.items);
             Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}]: " +
                     $"{WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
+        }
+
+        /// <summary>True only when this entity id is a loaded NPC, not the player who owns a crate.</summary>
+        private static bool BelongsToAnNPC(int entityId)
+        {
+            if (entityId <= 0) return false;
+            var entity = GameManager.Instance?.World?.GetEntity(entityId) as EntityAlive;
+            return entity != null && NPCLLMChatMod.IsNPC(entity);
         }
 
         private static EntityAlive NearestNPC()

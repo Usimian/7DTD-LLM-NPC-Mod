@@ -399,9 +399,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
             if (repeats >= 2)
             {
-                sb.AppendLine($"The player has now asked you this {repeats + 1} times in a row and you have " +
-                              "answered every single time. React the way your mood above would: call it out, " +
-                              "let the irritation show. Under 20 words.");
+                sb.AppendLine($"The player has asked you this {repeats + 1} times in a row. React the way your " +
+                              "mood above would - a word about being asked again is fair - but ANSWER THE " +
+                              "QUESTION anyway, properly, in the same breath. They may be asking again because " +
+                              "your last answer was no use. Under 25 words.");
             }
             else if (repeats == 1)
             {
