@@ -1078,6 +1078,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private readonly Dictionary<string, float> _nextByTrigger = new Dictionary<string, float>();
         private string _lastRemarkedPlace;
         private bool _wasBleeding;
+        private string _lastAfflictions = "\0";   // never equal to a real value, so the first pass logs
         private int _lastStormState;
         // Keyed by name, not entity id: an NPC that is picked up and set down again gets a new
         // id, and she should not greet the same person twice for that.
@@ -1165,6 +1166,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             int hour = 12;
             if (!string.IsNullOrEmpty(time) && time.Length >= 2) int.TryParse(time.Substring(0, 2), out hour);
 
+            // 0. the player is cooking in a radiated zone - it kills, and only walking out fixes it
+            if (HasBuffLike(player, "radiation", "radiated") && Ready("radiation", 180f))
+            {
+                Remark("radiation", "The player is standing in a radiated zone taking radiation damage. Nothing " +
+                                    "in either pack fixes it - he has to walk out, back toward the middle of the " +
+                                    "map. Tell him now, short and serious.");
+                return;
+            }
+
             // 1. she is badly hurt herself
             float ownHealth = _npcEntity.GetMaxHealth() > 0
                 ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
@@ -1175,20 +1185,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
 
             // 2. the player has started bleeding since you last looked
-            bool bleeding = false;
-            if (player?.Buffs?.ActiveBuffs != null)
-            {
-                foreach (var buff in player.Buffs.ActiveBuffs)
-                {
-                    string name = buff.BuffClass?.Name ?? "";
-                    if (name.IndexOf("bleed", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        name.IndexOf("infection", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        bleeding = true;
-                        break;
-                    }
-                }
-            }
+            bool bleeding = HasBuffLike(player, "bleed", "infection");
             if (bleeding && !_wasBleeding && Ready("player-wound", 120f))
             {
                 _wasBleeding = true;
@@ -1297,6 +1294,23 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     return;
                 }
             }
+        }
+
+        /// <summary>True when any visible buff on the entity contains one of these fragments.</summary>
+        private static bool HasBuffLike(EntityAlive entity, params string[] fragments)
+        {
+            if (entity?.Buffs?.ActiveBuffs == null) return false;
+            foreach (var buff in entity.Buffs.ActiveBuffs)
+            {
+                var buffClass = buff.BuffClass;
+                if (buffClass == null || buffClass.Hidden) continue;
+                string name = buffClass.Name ?? "";
+                foreach (string fragment in fragments)
+                {
+                    if (name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+                }
+            }
+            return false;
         }
 
         private bool Ready(string trigger, float cooldown)
@@ -1786,10 +1800,25 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     sb.AppendLine("If asked what to do next, an unstarted job is the obvious suggestion - name who it came from.");
                 }
 
-                string condition = WorldContextHelper.DescribePlayerCondition(GameManager.Instance?.World?.GetPrimaryPlayer());
+                var thePlayer = GameManager.Instance?.World?.GetPrimaryPlayer();
+                string condition = WorldContextHelper.DescribePlayerCondition(thePlayer);
                 if (!string.IsNullOrEmpty(condition))
                 {
                     sb.AppendLine($"How the player looks to you right now, at a glance: {condition}.");
+                }
+
+                string afflictions = WorldContextHelper.DescribeAfflictions(thePlayer);
+                if (afflictions != _lastAfflictions)
+                {
+                    _lastAfflictions = afflictions;
+                    Log.Out($"[NPCLLMChat] Player afflictions in context: {afflictions ?? "(none)"}");
+                }
+                if (!string.IsNullOrEmpty(afflictions))
+                {
+                    sb.AppendLine($"WHAT IS WRONG WITH HIM RIGHT NOW: {afflictions}.");
+                    sb.AppendLine("You are the one who notices this sort of thing. If he asks how he is doing, " +
+                                  "or asks what to do next, lead with whatever is hurting him and what fixes it - " +
+                                  "and if it is the kind that kills, say it plainly rather than making a joke of it.");
                 }
 
                 string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);

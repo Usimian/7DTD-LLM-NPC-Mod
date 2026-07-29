@@ -215,23 +215,70 @@ namespace NPCLLMChat
                 Band(player.Stats.Water, "well hydrated", "could use a drink", "properly thirsty", "badly dehydrated")
             };
 
-            var ailments = new List<string>();
-            if (player.Buffs?.ActiveBuffs != null)
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>
+        /// What is actually wrong with the player, and what it means. A bare buff name tells her
+        /// nothing worth saying - "Deadly Radiation" buried at the end of a list of stats read as
+        /// scenery - so each affliction she can recognise comes with the treatment attached.
+        /// </summary>
+        public static string DescribeAfflictions(EntityPlayer player)
+        {
+            if (player?.Buffs?.ActiveBuffs == null) return null;
+
+            var lines = new List<string>();
+            var seen = new HashSet<string>();
+            foreach (var buff in player.Buffs.ActiveBuffs)
             {
-                foreach (var buff in player.Buffs.ActiveBuffs)
-                {
-                    var buffClass = buff.BuffClass;
-                    if (buffClass == null || buffClass.Hidden || !buffClass.ShowOnHUD) continue;
-                    ailments.Add(string.IsNullOrEmpty(buffClass.LocalizedName) ? buffClass.Name : buffClass.LocalizedName);
-                }
+                var buffClass = buff.BuffClass;
+                if (buffClass == null || buffClass.Hidden || !buffClass.ShowOnHUD) continue;
+
+                string raw = buffClass.Name ?? "";      // BuffClass lowercases this at load
+                string label = string.IsNullOrEmpty(buffClass.LocalizedName) ? raw : buffClass.LocalizedName;
+                string meaning = Treatment(raw);
+                if (meaning == null) continue;          // a perk or food bonus, not an affliction
+
+                string line = meaning.Length > 0 ? $"{label} - {meaning}" : label;
+                if (seen.Add(line)) lines.Add(line);
             }
 
-            string condition = string.Join(", ", parts);
-            if (ailments.Count > 0)
-            {
-                condition += ". Conditions you can see on them: " + string.Join(", ", ailments);
-            }
-            return condition;
+            return lines.Count == 0 ? null : string.Join("; ", lines);
+        }
+
+        /// <summary>
+        /// Empty string for an affliction with nothing to be done about it, null for a buff that
+        /// is not an affliction at all (perks, food bonuses, being drunk on moonshine).
+        /// </summary>
+        private static string Treatment(string buffName)
+        {
+            if (buffName.Contains("radiation") || buffName.Contains("radiated"))
+                return "he is standing in a radiated zone and it is burning through him. No pill fixes this - " +
+                       "the ONLY cure is to walk out of the zone, back toward the middle of the map. " +
+                       "Say so straight away, this one kills people";
+            if (buffName.Contains("bleeding") || buffName.Contains("laceration") || buffName.Contains("abrasion"))
+                return "he is bleeding and needs a bandage on it";
+            if (buffName.Contains("infection"))
+                return "an infection, and it climbs on its own. Antibiotics, or honey if there are none";
+            if (buffName.Contains("dysentery"))
+                return "dysentery from bad food or water - goldenrod tea will settle it";
+            if (buffName.Contains("legbroken") || buffName.Contains("armbroken") || buffName.Contains("brokenlimb"))
+                return "a broken bone - that wants a splint or a cast before he walks it off";
+            if (buffName.Contains("sprained"))
+                return "a sprain - a splint and a bandage, and he should take it easy";
+            if (buffName.Contains("concussion"))
+                return "a concussion, which is why he cannot see straight";
+            if (buffName.Contains("elementcold") || buffName.Contains("hypo"))
+                return "he is freezing - warmer clothes, a fire, or get indoors";
+            if (buffName.Contains("elementhot") || buffName.Contains("heat"))
+                return "he is overheating - shade, water, less armour";
+            if (buffName.Contains("crippled") || buffName.Contains("slow"))
+                return "his leg is wrecked and he is barely moving";
+            if (buffName.Contains("stunned") || buffName.Contains("knockdown") || buffName.Contains("unconscious"))
+                return "";  // she can see it, and there is nothing to hand him for it
+            if (buffName.Contains("sprain") || buffName.Contains("injury"))
+                return "";
+            return null;
         }
 
         /// <summary>
