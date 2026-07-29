@@ -336,6 +336,69 @@ namespace NPCLLMChat
         }
 
         /// <summary>
+        /// The other people in sight. She has eyes, so a survivor standing twenty metres away
+        /// is something she can see and remark on - traders behind their counters, allies the
+        /// player has already hired, and strangers who are standing around waiting to be.
+        /// Null when the two of you are alone, so she never invents company.
+        /// </summary>
+        public static string DescribePeopleNearby(Vector3 from, int selfId, int playerId, float radius = 45f)
+        {
+            try
+            {
+                var world = GameManager.Instance?.World;
+                if (world == null) return null;
+
+                var lines = new List<string>();
+                foreach (var entity in world.Entities.list)
+                {
+                    if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
+                    if (alive.entityId == selfId || alive.entityId == playerId) continue;
+                    if (!NPCLLMChatMod.IsNPC(alive)) continue;
+
+                    float dist = Vector3.Distance(from, alive.position);
+                    if (dist > radius) continue;
+
+                    string where = dist < 8f
+                        ? "right next to you"
+                        : $"{Mathf.RoundToInt(dist)}m {CompassDir(alive.position.x - from.x, alive.position.z - from.z)}";
+
+                    // A vanilla trader is the shopkeeper; an SCore NPC derives from EntityTrader
+                    // too, so the type name has to settle which one this is.
+                    bool isSDX = alive.GetType().Name.Contains("SDX");
+                    if (alive is EntityTrader && !isSDX)
+                    {
+                        lines.Add($"- {PersonName(alive)}, the trader, {where}");
+                        continue;
+                    }
+
+                    bool hired = alive.Buffs != null &&
+                                 ((alive.Buffs.HasCustomVar("Leader") && alive.Buffs.GetCustomVar("Leader") > 0f) ||
+                                  (alive.Buffs.HasCustomVar("Owner") && alive.Buffs.GetCustomVar("Owner") > 0f));
+                    lines.Add(hired
+                        ? $"- {PersonName(alive)}, working for the player like you are, {where}"
+                        : $"- {PersonName(alive)}, a survivor standing around loose - not hired by anyone, {where}");
+                }
+
+                return lines.Count == 0 ? null : string.Join("\n", lines);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Nearby people lookup failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>Entity names come through as "npcWhiteRiverGuard" or "WastelandRaider5Axe".</summary>
+        public static string PersonName(EntityAlive entity)
+        {
+            string name = entity?.EntityName;
+            if (string.IsNullOrEmpty(name)) return "someone";
+            if (name.StartsWith("npcTrader")) name = name.Substring("npcTrader".Length);
+            else if (name.StartsWith("npc")) name = name.Substring("npc".Length);
+            return Prettify(name);
+        }
+
+        /// <summary>
         /// Distance and compass direction from an observer to a point, phrased for the
         /// prompt: "about 420m NE of you", or "right here" when on top of it.
         /// </summary>

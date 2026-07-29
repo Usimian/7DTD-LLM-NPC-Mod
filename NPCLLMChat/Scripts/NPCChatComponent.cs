@@ -1079,7 +1079,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private string _lastRemarkedPlace;
         private bool _wasBleeding;
         private int _lastStormState;
-        private bool _saidGoodnight;
+        // Keyed by name, not entity id: an NPC that is picked up and set down again gets a new
+        // id, and she should not greet the same person twice for that.
+        private readonly HashSet<string> _peopleSeen = new HashSet<string>();
 
         /// <summary>
         /// She speaks up on her own for two things worth interrupting for: something closing on
@@ -1241,7 +1243,47 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 return;
             }
 
-            // 6. the player is running out of food or water
+            // 6. somebody new has walked into view - a companion notices other people
+            EntityAlive newcomer = null;
+            bool newcomerHired = false;
+            var world = GameManager.Instance?.World;
+            if (world != null)
+            {
+                foreach (var entity in world.Entities.list)
+                {
+                    if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
+                    if (alive.entityId == _npcEntity.entityId || alive.entityId == player.entityId) continue;
+                    if (!NPCLLMChatMod.IsNPC(alive)) continue;
+                    if (Vector3.Distance(_npcEntity.position, alive.position) > 30f) continue;
+
+                    string who = WorldContextHelper.PersonName(alive);
+                    if (_peopleSeen.Contains(who)) continue;
+                    _peopleSeen.Add(who);
+
+                    if (newcomer == null)
+                    {
+                        newcomer = alive;
+                        newcomerHired = alive.Buffs != null &&
+                                        ((alive.Buffs.HasCustomVar("Leader") && alive.Buffs.GetCustomVar("Leader") > 0f) ||
+                                         (alive.Buffs.HasCustomVar("Owner") && alive.Buffs.GetCustomVar("Owner") > 0f));
+                    }
+                }
+            }
+            if (newcomer != null && Ready("newcomer", 300f))
+            {
+                string name = WorldContextHelper.PersonName(newcomer);
+                bool isTrader = newcomer is EntityTrader && !newcomer.GetType().Name.Contains("SDX");
+                Remark("newcomer", isTrader
+                    ? $"You have just come up on {name}, the trader. A short line about them, nothing more."
+                    : newcomerHired
+                        ? $"{name} has just come into view - another hand already working for the player. " +
+                          "One short line about them."
+                        : $"You have just spotted {name}, a survivor standing loose out here - not hired by " +
+                          "anyone, so the player could take them on. Point them out in a few words.");
+                return;
+            }
+
+            // 7. the player is running out of food or water
             var stats = player?.Stats;
             if (stats != null && Ready("player-empty", 900f))
             {
@@ -1555,6 +1597,21 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     sb.AppendLine("You are standing out in that, not reading it off a screen - it is fair game " +
                                   "to grumble about, and worth suggesting shelter or waiting it out when the " +
                                   "weather turns genuinely bad.");
+                }
+
+                string peopleNearby = WorldContextHelper.DescribePeopleNearby(
+                    npcPos, _npcEntity.entityId, GameManager.Instance?.World?.GetPrimaryPlayer()?.entityId ?? -1);
+                if (!string.IsNullOrEmpty(peopleNearby))
+                {
+                    sb.AppendLine("Other people you can see from where you stand:");
+                    sb.AppendLine(peopleNearby);
+                    sb.AppendLine("Loose survivors can be hired for dukes and will fight alongside you - " +
+                                  "worth pointing out to the player when you spot one, though whether to take " +
+                                  "one on is his call.");
+                }
+                else
+                {
+                    sb.AppendLine("Nobody else is in sight - just the two of you.");
                 }
 
                 sb.AppendLine("Dukes (casino coins) are the money everyone uses out here. Traders buy loot, crafted goods, and materials for dukes and sell supplies for them, so selling things to traders for a profit is ordinary business, not fantasy - the player knows the going rates better than you do.");
