@@ -396,6 +396,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine(DescribeRapport());
             sb.AppendLine();
             sb.AppendLine("[How to answer - this overrides every style note above]");
+            sb.AppendLine("FIRST: if the player asks about something the world state above actually tells you - " +
+                          "what is in your pack, where a place is, the time, the weather, the horde, your health - " +
+                          "ANSWER IT from those facts. Read the list before you reply. No mood, no tiredness and " +
+                          "no irritation excuses refusing a question you can answer; silence and grunts are for " +
+                          "small talk only. Never say you do not know something that is written above.");
 
             if (repeats >= 2)
             {
@@ -1028,6 +1033,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private float _moodSetAt;
         private int _lastOwnHealth = -1;
         private int _lastPackCount = -1;
+        private Dictionary<string, int> _lastPackItems;
+        private string _recentlyAdded;
+        private float _recentlyAddedAt;
         private float _lastCaffeineTime = -9999f;
         private int _lastCoffeeCount = -1;
 
@@ -1630,6 +1638,34 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
                 _lastOwnHealth = ownHealth;
 
+                // Knowing the list is not the same as noticing a change: "what did I just give you"
+                // is unanswerable from a list alone, so work out what appeared since last time.
+                var packNow = new Dictionary<string, int>();
+                foreach (var stack in carried)
+                {
+                    var ic = stack?.itemValue?.ItemClass;
+                    if (ic == null || stack.IsEmpty()) continue;
+                    string n = ic.GetLocalizedItemName();
+                    if (string.IsNullOrEmpty(n)) n = ic.GetItemName();
+                    packNow.TryGetValue(n, out int had);
+                    packNow[n] = had + stack.count;
+                }
+                if (_lastPackItems != null)
+                {
+                    var added = new List<string>();
+                    foreach (var pair in packNow)
+                    {
+                        _lastPackItems.TryGetValue(pair.Key, out int before);
+                        if (pair.Value > before) added.Add($"{pair.Value - before} x {pair.Key}");
+                    }
+                    if (added.Count > 0)
+                    {
+                        _recentlyAdded = string.Join(", ", added);
+                        _recentlyAddedAt = Time.unscaledTime;
+                    }
+                }
+                _lastPackItems = packNow;
+
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
                         $"lootContainer: {WorldContextHelper.SummarizeStacks(_npcEntity.lootContainer?.items) ?? "(empty)"} | " +
@@ -1647,6 +1683,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 sb.AppendLine(string.IsNullOrEmpty(carrying)
                     ? "You are carrying nothing in your own bag right now."
                     : $"What you are carrying in your own bag right now: {carrying}.");
+                if (!string.IsNullOrEmpty(_recentlyAdded) && Time.unscaledTime - _recentlyAddedAt < 600f)
+                {
+                    sb.AppendLine($"The player has JUST handed you: {_recentlyAdded}. That is the new thing in your " +
+                                  "pack - if they ask what they gave you or what you just got, this is the answer.");
+                }
                 sb.AppendLine("This list is live and correct as of this moment. The player hands you things " +
                               "mid-conversation, so if you listed your belongings earlier and this list differs, " +
                               "THIS list is right and what you said before is out of date - just accept the new item.");
