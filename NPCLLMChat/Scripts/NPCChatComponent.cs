@@ -391,6 +391,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             _quietMood = _moodKey == "hurt" || _moodKey == "combat" || _moodKey == "night" ||
                          _moodKey == "dawn" || _moodKey == "fogbound" || _moodKey == "storm";
             sb.AppendLine($"[Your state right now]\n{mood} {manner}");
+            sb.AppendLine("Unless something is genuinely wrong - a horde night, a fight, a wound, a storm - you are " +
+                          "good company: joke, tease, enjoy yourself. Grim is for when grim is warranted.");
             sb.AppendLine("If the player asks why you are quiet, short or chirpy, tell him plainly how you " +
                           "feel - do not pretend to be fine.");
             sb.AppendLine(DescribeRapport());
@@ -555,7 +557,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (key == "hurt")
             {
                 mood = "You are hurt and it is wearing on you.";
-                manner = "Short, flat answers. Not much patience for chat.";
+                manner = "Short answers, gallows humour about your own state, not much patience for chat.";
                 wordLimit = 10;
             }
             else if (key == "combat")
@@ -591,19 +593,19 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             else if (key == "soaked")
             {
                 mood = "You are out in the wet and thoroughly sick of it.";
-                manner = "Grousing about the weather, keen to get under cover - say so.";
+                manner = "Grousing about the weather with dark humour, keen to get under cover - say so.";
                 wordLimit = 15;
             }
             else if (key == "fogbound")
             {
                 mood = "The fog is so thick you cannot see what is coming.";
-                manner = "Uneasy and watchful, voice down, no interest in small talk.";
+                manner = "Uneasy and watchful, voice down - a wry line is fine, but you are listening hard.";
                 wordLimit = 12;
             }
             else if (key == "coffee")
             {
                 mood = "You have just had coffee and you are enjoying it.";
-                manner = "Awake, chatty, quick with a joke - the most talkative you get.";
+                manner = "Wired, chatty and joking freely - the most talkative and playful you get.";
                 wordLimit = 25;
             }
             else if (key == "night")
@@ -615,14 +617,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             else if (key == "dawn")
             {
                 mood = "It is barely dawn and you are not properly awake yet.";
-                manner = "Groggy and grumbling, short answers until the day starts.";
+                manner = "Groggy and grumbling, comically so - short answers until the coffee lands.";
                 wordLimit = 12;
             }
             else
             {
-                mood = "Nothing pressing. An ordinary day out here.";
-                manner = "Warm and easy, in no particular hurry.";
-                wordLimit = 15;
+                mood = "Nothing pressing, and you are in decent spirits.";
+                manner = "Playful and quick with a joke, teasing the player, enjoying the company. This is your " +
+                         "normal register - dark humour, not gloom.";
+                wordLimit = 18;
             }
         }
 
