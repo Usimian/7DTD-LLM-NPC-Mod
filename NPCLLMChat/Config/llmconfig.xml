@@ -106,8 +106,14 @@
         <!--
             Context window - how much conversation history to consider
             Larger = better memory but more VRAM
+
+            Her world state is not small: every labelled storage crate is its own entry with
+            its full contents, and that alone runs to ~2700 tokens at a well-sorted base and
+            grows by 200-400 with each new crate. 32768 leaves room for that plus the
+            conversation; drop it back to 16384 if you are running a smaller GPU and keep an
+            eye on whether she starts losing the thread of a conversation.
         -->
-        <NumCtx>16384</NumCtx>
+        <NumCtx>32768</NumCtx>
     </Server>
 
     <!-- NPC Personality Defaults -->
