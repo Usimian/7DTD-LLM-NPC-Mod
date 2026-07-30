@@ -1498,6 +1498,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             // Player-owned storage containers, one snapshot per place ("storage at Trader Rekt")
             var byPlace = new Dictionary<string, List<ItemStack>>();
             var placePositions = new Dictionary<string, Vector3>();
+            var placesSwept = new HashSet<string>();
             foreach (var chunk in world.ChunkCache.GetChunkArrayCopySync())
             {
                 foreach (var tileEntity in chunk.tileEntities.list)
@@ -1506,13 +1507,23 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     if (contents == null) continue;
                     Vector3i wp = tileEntity.ToWorldPos();
                     string place = WorldContextHelper.GetPOINameAt(new Vector3(wp.x, wp.y, wp.z));
-                    string key = string.IsNullOrEmpty(place) ? "storage out in the wild" : $"storage at {place}";
+                    string at = string.IsNullOrEmpty(place) ? "" : $" at {place}";
+
+                    // A crate the player has written on is the one he will name out loud, so keep
+                    // it as its own entry - merging every crate at a POI into one pile loses the
+                    // labels and with them any answer to "which crate is it in?". Two crates
+                    // wearing the same label still merge, which is what the labels are for.
+                    string label = StorageLabel(tileEntity);
+                    string key = label != null
+                        ? $"the \"{label}\" crate{at}"
+                        : (string.IsNullOrEmpty(place) ? "storage out in the wild" : $"storage{at}");
                     if (!byPlace.TryGetValue(key, out var stacks))
                     {
                         stacks = new List<ItemStack>();
                         byPlace[key] = stacks;
                     }
                     if (!placePositions.ContainsKey(key)) placePositions[key] = new Vector3(wp.x, wp.y, wp.z);
+                    placesSwept.Add(place ?? "");
                     stacks.AddRange(contents);
                 }
             }
@@ -1521,6 +1532,24 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 changed |= UpdateCargoSnapshot(group.Key, day, time,
                     WorldContextHelper.SummarizeStacks(group.Value),
                     placePositions.TryGetValue(group.Key, out var where) ? where : Vector3.zero);
+            }
+
+            // A crate that has been relabelled, emptied or torn down leaves its old entry behind
+            // for good, since nothing will ever write that name again - which is also how the one
+            // merged "storage at X" pile survives the move to per-crate labels. Drop entries for a
+            // place just swept that did not turn up, but only while standing there, so a
+            // half-loaded chunk from across the valley cannot make her forget the base.
+            var stillThere = new HashSet<string>(byPlace.Keys);
+            Vector2 herePos = new Vector2(_npcEntity.position.x, _npcEntity.position.z);
+            int dropped = _memory.cargoSnapshots.RemoveAll(snap =>
+                IsStorageEntry(snap.name, out string snapPlace) &&
+                placesSwept.Contains(snapPlace) &&
+                !stillThere.Contains(snap.name) &&
+                Vector2.Distance(new Vector2(snap.x, snap.z), herePos) < 40f);
+            if (dropped > 0)
+            {
+                Log.Out($"[NPCLLMChat] Dropped {dropped} stale storage entr{(dropped == 1 ? "y" : "ies")}");
+                changed = true;
             }
 
             if (changed) PersistMemory();
@@ -1533,6 +1562,37 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// TileEntitySecureLootContainer. Testing for just that type made every crate at the base
         /// invisible to her.
         /// </summary>
+        /// <summary>
+        /// True for the snapshots the storage sweep owns, with the place they sit at: "storage at
+        /// Trader Rekt" and 'the "Ammo" crate at Trader Rekt'. Vehicles, the drone and trader stock
+        /// are named differently and must never be pruned by it.
+        /// </summary>
+        private static bool IsStorageEntry(string name, out string place)
+        {
+            place = null;
+            if (string.IsNullOrEmpty(name)) return false;
+            if (!name.StartsWith("storage", StringComparison.Ordinal) &&
+                !name.StartsWith("the \"", StringComparison.Ordinal)) return false;
+
+            int at = name.LastIndexOf(" at ", StringComparison.Ordinal);
+            place = at >= 0 ? name.Substring(at + 4) : "";
+            return true;
+        }
+
+        /// <summary>
+        /// The text the player has painted on a crate - "Ammo", "Seeds" - or null for a blank one.
+        /// The writable crates carry a signable feature alongside their storage.
+        /// </summary>
+        private static string StorageLabel(TileEntity tileEntity)
+        {
+            var signable = (tileEntity as TileEntityComposite)?.GetFeature<ITileEntitySignable>();
+            string text = signable?.GetAuthoredText()?.Text;
+            if (string.IsNullOrWhiteSpace(text)) return null;
+
+            // Signs run to three lines; she has to say it out loud as one phrase.
+            return System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
+        }
+
         private static ItemStack[] PlayerStorageContents(TileEntity tileEntity)
         {
             if (tileEntity is TileEntitySecureLootContainer secure)
@@ -1822,6 +1882,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     {
                         sb.AppendLine($"- {snap.name} (last checked Day {snap.day} {snap.time}): {snap.summary}");
                     }
+                    sb.AppendLine("A name in quotes is what the player has actually painted on that crate, so " +
+                                  "use it when you tell him where something is - \"it's in the Ammo crate\" - " +
+                                  "rather than describing the box.");
                 }
                 sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask.");
 
