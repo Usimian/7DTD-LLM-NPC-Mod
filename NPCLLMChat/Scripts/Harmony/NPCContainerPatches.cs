@@ -48,15 +48,21 @@ namespace NPCLLMChat.Harmony
         {
             if (_te == null || _te.items == null) return;
 
-            // Only a store the NPC is carrying may be attributed to her. A placed crate sits at
-            // real world coordinates AND records its owner's entity id, so checking the id alone
-            // let a storage box next to her become "her pack" - 143 ears of corn and all.
-            var asTile = _te as TileEntity;
-            bool isPlacedBlock = asTile != null && asTile.ToWorldPos() != Vector3i.zero;
-            if (isPlacedBlock && !BelongsToAnNPC(asTile.entityId)) return;
-
             EntityAlive npc = NearestNPC();
             if (npc == null) return;
+
+            // Only a store the NPC is carrying may be attributed to her, and the window title is
+            // the one reliable way to tell: an NPC's own store is titled "traderNPC" or her name.
+            // Testing the tile entity instead does not work - V2.6 storage crates are a
+            // CompositeTileEntity whose storage feature is NOT a TileEntity, so the old
+            // "is this a placed block?" cast came back null, the guard never ran, and a crate
+            // full of corn became her pack. Corpse bags and the drone slipped through the same way.
+            if (!IsStoreOf(npc, _lootContainerName) || _te.bPlayerStorage)
+            {
+                Log.Out($"[NPCLLMChat] Not attributing container '{_lootContainerName}' to " +
+                        $"{npc.EntityName ?? "?"} - not her store");
+                return;
+            }
 
             int entityId = npc.entityId;
             string npcName = npc.EntityName;
@@ -65,12 +71,19 @@ namespace NPCLLMChat.Harmony
                     $"{WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
         }
 
-        /// <summary>True only when this entity id is a loaded NPC, not the player who owns a crate.</summary>
-        private static bool BelongsToAnNPC(int entityId)
+        /// <summary>
+        /// The hire UI titles a companion's store "traderNPC"; opening another NPC's store titles
+        /// it with that NPC's name. Anything else - "Steel Storage Crate", "Junk Eyebot",
+        /// "Drowned Zombie" - belongs to someone or something else.
+        /// </summary>
+        private static bool IsStoreOf(EntityAlive npc, string containerName)
         {
-            if (entityId <= 0) return false;
-            var entity = GameManager.Instance?.World?.GetEntity(entityId) as EntityAlive;
-            return entity != null && NPCLLMChatMod.IsNPC(entity);
+            if (string.IsNullOrEmpty(containerName)) return false;
+            if (containerName.Equals("traderNPC", System.StringComparison.OrdinalIgnoreCase)) return true;
+
+            string npcName = npc.EntityName;
+            return !string.IsNullOrEmpty(npcName) &&
+                   containerName.IndexOf(npcName, System.StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static EntityAlive NearestNPC()

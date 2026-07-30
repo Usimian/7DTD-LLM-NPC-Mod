@@ -1483,9 +1483,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 foreach (var tileEntity in chunk.tileEntities.list)
                 {
-                    if (!(tileEntity is TileEntitySecureLootContainer container) || !container.LocalPlayerIsOwner())
-                        continue;
-                    Vector3i wp = container.ToWorldPos();
+                    ItemStack[] contents = PlayerStorageContents(tileEntity);
+                    if (contents == null) continue;
+                    Vector3i wp = tileEntity.ToWorldPos();
                     string place = WorldContextHelper.GetPOINameAt(new Vector3(wp.x, wp.y, wp.z));
                     string key = string.IsNullOrEmpty(place) ? "storage out in the wild" : $"storage at {place}";
                     if (!byPlace.TryGetValue(key, out var stacks))
@@ -1494,16 +1494,49 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         byPlace[key] = stacks;
                     }
                     if (!placePositions.ContainsKey(key)) placePositions[key] = new Vector3(wp.x, wp.y, wp.z);
-                    if (container.items != null) stacks.AddRange(container.items);
+                    stacks.AddRange(contents);
                 }
             }
             foreach (var group in byPlace)
             {
-                changed |= UpdateCargoSnapshot(group.Key, day, time, WorldContextHelper.SummarizeStacks(group.Value),
+                // Base storage runs to dozens of kinds of item and the summary is sorted by count,
+                // so a short cap quietly hides the single rare thing worth asking about - one
+                // nuclear material behind 184 raw meat. List it all.
+                changed |= UpdateCargoSnapshot(group.Key, day, time,
+                    WorldContextHelper.SummarizeStacks(group.Value, 120),
                     placePositions.TryGetValue(group.Key, out var where) ? where : Vector3.zero);
             }
 
             if (changed) PersistMemory();
+        }
+
+        /// <summary>
+        /// Contents of a container the player owns, or null for anything else. The wood, iron and
+        /// steel crates are all CompositeTileEntity in V2.6, so their storage hangs off a feature
+        /// rather than off the tile entity itself; only older containers are a
+        /// TileEntitySecureLootContainer. Testing for just that type made every crate at the base
+        /// invisible to her.
+        /// </summary>
+        private static ItemStack[] PlayerStorageContents(TileEntity tileEntity)
+        {
+            if (tileEntity is TileEntitySecureLootContainer secure)
+                return secure.LocalPlayerIsOwner() ? secure.items : null;
+
+            if (tileEntity is TileEntityComposite composite && composite.PlayerPlaced)
+            {
+                var lootable = composite.GetFeature<ITileEntityLootable>();
+                if (lootable?.items == null) return null;
+
+                // A crate the player placed is his whether or not he ever locked it, so an owner
+                // match counts even when the lock feature says nothing.
+                var lockable = composite.GetFeature<ILockable>();
+                bool mine = (lockable != null && lockable.LocalPlayerIsOwner()) ||
+                            (composite.Owner != null &&
+                             composite.Owner.Equals(Platform.PlatformManager.InternalLocalUserIdentifier));
+                return mine ? lootable.items : null;
+            }
+
+            return null;
         }
 
         private bool UpdateCargoSnapshot(string name, int day, string time, string summary, Vector3 position)
