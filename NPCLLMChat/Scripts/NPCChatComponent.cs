@@ -209,7 +209,7 @@ namespace NPCLLMChat
                 actionPrompt,
                 _conversationHistory,
                 playerMessage,
-                response => HandleLLMResponse(response, onComplete),
+                response => HandleLLMResponse(response, playerMessage, onComplete),
                 error => HandleLLMError(error)
             );
         }
@@ -257,7 +257,7 @@ Stay in character. Only perform actions that make sense for your personality.
 The ""dialogue"" field and any plain response are spoken aloud word for word: only words you actually say, no narration, no describing your actions.";
         }
 
-        private void HandleLLMResponse(string response, Action<string> onComplete)
+        private void HandleLLMResponse(string response, string playerMessage, Action<string> onComplete)
         {
             _isWaitingForResponse = false;
 
@@ -272,7 +272,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 {
                     dialogueResponse = action.DialogueBefore;
                 }
-                Log.Out($"[NPCLLMChat] Parsed action: {action?.Type ?? NPCActionType.None}");
+
+                // An order the player gave outranks whatever her reply happens to imply - she can
+                // agree in any words she likes and still do as asked. Only her saying the opposite
+                // outright stops it.
+                NPCActionType ordered = ActionParser.ParseCommand(playerMessage);
+                if (action != null && ordered != NPCActionType.None)
+                {
+                    if (ActionParser.Contradicts(ordered, action.Type))
+                    {
+                        Log.Out($"[NPCLLMChat] Ordered {ordered}, but she said otherwise - not forcing it");
+                    }
+                    else
+                    {
+                        action.Type = ordered;
+                        action.Confidence = 0.95f;
+                    }
+                }
+
+                Log.Out($"[NPCLLMChat] Parsed action: {action?.Type ?? NPCActionType.None}" +
+                        (ordered != NPCActionType.None ? $" (ordered: {ordered})" : ""));
             }
 
             // She is allowed to let something pass without answering

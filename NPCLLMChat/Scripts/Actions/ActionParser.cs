@@ -16,7 +16,8 @@ namespace NPCLLMChat.Actions
         {
             { NPCActionType.Follow, new[] {
                 @"\b(follow|come with|i'?ll come|let'?s go|lead the way|i'?m with you|right behind you)\b",
-                @"\b(sure,? i'?ll follow|okay,? let'?s move|alright,? lead on)\b"
+                @"\b(sure,? i'?ll follow|okay,? let'?s move|alright,? lead on)\b",
+                @"\b(i'?m coming|coming with you|not leaving you)\b"
             }},
             { NPCActionType.StopFollow, new[] {
                 @"\b(stop following|stay here|wait here|i'?ll stay|not coming|staying put)\b",
@@ -24,7 +25,8 @@ namespace NPCLLMChat.Actions
             }},
             { NPCActionType.Wait, new[] {
                 @"\b(i'?ll wait|waiting here|stay put|hold position|standing by)\b",
-                @"\b(okay,? i'?ll wait|sure,? i'?ll stay)\b"
+                @"\b(okay,? i'?ll wait|sure,? i'?ll stay)\b",
+                @"\b(i'?m not going anywhere|not moving|i'?m staying|right here then)\b"
             }},
             { NPCActionType.Guard, new[] {
                 @"\b(guard|protect|watch over|keep watch|defend|patrol)\b",
@@ -65,6 +67,77 @@ namespace NPCLLMChat.Actions
                 @"\b(\d+)\s*(duke|dukes|coin|coins)\b"
             }}
         };
+
+        /// <summary>
+        /// Orders the player gives her, matched against HIS words rather than her reply. Inferring
+        /// the action from what she said only worked while she answered in stock phrases: asked to
+        /// stay, she said "I'm not going anywhere, hon", which matches nothing, so she agreed out
+        /// loud and never got the command. What he asked for is not open to interpretation.
+        /// </summary>
+        private static readonly Dictionary<NPCActionType, string[]> CommandPatterns = new Dictionary<NPCActionType, string[]>
+        {
+            { NPCActionType.StopFollow, new[] {
+                @"\b(stop following|quit following|don'?t follow)\b"
+            }},
+            { NPCActionType.Wait, new[] {
+                @"\bstay (right )?(here|there|put|behind)\b",
+                @"\b(wait|hold) (right )?(here|there|up|on)\b",
+                @"\b(hold|hold your) position\b",
+                @"\b(sit tight|stay back|remain here|wait for me)\b"
+            }},
+            { NPCActionType.Follow, new[] {
+                @"\b(follow me|come with me|come along|come on|keep up|let'?s go|let'?s move|move out|on me)\b",
+                @"\b(stay close|stick with me|with me)\b"
+            }},
+            { NPCActionType.Guard, new[] {
+                @"\b(guard (this|here|the)|stand guard|keep watch|watch (my back|this|over)|defend (this|here))\b"
+            }},
+            { NPCActionType.Heal, new[] {
+                @"\b(patch me up|heal me|bandage me|fix me up|patch this up|treat my)\b"
+            }}
+        };
+
+        /// <summary>
+        /// The action the player just ordered, or None when he was only talking. Longest match
+        /// wins, so "stop following me" beats the bare "follow me" inside it.
+        /// </summary>
+        public static NPCActionType ParseCommand(string playerMessage)
+        {
+            if (string.IsNullOrWhiteSpace(playerMessage)) return NPCActionType.None;
+
+            string text = playerMessage.ToLowerInvariant();
+            NPCActionType best = NPCActionType.None;
+            int bestLength = 0;
+
+            foreach (var kvp in CommandPatterns)
+            {
+                foreach (string pattern in kvp.Value)
+                {
+                    var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+                    if (match.Success && match.Length > bestLength)
+                    {
+                        bestLength = match.Length;
+                        best = kvp.Key;
+                    }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// True when her reply asserts the opposite of the order - told to stay, she says she is
+        /// coming anyway. Only a genuine countermand blocks the command; a grumble does not, since
+        /// she is a companion and the player's word carries.
+        /// </summary>
+        public static bool Contradicts(NPCActionType ordered, NPCActionType impliedByReply)
+        {
+            bool orderedStay = ordered == NPCActionType.Wait || ordered == NPCActionType.StopFollow;
+            bool repliedStay = impliedByReply == NPCActionType.Wait || impliedByReply == NPCActionType.StopFollow;
+
+            if (orderedStay) return impliedByReply == NPCActionType.Follow;
+            if (ordered == NPCActionType.Follow) return repliedStay;
+            return false;
+        }
 
         // Patterns for extracting structured JSON from LLM response
         private static readonly Regex JsonPattern = new Regex(
