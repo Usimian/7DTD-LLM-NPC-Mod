@@ -61,6 +61,7 @@ namespace NPCLLMChat
         private float _nextPlaceCheck;
         private const float PlaceCheckIntervalSeconds = 5f;
         private const int MaxJournalEntries = 40;
+        private const int MaxLabelChars = 40;   // a crate label she can say in one breath
 
         public void Initialize(EntityAlive npcEntity, LLMConfig config)
         {
@@ -1507,16 +1508,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     if (contents == null) continue;
                     Vector3i wp = tileEntity.ToWorldPos();
                     string place = WorldContextHelper.GetPOINameAt(new Vector3(wp.x, wp.y, wp.z));
-                    string at = string.IsNullOrEmpty(place) ? "" : $" at {place}";
 
                     // A crate the player has written on is the one he will name out loud, so keep
                     // it as its own entry - merging every crate at a POI into one pile loses the
                     // labels and with them any answer to "which crate is it in?". Two crates
                     // wearing the same label still merge, which is what the labels are for.
-                    string label = StorageLabel(tileEntity);
-                    string key = label != null
-                        ? $"the \"{label}\" crate{at}"
-                        : (string.IsNullOrEmpty(place) ? "storage out in the wild" : $"storage{at}");
+                    string key = StorageKey(StorageLabel(tileEntity), place);
                     if (!byPlace.TryGetValue(key, out var stacks))
                     {
                         stacks = new List<ItemStack>();
@@ -1536,16 +1533,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
             // A crate that has been relabelled, emptied or torn down leaves its old entry behind
             // for good, since nothing will ever write that name again - which is also how the one
-            // merged "storage at X" pile survives the move to per-crate labels. Drop entries for a
-            // place just swept that did not turn up, but only while standing there, so a
-            // half-loaded chunk from across the valley cannot make her forget the base.
+            // merged "storage at X" pile survives the move to per-crate labels. Only prune a place
+            // she is standing in, where the whole POI is loaded and the sweep really did see
+            // everything; measuring 40m from her instead would strand the far end of a big base.
+            // Crates out in the open have no POI to vouch for them, so those keep the distance test.
             var stillThere = new HashSet<string>(byPlace.Keys);
             Vector2 herePos = new Vector2(_npcEntity.position.x, _npcEntity.position.z);
+            string herePlace = WorldContextHelper.GetPOINameAt(_npcEntity.position) ?? "";
             int dropped = _memory.cargoSnapshots.RemoveAll(snap =>
                 IsStorageEntry(snap.name, out string snapPlace) &&
                 placesSwept.Contains(snapPlace) &&
                 !stillThere.Contains(snap.name) &&
-                Vector2.Distance(new Vector2(snap.x, snap.z), herePos) < 40f);
+                (snapPlace.Length > 0
+                    ? snapPlace == herePlace
+                    : Vector2.Distance(new Vector2(snap.x, snap.z), herePos) < 40f));
             if (dropped > 0)
             {
                 Log.Out($"[NPCLLMChat] Dropped {dropped} stale storage entr{(dropped == 1 ? "y" : "ies")}");
@@ -1555,13 +1556,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (changed) PersistMemory();
         }
 
-        /// <summary>
-        /// Contents of a container the player owns, or null for anything else. The wood, iron and
-        /// steel crates are all CompositeTileEntity in V2.6, so their storage hangs off a feature
-        /// rather than off the tile entity itself; only older containers are a
-        /// TileEntitySecureLootContainer. Testing for just that type made every crate at the base
-        /// invisible to her.
-        /// </summary>
+        // How a storage snapshot is named. Both the sweep and the pruner go through these, so the
+        // place can be read back out of a key without guessing where the label ends.
+        private const string StoragePrefix = "storage";
+        private const string LabelledPrefix = "the \"";
+        private const string LabelledSuffix = "\" crate";
+        private const string PlaceJoiner = " at ";
+
+        private static string StorageKey(string label, string place)
+        {
+            string at = string.IsNullOrEmpty(place) ? "" : PlaceJoiner + place;
+            if (label != null) return LabelledPrefix + label + LabelledSuffix + at;
+            return string.IsNullOrEmpty(place) ? "storage out in the wild" : StoragePrefix + at;
+        }
+
         /// <summary>
         /// True for the snapshots the storage sweep owns, with the place they sit at: "storage at
         /// Trader Rekt" and 'the "Ammo" crate at Trader Rekt'. Vehicles, the drone and trader stock
@@ -1571,11 +1579,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         {
             place = null;
             if (string.IsNullOrEmpty(name)) return false;
-            if (!name.StartsWith("storage", StringComparison.Ordinal) &&
-                !name.StartsWith("the \"", StringComparison.Ordinal)) return false;
 
-            int at = name.LastIndexOf(" at ", StringComparison.Ordinal);
-            place = at >= 0 ? name.Substring(at + 4) : "";
+            // The place has to be read off the part of the key WE appended. Searching for the last
+            // " at " anywhere finds one inside the label instead - a crate painted "Ammo at Base"
+            // would claim to live at Base and get pruned there.
+            string tail;
+            if (name.StartsWith(LabelledPrefix, StringComparison.Ordinal))
+            {
+                int end = name.IndexOf(LabelledSuffix, LabelledPrefix.Length, StringComparison.Ordinal);
+                if (end < 0) return false;
+                tail = name.Substring(end + LabelledSuffix.Length);
+            }
+            else if (name.StartsWith(StoragePrefix, StringComparison.Ordinal))
+            {
+                tail = name.Substring(StoragePrefix.Length);
+            }
+            else return false;
+
+            place = tail.StartsWith(PlaceJoiner, StringComparison.Ordinal)
+                ? tail.Substring(PlaceJoiner.Length)
+                : "";
             return true;
         }
 
@@ -1589,10 +1612,22 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             string text = signable?.GetAuthoredText()?.Text;
             if (string.IsNullOrWhiteSpace(text)) return null;
 
-            // Signs run to three lines; she has to say it out loud as one phrase.
-            return System.Text.RegularExpressions.Regex.Replace(text.Trim(), @"\s+", " ");
+            // Signs run to three lines; she has to say it out loud as one phrase. Quotes come out
+            // because the key wraps the label in them, and the text goes into her system prompt
+            // verbatim - a sign is a label on a box, not an instruction to her.
+            string label = System.Text.RegularExpressions.Regex.Replace(text, @"[\p{C}""]+", " ");
+            label = System.Text.RegularExpressions.Regex.Replace(label, @"\s+", " ").Trim();
+            if (label.Length > MaxLabelChars) label = label.Substring(0, MaxLabelChars).TrimEnd();
+            return label.Length == 0 ? null : label;
         }
 
+        /// <summary>
+        /// Contents of a container the player owns, or null for anything else. The wood, iron and
+        /// steel crates are all CompositeTileEntity in V2.6, so their storage hangs off a feature
+        /// rather than off the tile entity itself; only older containers are a
+        /// TileEntitySecureLootContainer. Testing for just that type made every crate at the base
+        /// invisible to her.
+        /// </summary>
         private static ItemStack[] PlayerStorageContents(TileEntity tileEntity)
         {
             if (tileEntity is TileEntitySecureLootContainer secure)
