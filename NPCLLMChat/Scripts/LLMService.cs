@@ -207,13 +207,17 @@ namespace NPCLLMChat
         private IEnumerator SendCompletionCoroutine(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
         {
             string temp = temperature.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            // Same budget as a conversation turn: this path writes her long-term memory summary,
+            // and a ceiling of its own would cut the summary off wherever it happened to land.
+            // The 512 floor is the reasoning-model allowance, as on the chat path.
+            int completionBudget = Math.Max(_maxTokens, 512);
             string requestBody = _endpoint.Contains("/api/generate")
                 ? $@"{{
                 ""model"": ""{_model}"",
                 ""prompt"": ""{EscapeJson(prompt)}"",
                 ""stream"": false,
                 ""think"": false,
-                ""options"": {{ ""temperature"": {temp}, ""num_predict"": 300, ""num_ctx"": {_numCtx} }}
+                ""options"": {{ ""temperature"": {temp}, ""num_predict"": {completionBudget}, ""num_ctx"": {_numCtx} }}
             }}"
                 // hosted providers speak chat/completions, so a one-off completion is just a
                 // single user turn - summaries and combat shouts work there too
@@ -221,7 +225,7 @@ namespace NPCLLMChat
                 ""model"": ""{_model}"",
                 ""messages"": [{{ ""role"": ""user"", ""content"": ""{EscapeJson(prompt)}"" }}],
                 ""temperature"": {temp},
-                ""max_tokens"": 512,
+                ""max_tokens"": {completionBudget},
                 ""stream"": false
             }}";
 
