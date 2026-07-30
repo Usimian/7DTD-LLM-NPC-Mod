@@ -111,7 +111,7 @@ namespace NPCLLMChat
         /// Human-readable inventory summary of item stacks: "120 x 9mm Round, 12 x First Aid
         /// Bandage", biggest stacks first, truncated past maxItems. Null when everything is empty.
         /// </summary>
-        public static string SummarizeStacks(IEnumerable<ItemStack> slots, int maxItems = 20)
+        public static string SummarizeStacks(IEnumerable<ItemStack> slots)
         {
             if (slots == null) return null;
             var totals = new Dictionary<string, int>();
@@ -130,17 +130,15 @@ namespace NPCLLMChat
 
             var sorted = new List<KeyValuePair<string, int>>(totals);
             sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
+            // Everything, never a "and 43 other kinds of item" tail: the list is sorted by count,
+            // so any cap hides exactly the rare thing worth asking her about - one piece of
+            // nuclear material sitting behind 184 raw meat.
             var parts = new List<string>();
-            for (int i = 0; i < sorted.Count && i < maxItems; i++)
+            foreach (var entry in sorted)
             {
-                parts.Add($"{sorted[i].Value} x {sorted[i].Key}");
+                parts.Add($"{entry.Value} x {entry.Key}");
             }
-            string summary = string.Join(", ", parts);
-            if (sorted.Count > maxItems)
-            {
-                summary += $" and {sorted.Count - maxItems} other kinds of item";
-            }
-            return summary;
+            return string.Join(", ", parts);
         }
 
         /// <summary>

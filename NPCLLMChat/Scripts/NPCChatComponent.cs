@@ -1471,7 +1471,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (Vector3.Distance(_npcEntity.position, trader.position) > 20f) continue;
 
                 var stock = trader.TileEntityTrader?.TraderData?.PrimaryInventory;
-                string stockSummary = WorldContextHelper.SummarizeStacks(stock, 25);
+                string stockSummary = WorldContextHelper.SummarizeStacks(stock);
                 if (string.IsNullOrEmpty(stockSummary)) continue;
                 changed |= UpdateCargoSnapshot($"{TraderName(trader)}'s stock", day, time, stockSummary, trader.position);
             }
@@ -1499,11 +1499,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
             foreach (var group in byPlace)
             {
-                // Base storage runs to dozens of kinds of item and the summary is sorted by count,
-                // so a short cap quietly hides the single rare thing worth asking about - one
-                // nuclear material behind 184 raw meat. List it all.
                 changed |= UpdateCargoSnapshot(group.Key, day, time,
-                    WorldContextHelper.SummarizeStacks(group.Value, 120),
+                    WorldContextHelper.SummarizeStacks(group.Value),
                     placePositions.TryGetValue(group.Key, out var where) ? where : Vector3.zero);
             }
 
