@@ -974,6 +974,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private bool _isSummarizing;
         private const int SummarizeBatchSize = 10; // messages (5 exchanges) per summarization pass
 
+        // The summary is written to disk and then prepended to EVERY prompt for the rest of the
+        // save, so its length is not a per-request cost the way a spoken reply is. It stays on its
+        // own budget rather than tracking MaxTokens: raising MaxTokens for longer conversation
+        // must not quietly license a longer permanent memory. 150 words of prose needs ~200.
+        private const int SummaryTokenBudget = 512;
+
         private void MaybeSummarize()
         {
             if (_isSummarizing || _memory == null || _memory.pendingSummary.Count < SummarizeBatchSize) return;
@@ -1012,7 +1018,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 {
                     _isSummarizing = false;
                     Log.Warning($"[NPCLLMChat] Summarization failed (will retry later): {error}");
-                });
+                },
+                SummaryTokenBudget);
         }
 
         // ========== Travel journal + world context ==========

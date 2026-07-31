@@ -199,18 +199,22 @@ namespace NPCLLMChat
         /// Send a bare completion request (no NPC conversation framing) - used for
         /// background tasks like memory summarization. Ollama endpoints only.
         /// </summary>
-        public void SendCompletionRequest(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
+        /// <summary>
+        /// A one-off completion. Pass a budget when the caller's output has a life of its own -
+        /// see NPCChatComponent.SummaryTokenBudget - otherwise it tracks MaxTokens like a turn.
+        /// </summary>
+        public void SendCompletionRequest(string prompt, float temperature, Action<string> onResponse, Action<string> onError, int budget = 0)
         {
-            StartCoroutine(SendCompletionCoroutine(prompt, temperature, onResponse, onError));
+            StartCoroutine(SendCompletionCoroutine(prompt, temperature, onResponse, onError, budget));
         }
 
-        private IEnumerator SendCompletionCoroutine(string prompt, float temperature, Action<string> onResponse, Action<string> onError)
+        private IEnumerator SendCompletionCoroutine(string prompt, float temperature, Action<string> onResponse, Action<string> onError, int budget)
         {
             string temp = temperature.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            // Same budget as a conversation turn: this path writes her long-term memory summary,
-            // and a ceiling of its own would cut the summary off wherever it happened to land.
-            // The 512 floor is the reasoning-model allowance, as on the chat path.
-            int completionBudget = Math.Max(_maxTokens, 512);
+            // Floor of 512 because a hosted reasoning model spends the budget on hidden thinking
+            // before it writes anything - the Ollama "think": false switch does not exist there.
+            // (The Ollama chat path needs no such floor for exactly that reason.)
+            int completionBudget = Math.Max(budget > 0 ? budget : _maxTokens, 512);
             string requestBody = _endpoint.Contains("/api/generate")
                 ? $@"{{
                 ""model"": ""{_model}"",
