@@ -20,9 +20,21 @@ copy /Y "NPCLLMChat\bin\Release\NPCLLMChat.dll" "_package\NPCLLMChat\"
 copy /Y "NPCLLMChat\ModInfo.xml" "_package\NPCLLMChat\"
 xcopy /Y /E /I "NPCLLMChat\Config" "_package\NPCLLMChat\Config"
 
-REM Copy servers with venvs (no Python install needed)
-xcopy /Y /E /I "piper-server" "_package\NPCLLMChat\piper-server"
-xcopy /Y /E /I "whisper-server" "_package\NPCLLMChat\whisper-server"
+REM Copy the voice servers, but NEVER their venvs. A virtual environment records
+REM the absolute path of the Python that built it, so a bundled one only works on
+REM the machine that packaged it - v1.1.0 shipped venvs pointing at
+REM C:\Users\marcw\...\Python312 and voice was broken for every user until they
+REM deleted them by hand. Users build their own with setup_servers.bat.
+xcopy /Y /E /I /EXCLUDE:package_exclude.txt "piper-server" "_package\NPCLLMChat\piper-server"
+xcopy /Y /E /I /EXCLUDE:package_exclude.txt "whisper-server" "_package\NPCLLMChat\whisper-server"
+
+REM /E recreates the directory tree even where every file was excluded, so clear
+REM out any empty venv shells it left behind
+if exist "_package\NPCLLMChat\piper-server\venv" rmdir /s /q "_package\NPCLLMChat\piper-server\venv"
+if exist "_package\NPCLLMChat\whisper-server\venv" rmdir /s /q "_package\NPCLLMChat\whisper-server\venv"
+
+REM Ship the setup script inside the mod folder, where the user will look for it
+copy /Y "setup_servers.bat" "_package\NPCLLMChat\"
 
 REM Create simple README
 (
@@ -68,13 +80,26 @@ echo 1. Install Python 3.10 or newer:
 echo    - Download from python.org
 echo    - CHECK "Add Python to PATH" during install
 echo.
-echo 2. Voice features will auto-start:
+echo 2. Run setup_servers.bat ONCE, before launching the game:
+echo    - Open the Mods\NPCLLMChat folder
+echo    - Double-click setup_servers.bat
+echo    - Wait for it to finish ^(it downloads the Python packages^)
+echo.
+echo    This has to run on your own machine. A Python environment records
+echo    the exact path of the Python that built it, so one prepared on
+echo    somebody else's PC cannot work on yours.
+echo.
+echo 3. Voice features will auto-start:
 echo    - TTS/STT servers start automatically
 echo    - Hold V key to speak to NPCs
 echo    - NPCs will respond with voice
 echo.
-echo NOTE: Python packages are pre-bundled in this release!
-echo No pip install or setup needed - just install Python.
+echo UPGRADING FROM AN EARLIER DOWNLOAD:
+echo    Releases before this one shipped prebuilt "venv" folders that only
+echo    worked on the machine that packaged them. If you have those, delete
+echo    the "venv" folder inside Mods\NPCLLMChat\piper-server and inside
+echo    Mods\NPCLLMChat\whisper-server, then run setup_servers.bat.
+echo    The script also detects and replaces them for you.
 echo.
 echo =====================================
 echo USAGE:
