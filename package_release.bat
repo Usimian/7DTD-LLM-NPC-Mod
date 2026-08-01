@@ -3,7 +3,7 @@ REM ========================================
 REM  Package NPCLLMChat - Simple Release
 REM ========================================
 
-set VERSION=1.1.0
+set VERSION=1.1.1
 set RELEASE_NAME=NPCLLMChat-v%VERSION%
 
 echo Packaging NPCLLMChat v%VERSION%...
