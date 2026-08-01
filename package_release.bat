@@ -85,9 +85,9 @@ echo    - Open the Mods\NPCLLMChat folder
 echo    - Double-click setup_servers.bat
 echo    - Wait for it to finish ^(it downloads the Python packages^)
 echo.
-echo    This has to run on your own machine. A Python environment records
-echo    the exact path of the Python that built it, so one prepared on
-echo    somebody else's PC cannot work on yours.
+echo    The packages have to be built on your own PC. They are compiled
+echo    for the exact Python version you have, so a set prepared on
+echo    somebody else's machine will not load on yours.
 echo.
 echo 3. Voice features will auto-start:
 echo    - TTS/STT servers start automatically
@@ -95,8 +95,9 @@ echo    - Hold V key to speak to NPCs
 echo    - NPCs will respond with voice
 echo.
 echo UPGRADING FROM AN EARLIER DOWNLOAD:
-echo    Releases before this one shipped prebuilt "venv" folders that only
-echo    worked on the machine that packaged them. If you have those, delete
+echo    Releases before this one shipped prebuilt "venv" folders built for
+echo    one specific Python version, which is why voice did not work.
+echo    If you have those, delete
 echo    the "venv" folder inside Mods\NPCLLMChat\piper-server and inside
 echo    Mods\NPCLLMChat\whisper-server, then run setup_servers.bat.
 echo    The script also detects and replaces them for you.
