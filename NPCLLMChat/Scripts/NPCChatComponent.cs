@@ -1103,6 +1103,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private readonly Dictionary<string, float> _placeRemarkedAt = new Dictionary<string, float>();
         private const float PlaceGreetingGap = 1800f;
         private bool _wasBleeding;
+        // whether the cure for what ails him was within reach last time she looked, so that
+        // finding one is a moment and carrying one is not remarked on over and over
+        private bool _cureInReach;
         private string _lastAfflictions = "\0";   // never equal to a real value, so the first pass logs
         private int _lastStormState;
         // Keyed by name, not entity id: an NPC that is picked up and set down again gets a new
@@ -1205,6 +1208,17 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             // basement is not a companion, she is a liability.
             if (PlayerIsSneaking()) return;
 
+            // 0b. he is about to die. Food and water had a trigger and the thing that actually
+            // kills him did not.
+            var health = player?.Stats?.Health;
+            if (health != null && health.ValuePercentUI < 0.25f && Ready("player-critical", 120f))
+            {
+                Remark("player-critical", "He is badly hurt and close to going down. Say so now - tell him to " +
+                                          "get something in him or get out of here. No jokes, this is the moment " +
+                                          "you are a nurse.");
+                return;
+            }
+
             // 1. she is badly hurt herself
             float ownHealth = _npcEntity.GetMaxHealth() > 0
                 ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
@@ -1224,6 +1238,31 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 return;
             }
             _wasBleeding = bleeding;
+
+            // 2b. he has just come up with the thing that fixes what is wrong with him. Watching
+            // for one named bottle while he is ill is not the same as reading his pack, and it is
+            // the difference between a companion who repeats the diagnosis and one who is pleased
+            // for him.
+            var ailing = WorldContextHelper.GetAfflictions(player);
+            bool cureInReach = false;
+            if (ailing.Count > 0)
+            {
+                var cures = new List<string>();
+                foreach (var ail in ailing) cures.AddRange(ail.CureItems);
+                if (cures.Count > 0)
+                {
+                    cureInReach = WorldContextHelper.CarriesAnyOf(player.bag?.GetSlots(), cures.ToArray()) ||
+                                  WorldContextHelper.CarriesAnyOf(player.inventory?.GetSlots(), cures.ToArray());
+                }
+            }
+            if (cureInReach && !_cureInReach && Ready("cure-found", 300f))
+            {
+                _cureInReach = true;
+                Remark("cure-found", $"He has just turned up the very thing that fixes his {ailing[0].Label} and " +
+                                     "it is in his hands now. One pleased line about that, and tell him to take it.");
+                return;
+            }
+            _cureInReach = cureInReach;
 
             // 3. a biome storm changing state is worth a word
             var biome = GameManager.Instance?.World?.GetBiome((int)_npcEntity.position.x, (int)_npcEntity.position.z);
@@ -1849,6 +1888,102 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// reasons about biomes she has personally stood in, and judges kit from what she can see
         /// being worn - hers and the player's - never from inside his pack.
         /// </summary>
+        /// <summary>
+        /// What is wrong with the player, what fixes it, and where the fix is.
+        ///
+        /// An affliction she can only name is something to repeat at him until it clears. One
+        /// that comes with a bottle and a shop she has written down is an errand - "there's a
+        /// Pop-N-Pills up ahead, let's see if they're stocked" - which is a companion being
+        /// useful rather than a companion nagging.
+        /// </summary>
+        private string DescribeWhatAilsHim(EntityPlayer player)
+        {
+            var ailments = WorldContextHelper.GetAfflictions(player);
+
+            string key = ailments.Count == 0 ? "(none)" : string.Join("; ", ailments.ConvertAll(a => a.Label));
+            if (key != _lastAfflictions)
+            {
+                _lastAfflictions = key;
+                Log.Out($"[NPCLLMChat] Player afflictions in context: {key}");
+            }
+            if (ailments.Count == 0) return "";
+
+            var sb = new System.Text.StringBuilder();
+            var described = new List<string>();
+            foreach (var ail in ailments)
+            {
+                described.Add(ail.Meaning.Length > 0 ? $"{ail.Label} - {ail.Meaning}" : ail.Label);
+            }
+            sb.AppendLine($"WHAT IS WRONG WITH HIM RIGHT NOW: {string.Join("; ", described)}.");
+            sb.AppendLine("You are the one who notices this sort of thing. If he asks how he is doing, or asks " +
+                          "what to do next, lead with whatever is hurting him and what fixes it - and if it is " +
+                          "the kind that kills, say it plainly rather than making a joke of it.");
+
+            // The cure he is already carrying. A narrow look for one named thing while he is ill -
+            // she still cannot see the rest of his pack, and is told so a few lines above.
+            var cures = new List<string>();
+            foreach (var ail in ailments) cures.AddRange(ail.CureItems);
+            if (cures.Count > 0)
+            {
+                var slots = new List<ItemStack>();
+                if (player?.bag?.GetSlots() != null) slots.AddRange(player.bag.GetSlots());
+                if (player?.inventory?.GetSlots() != null) slots.AddRange(player.inventory.GetSlots());
+
+                if (WorldContextHelper.CarriesAnyOf(slots, cures.ToArray()))
+                {
+                    sb.AppendLine("He is carrying the cure for it already - you spotted it when he last had his " +
+                                  "pack open. Tell him to take it rather than sending him looking.");
+                }
+                else if (WorldContextHelper.CarriesAnyOf(_npcEntity?.bag?.GetSlots(), cures.ToArray()))
+                {
+                    sb.AppendLine("YOU have the cure for it in your own bag. Say so and offer it over - that is " +
+                                  "what you carry a med kit for.");
+                }
+                else
+                {
+                    sb.AppendLine("Neither of you has anything on you that would fix it.");
+                    string chemist = NearestMedicalPlace();
+                    if (chemist != null && ailments.Exists(a => a.FoundInTown))
+                    {
+                        sb.AppendLine($"You know where to look though: {chemist}. Suggest going, cheerfully - " +
+                                      "having somewhere to go beats listing his symptoms at him again.");
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// The nearest chemist or hospital in her notebook, with a bearing, or null if the two of
+        /// them have never passed one. She does not know of shops she has not seen.
+        /// </summary>
+        private string NearestMedicalPlace()
+        {
+            if (_memory == null) return null;
+
+            PlaceVisit best = null;
+            float bestDistance = float.MaxValue;
+            var here = new Vector2(_npcEntity.position.x, _npcEntity.position.z);
+
+            foreach (var list in new[] { _memory.placesVisited, _memory.placesSeen })
+            {
+                foreach (var entry in list)
+                {
+                    if (!WorldContextHelper.IsMedicalPlace(entry.place)) continue;
+                    float distance = Vector2.Distance(here, new Vector2(entry.x, entry.z));
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        best = entry;
+                    }
+                }
+            }
+
+            return best == null
+                ? null
+                : $"{best.place}, {WorldContextHelper.DescribeRelative(_npcEntity.position, best.x, best.z)}";
+        }
+
         private string DescribeCountryAndKit()
         {
             var sb = new System.Text.StringBuilder();
@@ -2142,7 +2277,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                                   "use it when you tell him where something is - \"it's in the Ammo crate\" - " +
                                   "rather than describing the box.");
                 }
-                sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask.");
+                sb.AppendLine("You do NOT know what the player is carrying in their pack; if it ever matters, just ask. " +
+                              "The one exception is when something is wrong with him: you watch for the one thing " +
+                              "that would fix it the way any nurse would, and you will be told below if it turns up. " +
+                              "That is the only thing of his you keep an eye on - it is not a licence to know the rest.");
 
                 // She knows her own state precisely - it is her body and her ammo
                 float ownHealthPct = _npcEntity.GetMaxHealth() > 0
@@ -2175,19 +2313,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     sb.AppendLine($"How the player looks to you right now, at a glance: {condition}.");
                 }
 
-                string afflictions = WorldContextHelper.DescribeAfflictions(thePlayer);
-                if (afflictions != _lastAfflictions)
-                {
-                    _lastAfflictions = afflictions;
-                    Log.Out($"[NPCLLMChat] Player afflictions in context: {afflictions ?? "(none)"}");
-                }
-                if (!string.IsNullOrEmpty(afflictions))
-                {
-                    sb.AppendLine($"WHAT IS WRONG WITH HIM RIGHT NOW: {afflictions}.");
-                    sb.AppendLine("You are the one who notices this sort of thing. If he asks how he is doing, " +
-                                  "or asks what to do next, lead with whatever is hurting him and what fixes it - " +
-                                  "and if it is the kind that kills, say it plainly rather than making a joke of it.");
-                }
+                sb.AppendLine(DescribeWhatAilsHim(thePlayer));
 
                 // What she can see from where she is standing - and nothing whatsoever beyond it.
                 // She has no map. A building she has never walked up to is a shape on the skyline.
