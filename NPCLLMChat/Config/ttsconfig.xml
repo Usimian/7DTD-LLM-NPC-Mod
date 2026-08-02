@@ -64,6 +64,8 @@
     -->
     <Pronunciations>
         <Word say="Tooson">Tucson</Word>
+        <!-- The Arizona way, PRESS-kit. Change to Prescot for PRESS-kot. -->
+        <Word say="Presskit">Prescott</Word>
     </Pronunciations>
 
     <Voices>
