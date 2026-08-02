@@ -833,6 +833,29 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// Hired mid-session: switch this NPC onto the shared companion memory,
         /// keeping both the prior companion history and the current conversation.
         /// </summary>
+        /// <summary>
+        /// Mark the companion as worth keeping when the world is written out.
+        ///
+        /// An NPC the game does not consider persistent is culled on logout, and the player gets
+        /// back a world with no companion in it - her inventory gone, and everything she knew
+        /// with it but for the memory file being keyed by name rather than entity id. There was
+        /// already a console command for setting this by hand, which is no protection at all
+        /// against forgetting.
+        ///
+        /// Set directly rather than leaning on hire state: Nightingale was hired and still did
+        /// not come back, with CurrentHireCount reading 0 afterwards, so the hire was gone before
+        /// the save was written. Persist does not care what happens to the hire later.
+        /// </summary>
+        private void EnsureSurvivesLogout()
+        {
+            if (_npcEntity?.Buffs == null) return;
+            if (!IsCompanion && !IsHiredCompanion()) return;
+            if (_npcEntity.Buffs.HasCustomVar("Persist") && _npcEntity.Buffs.GetCustomVar("Persist") > 0f) return;
+
+            _npcEntity.Buffs.SetCustomVar("Persist", 1f);
+            Log.Out($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] marked to survive logout (Persist=1)");
+        }
+
         private void RefreshMemoryKey()
         {
             if (_memoryKey == CompanionMemoryKey || !IsHiredCompanion()) return;
@@ -984,6 +1007,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             try
             {
                 RefreshMemoryKey();
+                EnsureSurvivesLogout();
                 CheckCurrentPlace();
                 ObserveSurroundings();
 
