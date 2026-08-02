@@ -202,7 +202,7 @@ namespace NPCLLMChat
             actionPrompt += BuildWorldContext();
             // Last instruction before the question carries the most weight, and the length rule
             // in the base prompt was being buried under a thousand words of persona and state.
-            actionPrompt += BuildAnswerLengthGuidance(playerMessage);
+            actionPrompt += BuildAnswerLengthGuidance();
 
             // Send to LLM
             LLMService.Instance.SendChatRequest(
@@ -395,12 +395,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// People are not randomly terse or chatty - they run on a mood that comes from their
         /// situation. Hers is derived from what is actually happening: a fight a minute ago, a
         /// wound, the small hours, a horde due tomorrow, or a fresh cup of coffee. The mood sets
-        /// both her manner and how much she says, and repetition still overrides it.
+        /// both her manner and how much she says.
         /// </summary>
-        private string BuildAnswerLengthGuidance(string playerMessage)
+        private string BuildAnswerLengthGuidance()
         {
-            int repeats = CountRecentRepeats(playerMessage);
-
             var sb = new System.Text.StringBuilder();
             sb.AppendLine();
             sb.AppendLine();
@@ -424,37 +422,19 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                           "no irritation excuses refusing a question you can answer; silence and grunts are for " +
                           "small talk only. Never say you do not know something that is written above.");
 
-            if (repeats >= 2)
-            {
-                sb.AppendLine($"The player has asked you this {repeats + 1} times in a row. React the way your " +
-                              "mood above would - a word about being asked again is fair - but ANSWER THE " +
-                              "QUESTION anyway, properly, in the same breath. They may be asking again because " +
-                              "your last answer was no use. Under 25 words.");
-            }
-            else if (repeats == 1)
-            {
-                sb.AppendLine("You answered this exact question a moment ago. Repeat yourself in ONE WORD - " +
-                              "nothing else, no explanation, no joke.");
-                sb.AppendLine("UNLESS it is something you could look up - where a place is, what it is called, " +
-                              "when you were last there. Being asked that twice means your first answer was too " +
-                              "vague and he wants it exact, so this is when you check the notebook and read him " +
-                              "the real figures. Do not grunt at a man who is asking for the precise version.");
-            }
-            else
-            {
-                sb.AppendLine($"Answer in one sentence, {wordLimit} words at most, in the manner described above. " +
-                              "Even a yes or no carries a few words of your own voice the FIRST time it is asked - " +
-                              "save the bare one-word answer for when the player repeats himself.");
-                sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
-                              "up to 80 words - then tell it properly, all the way to the end.");
-                sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
-                sb.AppendLine("Not everything deserves a reply. If the player is making small talk, thinking out " +
-                              "loud, or saying something that asks nothing of you, a grunt is plenty - \"Mm.\", " +
-                              "\"Yeah.\", \"Hm.\" - or say nothing at all by answering with exactly <silence> " +
-                              "and no other characters. " + (_quietMood
-                                  ? "In the state you are in, silence or a grunt is the likely answer."
-                                  : "Use it when it fits; a real answer is still the norm when you are asked something."));
-            }
+            sb.AppendLine($"Answer in one sentence, {wordLimit} words at most, in the manner described above.");
+            sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
+                          "up to 80 words - then tell it properly, all the way to the end.");
+            sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
+            sb.AppendLine("If he asks you something twice, he has a reason - your first answer missed, or he needs " +
+                          "it exact. Answer it properly again, better than the first time. Never grunt at a repeated " +
+                          "question and never tell him you have already said it.");
+            sb.AppendLine("Not everything deserves a reply. If the player is making small talk, thinking out " +
+                          "loud, or saying something that asks nothing of you, a grunt is plenty - \"Mm.\", " +
+                          "\"Yeah.\", \"Hm.\" - or say nothing at all by answering with exactly <silence> " +
+                          "and no other characters. " + (_quietMood
+                              ? "In the state you are in, silence or a grunt is the likely answer."
+                              : "Use it when it fits; a real answer is still the norm when you are asked something."));
             return sb.ToString();
         }
 
@@ -654,43 +634,6 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         }
 
         /// <summary>
-        /// How many times the player has just asked this same thing, ignoring case, spacing and
-        /// punctuation, within the last few exchanges.
-        /// </summary>
-        private int CountRecentRepeats(string playerMessage)
-        {
-            string current = Normalize(playerMessage);
-            if (string.IsNullOrEmpty(current)) return 0;
-
-            int seen = 0, playerTurnsChecked = 0;
-            // the current message is already in history, so start from the end and skip it
-            for (int i = _conversationHistory.Count - 2; i >= 0 && playerTurnsChecked < 6; i--)
-            {
-                if (_conversationHistory[i].Role != "Player") continue;
-                playerTurnsChecked++;
-                if (Normalize(_conversationHistory[i].Content) == current) seen++;
-                else break; // only an unbroken run counts as nagging
-            }
-            return seen;
-        }
-
-        private static string Normalize(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return "";
-            var sb = new System.Text.StringBuilder(text.Length);
-            foreach (char c in text.ToLowerInvariant())
-            {
-                if (char.IsLetterOrDigit(c)) sb.Append(c);
-                else if (c == ' ' && sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(c);
-            }
-            return sb.ToString().Trim();
-        }
-
-        /// <summary>
-        /// Last line of defence against a rambling reply: keep whole sentences up to a word
-        /// budget. Prompting does most of the work; this stops the outliers reaching the player.
-        /// </summary>
-        /// <summary>
         /// The model's way of saying nothing. Anything that is only the marker counts, since it
         /// likes to wrap it in quotes or punctuation.
         /// </summary>
@@ -703,6 +646,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                    bare.Replace("\\u003c", "").Replace("\\u003e", "") == "silence";
         }
 
+        /// <summary>
+        /// Last line of defence against a rambling reply: keep whole sentences up to a word
+        /// budget. Prompting does most of the work; this stops the outliers reaching the player.
+        /// </summary>
         private static string CapLength(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
