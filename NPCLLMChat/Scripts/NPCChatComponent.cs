@@ -1875,10 +1875,14 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 WorldContextHelper.GetGameDayTime(out day, out time);
                 sb.AppendLine($"It is Day {day}, around {time}.");
 
-                if (!string.IsNullOrEmpty(_currentPlace))
-                {
-                    sb.AppendLine($"You are currently at: {_currentPlace}.");
-                }
+                // Saying nothing here is not the same as saying "nowhere". Left with no line at
+                // all she kept answering with the last place she remembered being, so standing
+                // in open ground has to be stated as plainly as standing in a shop.
+                sb.AppendLine(string.IsNullOrEmpty(_currentPlace)
+                    ? "You are not inside any building right now - you are out in the open, between places. " +
+                      "If asked where you are, say that, and name what you can see from here rather than the " +
+                      "last place you happened to be."
+                    : $"You are currently at: {_currentPlace}.");
 
                 Vector3 npcPos = _npcEntity.position;
                 sb.AppendLine($"Your map position: {(int)npcPos.x} E/W, {(int)npcPos.z} N/S.");

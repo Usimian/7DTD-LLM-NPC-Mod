@@ -296,6 +296,13 @@ namespace NPCLLMChat
         {
             string prefabName = poi?.prefab?.PrefabName;
             if (string.IsNullOrEmpty(prefabName)) return false;
+
+            // rwg_tile_* are the world-generation blocks a town is assembled from, and they are
+            // named ("Rural", "Country Town") despite being terrain rather than anywhere. They
+            // enclose every real building, so they won containment everywhere and she reported
+            // standing in "Rural" while she was on the doorstep of Mason Farms.
+            if (prefabName.StartsWith("rwg_tile_", StringComparison.OrdinalIgnoreCase)) return false;
+
             string localized = poi.prefab.LocalizedName;
             return !string.IsNullOrEmpty(localized) && localized != prefabName;
         }
