@@ -125,7 +125,28 @@ namespace NPCLLMChat.TTS
             string selectedVoice = string.IsNullOrEmpty(voice) ? _config.DefaultVoice : voice;
 
             // All platforms use Piper TTS server
-            SynthesizeWithPiper(text, selectedVoice, onSuccess, onError);
+            SynthesizeWithPiper(ApplyPronunciations(text), selectedVoice, onSuccess, onError);
+        }
+
+        /// <summary>
+        /// Respell the handful of words Piper gets wrong, for the synthesizer only - the line on
+        /// screen keeps the real spelling. Piper derives pronunciation from spelling, so place
+        /// names are where it loses: "Tucson" phonemizes to TUCK-sun, and "Tooson" to TOO-sun.
+        /// Whole words only, so "Tucsonan" is left alone.
+        /// </summary>
+        private string ApplyPronunciations(string text)
+        {
+            if (_config.Pronunciations.Count == 0 || string.IsNullOrEmpty(text)) return text;
+
+            foreach (var pair in _config.Pronunciations)
+            {
+                text = System.Text.RegularExpressions.Regex.Replace(
+                    text,
+                    $@"\b{System.Text.RegularExpressions.Regex.Escape(pair.Key)}\b",
+                    pair.Value,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+            return text;
         }
 
         /// <summary>

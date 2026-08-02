@@ -45,6 +45,11 @@ namespace NPCLLMChat.TTS
         // Voice settings
         // On Windows: "male" or "female" selects appropriate Windows voice
         // On Linux: Use Piper voice IDs like "en_US-lessac-medium"
+        // Written word -> how to spell it so the synthesizer says it right. Piper guesses
+        // pronunciation from spelling and loses on place names: "Tucson" becomes "TUCK-sun".
+        public System.Collections.Generic.Dictionary<string, string> Pronunciations { get; }
+            = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+
         public string DefaultVoice { get; set; } = "en_US-lessac-medium";
         public string TraderVoice { get; set; } = "en_US-ryan-medium";
         public string CompanionVoice { get; set; } = "en_US-amy-medium";

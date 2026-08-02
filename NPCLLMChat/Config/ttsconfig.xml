@@ -51,6 +51,21 @@
         On Windows: These map to voice gender (names containing "amy"/"lessac" = female, "ryan" = male)
         On Linux: Use Piper voice IDs (download from huggingface.co/rhasspy/piper-voices)
     -->
+    <!--
+        Pronunciation fixes
+
+        Piper works out how to say a word from its spelling, and place names
+        beat it: "Tucson" comes out "TUCK-sun". Respell the word the way it
+        sounds and it says it properly. Only the audio is affected - the
+        written line keeps the real spelling.
+
+        say = the respelling to speak, the element text = the word to catch.
+        Matching is whole-word and ignores case.
+    -->
+    <Pronunciations>
+        <Word say="Tooson">Tucson</Word>
+    </Pronunciations>
+
     <Voices>
         <DefaultVoice>en_US-lessac-medium</DefaultVoice>
         <TraderVoice>en_US-ryan-medium</TraderVoice>

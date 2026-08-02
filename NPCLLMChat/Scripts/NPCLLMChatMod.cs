@@ -379,6 +379,23 @@ namespace NPCLLMChat
                     config.BanditVoice = GetNodeValue(voicesNode, "BanditVoice", "en_US-ryan-medium");
                 }
 
+                // Words Piper says wrong, respelled for the synthesizer only
+                var pronunciationsNode = doc.SelectSingleNode("//Pronunciations");
+                if (pronunciationsNode != null)
+                {
+                    foreach (System.Xml.XmlNode word in pronunciationsNode.SelectNodes("Word"))
+                    {
+                        string written = word.InnerText?.Trim();
+                        string spoken = word.Attributes?["say"]?.Value;
+                        if (!string.IsNullOrEmpty(written) && !string.IsNullOrEmpty(spoken))
+                        {
+                            config.Pronunciations[written] = spoken;
+                        }
+                    }
+                    if (config.Pronunciations.Count > 0)
+                        Log.Out($"[NPCLLMChat] Loaded {config.Pronunciations.Count} pronunciation fix(es)");
+                }
+
                 // Audio levels chosen in the in-game settings override the XML defaults
                 if (UnityEngine.PlayerPrefs.HasKey("NPCLLMChat_Volume"))
                 {
