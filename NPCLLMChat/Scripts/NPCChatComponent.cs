@@ -1104,7 +1104,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private const float RemarkGlobalGap = 50f;
         private float _nextRemarkTime;
         private readonly Dictionary<string, float> _nextByTrigger = new Dictionary<string, float>();
-        private string _lastRemarkedPlace;
+        // When she last said something about arriving at each place, so coming back is only
+        // news after a real absence rather than every time a footprint boundary is crossed.
+        private readonly Dictionary<string, float> _placeRemarkedAt = new Dictionary<string, float>();
+        private const float PlaceGreetingGap = 1800f;
         private bool _wasBleeding;
         private string _lastAfflictions = "\0";   // never equal to a real value, so the first pass logs
         private int _lastStormState;
@@ -1236,10 +1239,13 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
             _lastStormState = stormState;
 
-            // 4. arriving somewhere the two of you already know
-            if (!string.IsNullOrEmpty(_currentPlace) && _currentPlace != _lastRemarkedPlace && Ready("arrival", 180f))
+            // 4. arriving somewhere the two of you already know. Only worth saying out loud once
+            // in a long while per place: the old guard only blocked the place she had just
+            // greeted, so Rekt's -> the coffee shop -> Rekt's greeted Rekt's twice, and working
+            // along a street had her welcoming him home every time he crossed a threshold.
+            if (!string.IsNullOrEmpty(_currentPlace) && PlaceWorthGreeting(_currentPlace) && Ready("arrival", 180f))
             {
-                _lastRemarkedPlace = _currentPlace;
+                _placeRemarkedAt[_currentPlace] = Time.unscaledTime;
                 var mark = _memory?.markedPlaces?.Find(m =>
                     !string.IsNullOrEmpty(m.poi) && m.poi.Equals(_currentPlace, StringComparison.OrdinalIgnoreCase));
                 bool visitedBefore = _memory?.placesVisited?.Exists(v =>
@@ -1341,6 +1347,18 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             return false;
         }
 
+        /// <summary>
+        /// True when walking into this place is actually an event: somewhere she has never
+        /// greeted, or somewhere she has been away from long enough that being back means
+        /// something. Ducking in and out of the same shop is not an arrival.
+        /// </summary>
+        private bool PlaceWorthGreeting(string place)
+        {
+            float last;
+            return !_placeRemarkedAt.TryGetValue(place, out last) ||
+                   Time.unscaledTime - last > PlaceGreetingGap;
+        }
+
         private bool Ready(string trigger, float cooldown)
         {
             float next;
@@ -1352,6 +1370,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private void Remark(string trigger, string situation)
         {
             _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
+            Log.Out($"[NPCLLMChat] {_npcName} remark trigger: {trigger}");
             SpeakUnprompted(situation);
         }
 
