@@ -1758,11 +1758,23 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         // there and how big it is, and that is the whole of what she knows about it.
         private const float SignReadRange = 80f;
 
-        // She fills forty sightings inside one town, so the notebook is far bigger than the
-        // travel journal - but only the nearest few go into a prompt, or a list of everywhere
-        // she has ever been crowds out everything else she needs to think about.
+        // She fills forty sightings inside a single town, so the notebook has to be far bigger
+        // than the travel journal or she quietly loses the first town on reaching the second.
         private const int MaxPlacesSeen = 200;
-        private const int PlacesSeenInPrompt = 12;
+
+        /// <summary>
+        /// One line of her notebook: what the place was called, where it is, and when they were
+        /// there - plus the bearing from where she is standing, which is the part she would work
+        /// out in her head rather than read off the page.
+        /// </summary>
+        private string NotebookLine(PlaceVisit entry)
+        {
+            // entries from before coordinates were recorded deserialize as (0,0)
+            string where = (entry.x == 0 && entry.z == 0)
+                ? "position not written down"
+                : $"{entry.x} E/W, {entry.z} N/S - {WorldContextHelper.DescribeRelative(_npcEntity.position, entry.x, entry.z)}";
+            return $"- {entry.place} | {where} | Day {entry.day} {entry.time}";
+        }
 
         /// <summary>
         /// What she notices as the two of them move. Anything they pass close enough to identify
@@ -2161,45 +2173,24 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                                   "and going for a closer look is a fair suggestion.");
                 }
 
+                // Her notebook, written out as a notebook: what it was called, where it was, when
+                // they were there. No summarising and no leaving pages out - what is written down
+                // she knows exactly, and everything else she has never seen.
                 if (_memory != null && _memory.placesVisited.Count > 0)
                 {
-                    sb.AppendLine("Places you have been inside (oldest first, with when you were last there):");
-                    foreach (var visit in _memory.placesVisited)
-                    {
-                        // entries from before coordinates were recorded deserialize as (0,0)
-                        string rel = (visit.x == 0 && visit.z == 0)
-                            ? ""
-                            : $" - {WorldContextHelper.DescribeRelative(_npcEntity.position, visit.x, visit.z)}";
-                        sb.AppendLine($"- {visit.place} (Day {visit.day} {visit.time}, at map position {visit.x} E/W, {visit.z} N/S{rel})");
-                    }
+                    sb.AppendLine($"YOUR NOTEBOOK. Places the two of you have been inside ({_memory.placesVisited.Count}), oldest first:");
+                    foreach (var visit in _memory.placesVisited) sb.AppendLine(NotebookLine(visit));
                 }
 
                 if (_memory != null && _memory.placesSeen.Count > 0)
                 {
-                    // Nearest first, and only a handful: she remembers every one, but reciting
-                    // two hundred landmarks at her would bury everything else in the prompt.
-                    var closest = new List<PlaceVisit>(_memory.placesSeen);
-                    closest.Sort((a, b) =>
-                        Vector2.Distance(new Vector2(_npcEntity.position.x, _npcEntity.position.z), new Vector2(a.x, a.z))
-                        .CompareTo(
-                        Vector2.Distance(new Vector2(_npcEntity.position.x, _npcEntity.position.z), new Vector2(b.x, b.z))));
-
-                    int shown = Math.Min(PlacesSeenInPrompt, closest.Count);
-                    sb.AppendLine($"Places you have walked past close enough to read the sign but never gone into " +
-                                  $"({shown} nearest of {closest.Count} you remember):");
-                    for (int i = 0; i < shown; i++)
-                    {
-                        var seen = closest[i];
-                        sb.AppendLine($"- {seen.place} ({WorldContextHelper.DescribeRelative(_npcEntity.position, seen.x, seen.z)}, " +
-                                      $"first noted Day {seen.day})");
-                    }
-                    if (closest.Count > shown)
-                    {
-                        sb.AppendLine("You have noted others further off. If he asks about somewhere not listed here, " +
-                                      "you may well have seen it - say it rings a bell and that you would have to get " +
-                                      "closer to be sure, rather than denying it outright.");
-                    }
+                    sb.AppendLine($"Passed but never gone into ({_memory.placesSeen.Count}):");
+                    foreach (var seen in _memory.placesSeen) sb.AppendLine(NotebookLine(seen));
                 }
+
+                sb.AppendLine("That notebook is the whole of it. A name written down you know exactly - read off the " +
+                              "coordinates and the day if he wants them. A name not written down you have never seen, " +
+                              "and you say so plainly. You do not half-remember and you do not guess.");
 
                 sb.AppendLine(DescribeCountryAndKit());
 
