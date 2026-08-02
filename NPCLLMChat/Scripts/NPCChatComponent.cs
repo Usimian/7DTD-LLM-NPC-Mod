@@ -435,6 +435,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 sb.AppendLine("You answered this exact question a moment ago. Repeat yourself in ONE WORD - " +
                               "nothing else, no explanation, no joke.");
+                sb.AppendLine("UNLESS it is something you could look up - where a place is, what it is called, " +
+                              "when you were last there. Being asked that twice means your first answer was too " +
+                              "vague and he wants it exact, so this is when you check the notebook and read him " +
+                              "the real figures. Do not grunt at a man who is asking for the precise version.");
             }
             else
             {
@@ -2188,9 +2192,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     foreach (var seen in _memory.placesSeen) sb.AppendLine(NotebookLine(seen));
                 }
 
-                sb.AppendLine("That notebook is the whole of it. A name written down you know exactly - read off the " +
-                              "coordinates and the day if he wants them. A name not written down you have never seen, " +
-                              "and you say so plainly. You do not half-remember and you do not guess.");
+                sb.AppendLine("That notebook is the whole of it. A name that is not written down you have never seen, " +
+                              "and you say so plainly rather than guessing.");
+                sb.AppendLine("But you do not walk around with it open. Asked where somewhere is, answer from your " +
+                              "head FIRST - roughly which way and roughly how far, hedged the way anyone is about a " +
+                              "number they have not checked: \"east of here, past the farm - six hundred metres, " +
+                              "give or take\". Never rattle exact coordinates out of memory; nobody does that.");
+                sb.AppendLine("If he asks again, presses you, or wants it exact, THEN you check: say so - \"hang on, " +
+                              "let me look it up\" - and read it straight off the page, coordinates and the day you " +
+                              "were there. That is the moment the numbers come out, not before.");
 
                 sb.AppendLine(DescribeCountryAndKit());
 
