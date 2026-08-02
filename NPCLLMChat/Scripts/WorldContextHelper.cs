@@ -44,47 +44,169 @@ namespace NPCLLMChat
                 if (pos.x >= min.x - margin && pos.x <= min.x + size.x + margin &&
                     pos.z >= min.z - margin && pos.z <= min.z + size.z + margin)
                 {
-                    return CleanName(poi.name);
+                    return PoiName(poi);
                 }
             }
             return null;
         }
 
         /// <summary>
-        /// Human-readable list of the closest POIs, e.g. "house old ranch 01 (about 240m NE)".
+        /// A place as she can actually perceive it from where she is standing. Name is null for
+        /// anything too far off to identify: she can see a building is out there and roughly how
+        /// big it is, and that is all she gets until the two of them walk over and look.
         /// </summary>
-        public static string DescribeNearbyPOIs(Vector3 pos, int maxCount, float radius)
+        public class PoiSighting
         {
-            var pois = GetPOIs();
-            if (pois == null || pois.Count == 0) return null;
+            public string Name;
+            public int X;
+            public int Z;
+            public int Distance;
+            public string Direction;
+            public string Size;
 
-            var withDistance = new List<KeyValuePair<float, PrefabInstance>>();
+            /// <summary>"Pop-N-Pills Mini-Mart, about 60m NE" / "something big, about 240m NE".</summary>
+            public string Describe()
+            {
+                string what = Name ?? $"something {Size}";
+                return $"{what}, about {Distance}m {Direction}";
+            }
+        }
+
+        /// <summary>
+        /// How far she can pick a building out of the landscape right now. Clear daylight carries
+        /// a long way; night, fog and heavy weather close it right down. She is observant, not
+        /// equipped with a satellite.
+        /// </summary>
+        public static float VisualRange(Vector3 pos)
+        {
+            float range = 300f;
+
+            int day; string time;
+            GetGameDayTime(out day, out time);
+            int hour = 12;
+            if (!string.IsNullOrEmpty(time) && time.Length >= 2) int.TryParse(time.Substring(0, 2), out hour);
+            if (hour >= 21 || hour < 5) range = Mathf.Min(range, 120f);
+
+            try
+            {
+                var biome = GameManager.Instance?.World?.GetBiome((int)pos.x, (int)pos.z);
+                var weather = biome != null ? WeatherManager.Instance?.FindBiomeWeather(biome.m_BiomeType) : null;
+                if ((weather?.FogPercent() ?? 0f) > 0.55f) range = Mathf.Min(range, 100f);
+
+                float rain = WeatherManager.Instance?.GetCurrentRainfallPercent() ?? 0f;
+                float snow = WeatherManager.Instance?.GetCurrentSnowfallPercent() ?? 0f;
+                if (rain > 0.45f || snow > 0.45f) range = Mathf.Min(range, 180f);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Visibility check failed: {ex.Message}");
+            }
+
+            return range;
+        }
+
+        /// <summary>
+        /// Everything she can see from here, nearest first. Inside readRange she is close enough
+        /// to read the sign on the front and knows what the place is; past that she gets a shape
+        /// and a bearing and nothing more. Beyond visualRange it is not there as far as she is
+        /// concerned - she does not get to read the map over the player's shoulder.
+        /// </summary>
+        public static List<PoiSighting> LookAround(Vector3 pos, float readRange, float visualRange)
+        {
+            var seen = new List<PoiSighting>();
+            var pois = GetPOIs();
+            if (pois == null || pois.Count == 0) return seen;
+
             foreach (var poi in pois)
             {
                 Vector3 min = poi.boundingBoxPosition;
                 Vector3 size = poi.boundingBoxSize;
-                Vector3 center = new Vector3(min.x + size.x / 2f, 0f, min.z + size.z / 2f);
-                float dist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(center.x, center.z));
-                if (dist < radius)
+                float cx = min.x + size.x / 2f;
+                float cz = min.z + size.z / 2f;
+                float dist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(cx, cz));
+                if (dist > visualRange) continue;
+
+                seen.Add(new PoiSighting
                 {
-                    withDistance.Add(new KeyValuePair<float, PrefabInstance>(dist, poi));
-                }
+                    Name = dist <= readRange ? PoiName(poi) : null,
+                    X = Mathf.RoundToInt(cx),
+                    Z = Mathf.RoundToInt(cz),
+                    Distance = Mathf.RoundToInt(dist),
+                    Direction = CompassDir(cx - pos.x, cz - pos.z),
+                    Size = DescribeBulk(size.x * size.z)
+                });
             }
-            if (withDistance.Count == 0) return null;
 
-            withDistance.Sort((a, b) => a.Key.CompareTo(b.Key));
+            seen.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+            return seen;
+        }
 
-            var parts = new List<string>();
-            for (int i = 0; i < withDistance.Count && parts.Count < maxCount; i++)
+        /// <summary>Footprint area to a word, since bulk is the one thing readable at a distance.</summary>
+        private static string DescribeBulk(float area)
+        {
+            if (area > 4000f) return "huge";
+            if (area > 1200f) return "big";
+            if (area > 300f) return "middling";
+            return "small";
+        }
+
+        /// <summary>
+        /// The game's own id for the biome underfoot ("pine_forest", "burnt_forest"). Stored
+        /// rather than the display name so the hazard lookup keeps working in any language.
+        /// </summary>
+        public static string BiomeIdAt(Vector3 pos)
+        {
+            try
             {
-                var poi = withDistance[i].Value;
-                float dist = withDistance[i].Key;
-                Vector3 min = poi.boundingBoxPosition;
-                Vector3 size = poi.boundingBoxSize;
-                string dir = CompassDir(min.x + size.x / 2f - pos.x, min.z + size.z / 2f - pos.z);
-                parts.Add($"{CleanName(poi.name)} (about {Mathf.RoundToInt(dist)}m {dir})");
+                var biome = GameManager.Instance?.World?.GetBiome((int)pos.x, (int)pos.z);
+                return biome?.m_sBiomeName;
             }
-            return string.Join(", ", parts);
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Biome lookup failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>"pine_forest" as a person would say it.</summary>
+        public static string BiomeLabel(string biomeId)
+        {
+            return string.IsNullOrEmpty(biomeId) ? biomeId : Prettify(biomeId.Replace('_', ' '));
+        }
+
+        /// <summary>
+        /// What that country does to someone dressed wrong, or null where ordinary clothes are
+        /// fine. This is the whole reason she cares which biome is which.
+        /// </summary>
+        public static string BiomeHazard(string biomeId)
+        {
+            if (string.IsNullOrEmpty(biomeId)) return null;
+            string id = biomeId.ToLowerInvariant();
+            if (id.Contains("snow")) return "cold";
+            if (id.Contains("wasteland") || id.Contains("radiated")) return "heat, and the air itself is foul";
+            if (id.Contains("desert") || id.Contains("burnt")) return "heat";
+            return null;   // forest, pine forest, plains, city - nothing special needed
+        }
+
+        /// <summary>
+        /// How well someone is dressed against temperature, read off what they have on. Clothes
+        /// are visible on a body, so this is fair game for her even though the inside of the
+        /// player's pack is not.
+        /// </summary>
+        public static void GetInsulation(EntityAlive who, out float warmth, out float cooling)
+        {
+            warmth = 0f;
+            cooling = 0f;
+            if (who == null) return;
+            try
+            {
+                warmth = EffectManager.GetValue(PassiveEffects.CoreTempGain, null, 0f, who);
+                cooling = EffectManager.GetValue(PassiveEffects.CoreTempLoss, null, 0f, who);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[NPCLLMChat] Insulation read failed: {ex.Message}");
+            }
         }
 
         private static List<PrefabInstance> GetPOIs()
@@ -466,6 +588,36 @@ namespace NPCLLMChat
         private static string CleanName(string raw)
         {
             return string.IsNullOrEmpty(raw) ? raw : raw.Replace('_', ' ');
+        }
+
+        /// <summary>
+        /// What a place is actually called - "Pop-N-Pills Mini-Mart", not "store pharmacy 01".
+        /// The game keeps a display name per prefab and shows it on the compass, so she should
+        /// use the same words the player is reading. Localization.Get hands the key straight
+        /// back when there is no entry for it, which is how a nameless POI is detected.
+        /// </summary>
+        private static string PoiName(PrefabInstance poi)
+        {
+            if (poi == null) return null;
+
+            var prefab = poi.prefab;
+            if (prefab != null)
+            {
+                string prefabName = prefab.PrefabName;
+                if (!string.IsNullOrEmpty(prefabName))
+                {
+                    string localized = prefab.LocalizedName;
+                    return !string.IsNullOrEmpty(localized) && localized != prefabName
+                        ? localized
+                        : CleanName(prefabName);
+                }
+            }
+
+            // world-generated instances carry a ".17" suffix the player never sees
+            string raw = poi.name ?? "";
+            int dot = raw.LastIndexOf('.');
+            if (dot > 0) raw = raw.Substring(0, dot);
+            return CleanName(raw);
         }
     }
 }

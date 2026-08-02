@@ -51,6 +51,13 @@ namespace NPCLLMChat
         public string npcName;
         public List<SavedMessage> messages = new List<SavedMessage>();
         public List<PlaceVisit> placesVisited = new List<PlaceVisit>();
+        // Places the two of them got close enough to identify but never went into. She is a
+        // note taker, not a cartographer: a building she has only squinted at from 300m away
+        // never lands here, and she is not told it exists.
+        public List<PlaceVisit> placesSeen = new List<PlaceVisit>();
+        // Biomes she has personally stood in, and where she crossed into each one. She has no
+        // idea what is out past the country the two of them have actually walked.
+        public List<PlaceVisit> biomesSeen = new List<PlaceVisit>();
 
         // Hand-written character sheet (backstory, mannerisms, fears). The mod only
         // READS this - edit it directly in the JSON file; the summarizer never touches it.

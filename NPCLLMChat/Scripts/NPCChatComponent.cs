@@ -1034,6 +1034,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 RefreshMemoryKey();
                 CheckCurrentPlace();
+                ObserveSurroundings();
 
                 if (IsCompanion && Time.unscaledTime >= _nextCargoCheck)
                 {
@@ -1734,6 +1735,133 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             NPCMemoryStore.Save(_memoryKey, _memory);
         }
 
+        // Close enough to read the sign over the door. Past this she can see a building is
+        // there and how big it is, and that is the whole of what she knows about it.
+        private const float SignReadRange = 80f;
+
+        /// <summary>
+        /// What she notices as the two of them move. Anything they pass close enough to identify
+        /// gets written down for good; anything further off stays a shape with no name. Same for
+        /// the country underfoot - she knows the ground she has walked and nothing beyond it.
+        /// </summary>
+        private void ObserveSurroundings()
+        {
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            bool somethingNew = false;
+
+            foreach (var sighting in WorldContextHelper.LookAround(_npcEntity.position, SignReadRange, SignReadRange))
+            {
+                if (string.IsNullOrEmpty(sighting.Name)) continue;
+                somethingNew |= RememberPlace(_memory.placesSeen, sighting.Name,
+                                              sighting.X, sighting.Z, day, time, "landmark");
+            }
+
+            string biome = WorldContextHelper.BiomeIdAt(_npcEntity.position);
+            if (!string.IsNullOrEmpty(biome))
+            {
+                somethingNew |= RememberPlace(_memory.biomesSeen, biome,
+                                              (int)_npcEntity.position.x, (int)_npcEntity.position.z,
+                                              day, time, "biome");
+            }
+
+            if (somethingNew) NPCMemoryStore.Save(_memoryKey, _memory);
+        }
+
+        /// <summary>
+        /// Adds an entry or refreshes the timestamp on one she already has. True only when it is
+        /// something she had never seen, which is what decides whether the file is worth writing.
+        /// </summary>
+        private bool RememberPlace(List<PlaceVisit> journal, string name,
+                                   int x, int z, int day, string time, string kind)
+        {
+            var existing = journal.Find(p => p.place == name);
+            if (existing != null)
+            {
+                existing.day = day;
+                existing.time = time;
+                return false;
+            }
+
+            journal.Add(new PlaceVisit { place = name, day = day, time = time, x = x, z = z });
+            while (journal.Count > MaxJournalEntries) journal.RemoveAt(0);
+            Log.Out($"[NPCLLMChat] {_npcName} noted a new {kind}: {name} at ({x}, {z}) on Day {day} {time}");
+            return true;
+        }
+
+        // Raw insulation numbers, logged only when they change, so the thresholds below can be
+        // checked against a real game rather than guessed at forever.
+        private string _lastKitKey = "\0";
+
+        /// <summary>
+        /// The country she has walked, and whether the two of them are dressed for it. She only
+        /// reasons about biomes she has personally stood in, and judges kit from what she can see
+        /// being worn - hers and the player's - never from inside his pack.
+        /// </summary>
+        private string DescribeCountryAndKit()
+        {
+            var sb = new System.Text.StringBuilder();
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            string here = WorldContextHelper.BiomeIdAt(_npcEntity.position);
+
+            if (!string.IsNullOrEmpty(here))
+            {
+                string hazard = WorldContextHelper.BiomeHazard(here);
+                sb.AppendLine($"The country you are standing in: {WorldContextHelper.BiomeLabel(here)}" +
+                              (hazard == null
+                                  ? " - ordinary clothes are fine here, nothing special needed."
+                                  : $" - it punishes anyone not dressed for {hazard}."));
+            }
+
+            if (_memory != null && _memory.biomesSeen.Count > 0)
+            {
+                var others = new List<string>();
+                foreach (var known in _memory.biomesSeen)
+                {
+                    if (known.place == here) continue;
+                    string hazard = WorldContextHelper.BiomeHazard(known.place);
+                    others.Add($"{WorldContextHelper.BiomeLabel(known.place)} " +
+                               $"({WorldContextHelper.DescribeRelative(_npcEntity.position, known.x, known.z)}" +
+                               (hazard == null ? ", needs no special kit" : $", {hazard}") + ")");
+                }
+                if (others.Count > 0)
+                {
+                    sb.AppendLine($"Other country the two of you have walked: {string.Join("; ", others)}.");
+                }
+            }
+            sb.AppendLine("That is all the country you have seen. You know nothing about any other biome on this " +
+                          "map - not where it starts, not what it is like - and you say so rather than guessing.");
+
+            float myWarmth, myCooling, hisWarmth, hisCooling;
+            WorldContextHelper.GetInsulation(_npcEntity, out myWarmth, out myCooling);
+            WorldContextHelper.GetInsulation(player, out hisWarmth, out hisCooling);
+
+            string kitKey = $"{myWarmth:F0}/{myCooling:F0} {hisWarmth:F0}/{hisCooling:F0}";
+            if (kitKey != _lastKitKey)
+            {
+                _lastKitKey = kitKey;
+                Log.Out($"[NPCLLMChat] Insulation - her warmth {myWarmth:F1} cooling {myCooling:F1}; " +
+                        $"player warmth {hisWarmth:F1} cooling {hisCooling:F1}");
+            }
+
+            sb.AppendLine($"How the two of you are dressed, going by what you can see being worn: " +
+                          $"you {KitVerdict(myWarmth, myCooling)}, and the player {KitVerdict(hisWarmth, hisCooling)}. " +
+                          "You judge that by looking at him - you still cannot see inside his pack. If he talks " +
+                          "about heading into country you are not dressed for, say so before you set off.");
+            return sb.ToString();
+        }
+
+        /// <summary>What a set of clothes is actually good for, in her words.</summary>
+        private static string KitVerdict(float warmth, float cooling)
+        {
+            bool forCold = warmth > 5f;
+            bool forHeat = cooling > 5f;
+            if (forCold && forHeat) return "are covered for heat and cold both";
+            if (forCold) return "are dressed for the cold";
+            if (forHeat) return "are dressed for the heat";
+            return "have nothing on that helps against heat or cold";
+        }
+
         private string BuildWorldContext()
         {
             try
@@ -1975,15 +2103,30 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                                   "and if it is the kind that kills, say it plainly rather than making a joke of it.");
                 }
 
-                string nearby = WorldContextHelper.DescribeNearbyPOIs(_npcEntity.position, 5, 1000f);
-                if (!string.IsNullOrEmpty(nearby))
+                // What she can see from where she is standing - and nothing whatsoever beyond it.
+                // She has no map. A building she has never walked up to is a shape on the skyline.
+                float visualRange = WorldContextHelper.VisualRange(_npcEntity.position);
+                var named = new List<string>();
+                var shapes = new List<string>();
+                foreach (var sighting in WorldContextHelper.LookAround(_npcEntity.position, SignReadRange, visualRange))
                 {
-                    sb.AppendLine($"Locations you know of nearby: {nearby}.");
+                    if (!string.IsNullOrEmpty(sighting.Name)) named.Add(sighting.Describe());
+                    else if (shapes.Count < 4) shapes.Add(sighting.Describe());
+                }
+                if (named.Count > 0)
+                {
+                    sb.AppendLine($"Places close enough to see and name from here: {string.Join("; ", named)}.");
+                }
+                if (shapes.Count > 0)
+                {
+                    sb.AppendLine($"Buildings you can pick out but not identify at this range: {string.Join("; ", shapes)}. " +
+                                  "You have no idea what they are or what is inside - say exactly that if asked, " +
+                                  "and going for a closer look is a fair suggestion.");
                 }
 
                 if (_memory != null && _memory.placesVisited.Count > 0)
                 {
-                    sb.AppendLine("Places you have visited (oldest first, with when you were last there):");
+                    sb.AppendLine("Places you have been inside (oldest first, with when you were last there):");
                     foreach (var visit in _memory.placesVisited)
                     {
                         // entries from before coordinates were recorded deserialize as (0,0)
@@ -1994,7 +2137,23 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
 
-                sb.AppendLine("When asked where a place is, point the player to it using the compass direction and rough distance given above (e.g. \"about 400 meters northeast of here\") and say how close it is. Answer only from these facts; if you don't know a place, say so honestly.");
+                if (_memory != null && _memory.placesSeen.Count > 0)
+                {
+                    sb.AppendLine("Places you have walked past close enough to read the sign, but never gone into:");
+                    foreach (var seen in _memory.placesSeen)
+                    {
+                        sb.AppendLine($"- {seen.place} ({WorldContextHelper.DescribeRelative(_npcEntity.position, seen.x, seen.z)}, " +
+                                      $"first noted Day {seen.day})");
+                    }
+                }
+
+                sb.AppendLine(DescribeCountryAndKit());
+
+                sb.AppendLine("Those lists are the whole of what you know about this map. You have never been handed " +
+                              "a map and you cannot see past the horizon: if the player asks after a place that is " +
+                              "not written above, you have simply never come across it, and the honest answer is that " +
+                              "you do not know - not a guess, and never a name you have not seen for yourself.");
+                sb.AppendLine("When asked where a place is, point the player to it using the compass direction and rough distance given above (e.g. \"about 400 meters northeast of here\") and say how close it is.");
                 return sb.ToString();
             }
             catch (Exception ex)
