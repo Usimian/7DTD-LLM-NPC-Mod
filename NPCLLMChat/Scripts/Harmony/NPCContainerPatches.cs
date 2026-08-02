@@ -57,7 +57,11 @@ namespace NPCLLMChat.Harmony
             // CompositeTileEntity whose storage feature is NOT a TileEntity, so the old
             // "is this a placed block?" cast came back null, the guard never ran, and a crate
             // full of corn became her pack. Corpse bags and the drone slipped through the same way.
-            if (!IsStoreOf(npc, _lootContainerName) || _te.bPlayerStorage)
+            // The title alone decides. bPlayerStorage used to be rejected alongside it, to keep
+            // player-placed crates out - but a hired companion's pack is player storage too, so
+            // the one container this exists to capture was the one being thrown away. Crates are
+            // already excluded by the title: "Wood Storage Crate Insecure" is not her name.
+            if (!IsStoreOf(npc, _lootContainerName))
             {
                 Log.Out($"[NPCLLMChat] Not attributing container '{_lootContainerName}' to " +
                         $"{npc.EntityName ?? "?"} - not her store");
@@ -67,8 +71,8 @@ namespace NPCLLMChat.Harmony
             int entityId = npc.entityId;
             string npcName = npc.EntityName;
             NPCContainerCache.Remember(entityId, npcName, _lootContainerName, _te.items);
-            Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}]: " +
-                    $"{WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
+            Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}] " +
+                    $"(playerStorage={_te.bPlayerStorage}): {WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
         }
 
         /// <summary>
