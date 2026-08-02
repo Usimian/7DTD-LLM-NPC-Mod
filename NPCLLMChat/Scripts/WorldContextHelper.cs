@@ -29,25 +29,47 @@ namespace NPCLLMChat
         }
 
         /// <summary>
-        /// Name of the POI whose footprint contains this position, or null in the wild.
+        /// Name of the building she is standing in, or null out in the open.
+        ///
+        /// Town POIs sit flush against each other - Drive-Up Coffee shares its north edge with
+        /// Bobcats Bar - so a generous margin plus first-match-wins put her in the wrong shop.
+        /// Anything whose footprint really contains her beats anything that merely almost does,
+        /// and the tightest footprint wins, since that is the building rather than its lot.
         /// </summary>
         public static string GetPOINameAt(Vector3 pos)
         {
             var pois = GetPOIs();
             if (pois == null) return null;
 
+            PrefabInstance best = null;
+            float bestArea = float.MaxValue;
+            bool bestContains = false;
+
             const float margin = 8f;
             foreach (var poi in pois)
             {
                 Vector3 min = poi.boundingBoxPosition;
                 Vector3 size = poi.boundingBoxSize;
-                if (pos.x >= min.x - margin && pos.x <= min.x + size.x + margin &&
-                    pos.z >= min.z - margin && pos.z <= min.z + size.z + margin)
+
+                bool contains = pos.x >= min.x && pos.x <= min.x + size.x &&
+                                pos.z >= min.z && pos.z <= min.z + size.z;
+                bool nearly = pos.x >= min.x - margin && pos.x <= min.x + size.x + margin &&
+                              pos.z >= min.z - margin && pos.z <= min.z + size.z + margin;
+                if (!contains && !nearly) continue;
+
+                // a real hit always beats a doorstep hit, whatever their sizes
+                if (bestContains && !contains) continue;
+
+                float area = size.x * size.z;
+                if (contains && !bestContains || area < bestArea)
                 {
-                    return PoiName(poi);
+                    best = poi;
+                    bestArea = area;
+                    bestContains = contains;
                 }
             }
-            return null;
+
+            return best == null ? null : PoiName(best);
         }
 
         /// <summary>
@@ -123,7 +145,11 @@ namespace NPCLLMChat
                 Vector3 size = poi.boundingBoxSize;
                 float cx = min.x + size.x / 2f;
                 float cz = min.z + size.z / 2f;
-                float dist = Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(cx, cz));
+
+                // How far to the building, not to the middle of it. Measuring to the centre put
+                // her 30m from a motel she was standing inside, and read the sign on a big POI
+                // only once she had walked halfway across its lot.
+                float dist = DistanceToFootprint(pos, min, size);
                 if (dist > visualRange) continue;
 
                 seen.Add(new PoiSighting
@@ -139,6 +165,18 @@ namespace NPCLLMChat
 
             seen.Sort((a, b) => a.Distance.CompareTo(b.Distance));
             return seen;
+        }
+
+        /// <summary>
+        /// Ground distance from a point to the nearest edge of a footprint, zero when the point
+        /// is inside it. Direction still comes off the centre, since "north-east" means the
+        /// building as a whole rather than its closest corner.
+        /// </summary>
+        private static float DistanceToFootprint(Vector3 pos, Vector3 min, Vector3 size)
+        {
+            float dx = Mathf.Max(min.x - pos.x, 0f, pos.x - (min.x + size.x));
+            float dz = Mathf.Max(min.z - pos.z, 0f, pos.z - (min.z + size.z));
+            return Mathf.Sqrt(dx * dx + dz * dz);
         }
 
         /// <summary>Footprint area to a word, since bulk is the one thing readable at a distance.</summary>
@@ -209,6 +247,16 @@ namespace NPCLLMChat
             }
         }
 
+        /// <summary>
+        /// Every building she could plausibly recognise.
+        ///
+        /// NOT GetPOIPrefabs() - that list is built with AddPrefab(pi, prefab.HasQuestTag()), so
+        /// it only holds POIs the trader can send you to. Drive-Up Coffee carries no quest tag,
+        /// which made every coffee shop, remnant and small business invisible to her while the
+        /// motel next door was not. The full list is the right source; the filter is whether the
+        /// game gives the prefab a display name, which is exactly the line between a building
+        /// with a sign on it and a driveway, a road tile or an empty lot.
+        /// </summary>
         private static List<PrefabInstance> GetPOIs()
         {
             try
@@ -218,8 +266,18 @@ namespace NPCLLMChat
 
                 var world = GameManager.Instance?.World;
                 var decorator = world?.ChunkCache?.ChunkProvider?.GetDynamicPrefabDecorator();
-                _poiCache = decorator?.GetPOIPrefabs();
+                var all = decorator?.GetDynamicPrefabs();
+                if (all == null) return _poiCache;
+
+                var named = new List<PrefabInstance>();
+                foreach (var poi in all)
+                {
+                    if (HasDisplayName(poi)) named.Add(poi);
+                }
+
+                _poiCache = named;
                 _poiCacheTime = Time.unscaledTime;
+                Log.Out($"[NPCLLMChat] POI cache rebuilt: {named.Count} named buildings of {all.Count} prefabs");
                 return _poiCache;
             }
             catch (Exception ex)
@@ -227,6 +285,19 @@ namespace NPCLLMChat
                 Log.Warning($"[NPCLLMChat] POI lookup failed: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// True when the game has a name for this prefab. Localization.Get echoes the key back
+        /// when there is no entry, so "part_driveway_countrytown_02" fails and "Drive-Up Coffee"
+        /// passes - and a modded POI with a proper name passes too, with nothing to maintain.
+        /// </summary>
+        private static bool HasDisplayName(PrefabInstance poi)
+        {
+            string prefabName = poi?.prefab?.PrefabName;
+            if (string.IsNullOrEmpty(prefabName)) return false;
+            string localized = poi.prefab.LocalizedName;
+            return !string.IsNullOrEmpty(localized) && localized != prefabName;
         }
 
         /// <summary>

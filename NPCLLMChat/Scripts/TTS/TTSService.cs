@@ -108,7 +108,12 @@ namespace NPCLLMChat.TTS
         /// <summary>
         /// Synthesize text to speech and return an AudioClip
         /// </summary>
-        public void Synthesize(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
+        /// <param name="rateScale">
+        /// Per-line speed, on top of the configured SpeechRate. Below 1 for the lines she says
+        /// quietly - a whisper is slower as well as softer - and above 1 for a shouted warning.
+        /// </param>
+        public void Synthesize(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError,
+                               float rateScale = 1f)
         {
             if (!_isInitialized || !_config.Enabled)
             {
@@ -125,7 +130,7 @@ namespace NPCLLMChat.TTS
             string selectedVoice = string.IsNullOrEmpty(voice) ? _config.DefaultVoice : voice;
 
             // All platforms use Piper TTS server
-            SynthesizeWithPiper(ApplyPronunciations(text), selectedVoice, onSuccess, onError);
+            SynthesizeWithPiper(ApplyPronunciations(text), selectedVoice, onSuccess, onError, rateScale);
         }
 
         /// <summary>
@@ -179,7 +184,8 @@ namespace NPCLLMChat.TTS
 
         #region Piper Server
 
-        private void SynthesizeWithPiper(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError)
+        private void SynthesizeWithPiper(string text, string voice, Action<AudioClip> onSuccess, Action<string> onError,
+                                         float rateScale)
         {
             if (!_piperServerAvailable)
             {
@@ -191,6 +197,7 @@ namespace NPCLLMChat.TTS
             {
                 Text = text,
                 Voice = voice,
+                RateScale = rateScale,
                 OnSuccess = onSuccess,
                 OnError = onError
             };
@@ -220,7 +227,7 @@ namespace NPCLLMChat.TTS
         {
             float startTime = Time.realtimeSinceStartup;
 
-            string jsonBody = BuildPiperRequestJson(request.Text, request.Voice);
+            string jsonBody = BuildPiperRequestJson(request.Text, request.Voice, request.RateScale);
 
             using (UnityWebRequest webRequest = new UnityWebRequest(_config.Endpoint, "POST"))
             {
@@ -267,7 +274,7 @@ namespace NPCLLMChat.TTS
             }
         }
 
-        private string BuildPiperRequestJson(string text, string voice)
+        private string BuildPiperRequestJson(string text, string voice, float rateScale)
         {
             string escapedText = text
                 .Replace("\\", "\\\\")
@@ -281,9 +288,12 @@ namespace NPCLLMChat.TTS
             sb.Append($"\"text\": \"{escapedText}\"");
             sb.Append($", \"voice\": \"{voice}\"");
 
-            if (Math.Abs(_config.SpeechRate - 1.0f) > 0.01f)
+            // Piper measures the opposite of speed: length_scale stretches each phoneme, so
+            // faster speech is a smaller number. The per-line scale rides on top of the config.
+            float rate = _config.SpeechRate * (rateScale > 0.01f ? rateScale : 1f);
+            if (Math.Abs(rate - 1.0f) > 0.01f)
             {
-                float lengthScale = 1.0f / _config.SpeechRate;
+                float lengthScale = 1.0f / rate;
                 sb.Append($", \"length_scale\": {lengthScale.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
             }
 
@@ -452,6 +462,8 @@ namespace NPCLLMChat.TTS
     {
         public string Text { get; set; }
         public string Voice { get; set; }
+        /// <summary>Speed for this line alone, multiplying the configured SpeechRate.</summary>
+        public float RateScale { get; set; } = 1f;
         public Action<AudioClip> OnSuccess { get; set; }
         public Action<string> OnError { get; set; }
     }
