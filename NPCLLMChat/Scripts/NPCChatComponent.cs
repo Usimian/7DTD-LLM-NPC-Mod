@@ -1891,22 +1891,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine("That is all the country you have seen. You know nothing about any other biome on this " +
                           "map - not where it starts, not what it is like - and you say so rather than guessing.");
 
-            float myCold, myHeat, hisCold, hisHeat;
-            WorldContextHelper.GetThermalProtection(_npcEntity, out myCold, out myHeat);
+            // Only his kit signifies. buffStatusCheck01, which maintains _coretemp and hands out
+            // the freezing and sweltering buffs, is on the playerMale entity class alone - NPCs
+            // have no core temperature and weather cannot touch them. Reporting her own gear
+            // would have her worrying about something that cannot happen to her.
+            float hisCold, hisHeat;
             WorldContextHelper.GetThermalProtection(player, out hisCold, out hisHeat);
 
-            string kitKey = $"{myCold:F0}/{myHeat:F0} {hisCold:F0}/{hisHeat:F0}";
+            string kitKey = $"{hisCold:F0}/{hisHeat:F0}";
             if (kitKey != _lastKitKey)
             {
                 _lastKitKey = kitKey;
-                Log.Out($"[NPCLLMChat] Thermal protection - her cold {myCold:F1} heat {myHeat:F1}; " +
-                        $"player cold {hisCold:F1} heat {hisHeat:F1}");
+                Log.Out($"[NPCLLMChat] Player thermal protection - cold {hisCold:F1} heat {hisHeat:F1}");
             }
 
-            sb.AppendLine($"How the two of you are turned out for weather: " +
-                          $"you {KitVerdict(myCold, myHeat)}, and the player {KitVerdict(hisCold, hisHeat)}. " +
-                          "You judge him by looking at him - you still cannot see inside his pack. If he talks " +
-                          "about heading into country neither of you is dressed for, say so before you set off.");
+            sb.AppendLine($"How the player is turned out for weather: he {KitVerdict(hisCold, hisHeat)}. " +
+                          "You judge that by looking at him - you still cannot see inside his pack.");
+            sb.AppendLine("The weather does not touch you. Cold and heat are his problem, not yours, and you can " +
+                          "walk into country he could not stand an hour in. So the worry is always for him: if he " +
+                          "talks about heading somewhere he is not dressed for, say so before you set off, and " +
+                          "never fuss about being cold yourself.");
             return sb.ToString();
         }
 
