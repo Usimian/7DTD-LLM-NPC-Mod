@@ -1758,6 +1758,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         // there and how big it is, and that is the whole of what she knows about it.
         private const float SignReadRange = 80f;
 
+        // She fills forty sightings inside one town, so the notebook is far bigger than the
+        // travel journal - but only the nearest few go into a prompt, or a list of everywhere
+        // she has ever been crowds out everything else she needs to think about.
+        private const int MaxPlacesSeen = 200;
+        private const int PlacesSeenInPrompt = 12;
+
         /// <summary>
         /// What she notices as the two of them move. Anything they pass close enough to identify
         /// gets written down for good; anything further off stays a shape with no name. Same for
@@ -1773,7 +1779,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 if (string.IsNullOrEmpty(sighting.Name)) continue;
                 somethingNew |= RememberPlace(_memory.placesSeen, sighting.Name,
-                                              sighting.X, sighting.Z, day, time, "landmark");
+                                              sighting.X, sighting.Z, day, time, "landmark", MaxPlacesSeen);
             }
 
             string biome = WorldContextHelper.BiomeIdAt(_npcEntity.position);
@@ -1781,7 +1787,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 somethingNew |= RememberPlace(_memory.biomesSeen, biome,
                                               (int)_npcEntity.position.x, (int)_npcEntity.position.z,
-                                              day, time, "biome");
+                                              day, time, "biome", MaxPlacesSeen);
             }
 
             if (somethingNew) NPCMemoryStore.Save(_memoryKey, _memory);
@@ -1792,7 +1798,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// something she had never seen, which is what decides whether the file is worth writing.
         /// </summary>
         private bool RememberPlace(List<PlaceVisit> journal, string name,
-                                   int x, int z, int day, string time, string kind)
+                                   int x, int z, int day, string time, string kind, int cap)
         {
             var existing = journal.Find(p => p.place == name);
             if (existing != null)
@@ -1803,7 +1809,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
 
             journal.Add(new PlaceVisit { place = name, day = day, time = time, x = x, z = z });
-            while (journal.Count > MaxJournalEntries) journal.RemoveAt(0);
+            while (journal.Count > cap) journal.RemoveAt(0);
             Log.Out($"[NPCLLMChat] {_npcName} noted a new {kind}: {name} at ({x}, {z}) on Day {day} {time}");
             return true;
         }
@@ -1823,30 +1829,38 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             string here = WorldContextHelper.BiomeIdAt(_npcEntity.position);
 
-            if (!string.IsNullOrEmpty(here))
-            {
-                string hazard = WorldContextHelper.BiomeHazard(here);
-                sb.AppendLine($"The country you are standing in: {WorldContextHelper.BiomeLabel(here)}" +
-                              (hazard == null
-                                  ? " - ordinary clothes are fine here, nothing special needed."
-                                  : $" - it punishes anyone not dressed for {hazard}."));
-            }
+            // One list, with the current biome inside it rather than pulled out above. Split in
+            // two, the second list read as "the biomes you know" - so having walked three she
+            // would answer that she knew two, because the other two were the ones in the list.
+            var country = new List<string>();
+            bool hereListed = false;
 
-            if (_memory != null && _memory.biomesSeen.Count > 0)
+            if (_memory != null)
             {
-                var others = new List<string>();
                 foreach (var known in _memory.biomesSeen)
                 {
-                    if (known.place == here) continue;
                     string hazard = WorldContextHelper.BiomeHazard(known.place);
-                    others.Add($"{WorldContextHelper.BiomeLabel(known.place)} " +
-                               $"({WorldContextHelper.DescribeRelative(_npcEntity.position, known.x, known.z)}" +
-                               (hazard == null ? ", needs no special kit" : $", {hazard}") + ")");
+                    string where = known.place == here
+                        ? "you are standing in it right now"
+                        : WorldContextHelper.DescribeRelative(_npcEntity.position, known.x, known.z);
+                    if (known.place == here) hereListed = true;
+                    country.Add($"{WorldContextHelper.BiomeLabel(known.place)} ({where}" +
+                                (hazard == null ? ", needs no special kit" : $", {hazard}") + ")");
                 }
-                if (others.Count > 0)
-                {
-                    sb.AppendLine($"Other country the two of you have walked: {string.Join("; ", others)}.");
-                }
+            }
+
+            // she can always see the ground she is on, even the first moment she steps onto it
+            if (!hereListed && !string.IsNullOrEmpty(here))
+            {
+                string hazard = WorldContextHelper.BiomeHazard(here);
+                country.Insert(0, $"{WorldContextHelper.BiomeLabel(here)} (you are standing in it right now" +
+                                  (hazard == null ? ", needs no special kit" : $", {hazard}") + ")");
+            }
+
+            if (country.Count > 0)
+            {
+                sb.AppendLine($"Every biome you have set foot in, all {country.Count} of them: " +
+                              $"{string.Join("; ", country)}.");
             }
             sb.AppendLine("That is all the country you have seen. You know nothing about any other biome on this " +
                           "map - not where it starts, not what it is like - and you say so rather than guessing.");
@@ -2162,11 +2176,28 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                 if (_memory != null && _memory.placesSeen.Count > 0)
                 {
-                    sb.AppendLine("Places you have walked past close enough to read the sign, but never gone into:");
-                    foreach (var seen in _memory.placesSeen)
+                    // Nearest first, and only a handful: she remembers every one, but reciting
+                    // two hundred landmarks at her would bury everything else in the prompt.
+                    var closest = new List<PlaceVisit>(_memory.placesSeen);
+                    closest.Sort((a, b) =>
+                        Vector2.Distance(new Vector2(_npcEntity.position.x, _npcEntity.position.z), new Vector2(a.x, a.z))
+                        .CompareTo(
+                        Vector2.Distance(new Vector2(_npcEntity.position.x, _npcEntity.position.z), new Vector2(b.x, b.z))));
+
+                    int shown = Math.Min(PlacesSeenInPrompt, closest.Count);
+                    sb.AppendLine($"Places you have walked past close enough to read the sign but never gone into " +
+                                  $"({shown} nearest of {closest.Count} you remember):");
+                    for (int i = 0; i < shown; i++)
                     {
+                        var seen = closest[i];
                         sb.AppendLine($"- {seen.place} ({WorldContextHelper.DescribeRelative(_npcEntity.position, seen.x, seen.z)}, " +
                                       $"first noted Day {seen.day})");
+                    }
+                    if (closest.Count > shown)
+                    {
+                        sb.AppendLine("You have noted others further off. If he asks about somewhere not listed here, " +
+                                      "you may well have seen it - say it rings a bell and that you would have to get " +
+                                      "closer to be sure, rather than denying it outright.");
                     }
                 }
 
