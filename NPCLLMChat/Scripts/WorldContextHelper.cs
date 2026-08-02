@@ -227,23 +227,27 @@ namespace NPCLLMChat
         }
 
         /// <summary>
-        /// How well someone is dressed against temperature, read off what they have on. Clothes
-        /// are visible on a body, so this is fair game for her even though the inside of the
-        /// player's pack is not.
+        /// How well someone is protected against cold and heat, totalled over everything the
+        /// game counts - worn clothing, food, perks and buffs alike.
+        ///
+        /// These are the effects armour actually grants: HypothermalResist against the cold,
+        /// HyperthermalResist against the heat. CoreTempGain and CoreTempLoss are in the enum
+        /// but nothing in the game's config grants them, so reading those returned a confident
+        /// zero for a player in full winter gear.
         /// </summary>
-        public static void GetInsulation(EntityAlive who, out float warmth, out float cooling)
+        public static void GetThermalProtection(EntityAlive who, out float cold, out float heat)
         {
-            warmth = 0f;
-            cooling = 0f;
+            cold = 0f;
+            heat = 0f;
             if (who == null) return;
             try
             {
-                warmth = EffectManager.GetValue(PassiveEffects.CoreTempGain, null, 0f, who);
-                cooling = EffectManager.GetValue(PassiveEffects.CoreTempLoss, null, 0f, who);
+                cold = EffectManager.GetValue(PassiveEffects.HypothermalResist, null, 0f, who);
+                heat = EffectManager.GetValue(PassiveEffects.HyperthermalResist, null, 0f, who);
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Insulation read failed: {ex.Message}");
+                Log.Warning($"[NPCLLMChat] Thermal protection read failed: {ex.Message}");
             }
         }
 

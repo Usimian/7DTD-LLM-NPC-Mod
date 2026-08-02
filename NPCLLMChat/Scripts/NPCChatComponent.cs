@@ -1891,34 +1891,44 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine("That is all the country you have seen. You know nothing about any other biome on this " +
                           "map - not where it starts, not what it is like - and you say so rather than guessing.");
 
-            float myWarmth, myCooling, hisWarmth, hisCooling;
-            WorldContextHelper.GetInsulation(_npcEntity, out myWarmth, out myCooling);
-            WorldContextHelper.GetInsulation(player, out hisWarmth, out hisCooling);
+            float myCold, myHeat, hisCold, hisHeat;
+            WorldContextHelper.GetThermalProtection(_npcEntity, out myCold, out myHeat);
+            WorldContextHelper.GetThermalProtection(player, out hisCold, out hisHeat);
 
-            string kitKey = $"{myWarmth:F0}/{myCooling:F0} {hisWarmth:F0}/{hisCooling:F0}";
+            string kitKey = $"{myCold:F0}/{myHeat:F0} {hisCold:F0}/{hisHeat:F0}";
             if (kitKey != _lastKitKey)
             {
                 _lastKitKey = kitKey;
-                Log.Out($"[NPCLLMChat] Insulation - her warmth {myWarmth:F1} cooling {myCooling:F1}; " +
-                        $"player warmth {hisWarmth:F1} cooling {hisCooling:F1}");
+                Log.Out($"[NPCLLMChat] Thermal protection - her cold {myCold:F1} heat {myHeat:F1}; " +
+                        $"player cold {hisCold:F1} heat {hisHeat:F1}");
             }
 
-            sb.AppendLine($"How the two of you are dressed, going by what you can see being worn: " +
-                          $"you {KitVerdict(myWarmth, myCooling)}, and the player {KitVerdict(hisWarmth, hisCooling)}. " +
-                          "You judge that by looking at him - you still cannot see inside his pack. If he talks " +
-                          "about heading into country you are not dressed for, say so before you set off.");
+            sb.AppendLine($"How the two of you are turned out for weather: " +
+                          $"you {KitVerdict(myCold, myHeat)}, and the player {KitVerdict(hisCold, hisHeat)}. " +
+                          "You judge him by looking at him - you still cannot see inside his pack. If he talks " +
+                          "about heading into country neither of you is dressed for, say so before you set off.");
             return sb.ToString();
         }
 
-        /// <summary>What a set of clothes is actually good for, in her words.</summary>
-        private static string KitVerdict(float warmth, float cooling)
+        /// <summary>
+        /// What a set of clothes is actually good for, in her words. Armour grants roughly one
+        /// to six points a piece, so a deliberate outfit reaches the twenties and an incidental
+        /// point or two off a single item is not protection worth the name.
+        /// </summary>
+        private static string KitVerdict(float cold, float heat)
         {
-            bool forCold = warmth > 5f;
-            bool forHeat = cooling > 5f;
-            if (forCold && forHeat) return "are covered for heat and cold both";
-            if (forCold) return "are dressed for the cold";
-            if (forHeat) return "are dressed for the heat";
-            return "have nothing on that helps against heat or cold";
+            string forCold = Rated(cold, "the cold");
+            string forHeat = Rated(heat, "the heat");
+            if (forCold == null && forHeat == null) return "have nothing on that helps against heat or cold";
+            if (forCold != null && forHeat != null) return $"{forCold}, and {forHeat}";
+            return forCold ?? forHeat;
+        }
+
+        private static string Rated(float value, string against)
+        {
+            if (value >= 20f) return $"are properly kitted out for {against}";
+            if (value >= 8f) return $"have something on for {against}, though not much";
+            return null;
         }
 
         /// <summary>
