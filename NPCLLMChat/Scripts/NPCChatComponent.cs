@@ -360,7 +360,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (_ttsEnabled && _audioPlayer != null && TTSService.Instance.ServerAvailable && !string.IsNullOrWhiteSpace(speech))
             {
                 OnSpeechStarted?.Invoke(speech);
-                _audioPlayer.Speak(speech, () => OnSpeechComplete?.Invoke());
+
+                // Telling her to whisper only changes the words. Actually sounding like a
+                // whisper is volume and pace, which are knobs rather than prompting.
+                bool quiet = PlayerIsSneaking();
+                _audioPlayer.Speak(speech, () => OnSpeechComplete?.Invoke(),
+                                   quiet ? 0.45f : 1f, quiet ? 0.9f : 1f);
             }
         }
 
@@ -427,6 +432,14 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                           "ANSWER IT from those facts. Read the list before you reply. No mood, no tiredness and " +
                           "no irritation excuses refusing a question you can answer; silence and grunts are for " +
                           "small talk only. Never say you do not know something that is written above.");
+
+            if (PlayerIsSneaking())
+            {
+                wordLimit = Math.Min(wordLimit, 8);
+                sb.AppendLine("HE IS CROUCHED AND MOVING QUIETLY, so you drop to a whisper and match him. " +
+                              "Barely above a breath, as few words as will do, and nothing said that did not " +
+                              "need saying. No banter and no stories while he is sneaking.");
+            }
 
             sb.AppendLine($"Answer in one sentence, {wordLimit} words at most, in the manner described above.");
             sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
@@ -1187,6 +1200,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 return;
             }
 
+            // While he is sneaking, nothing short of the radiation above is worth the noise.
+            // A companion who chatters about the weather while you are creeping through a
+            // basement is not a companion, she is a liability.
+            if (PlayerIsSneaking()) return;
+
             // 1. she is badly hurt herself
             float ownHealth = _npcEntity.GetMaxHealth() > 0
                 ? (float)_npcEntity.Health / _npcEntity.GetMaxHealth() : 1f;
@@ -1311,6 +1329,19 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
         }
 
+        /// <summary>
+        /// True when the player is moving quietly and she ought to match him. Crouching in the
+        /// middle of a firefight is taking cover, not sneaking, so recent shooting cancels it -
+        /// dropping to a whisper while the shooting is still going on would be daft.
+        /// </summary>
+        private bool PlayerIsSneaking()
+        {
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null || !player.IsCrouching) return false;
+            if (Time.unscaledTime - _lastCombatTime < 20f) return false;
+            return Vector3.Distance(_npcEntity.position, player.position) < ShoutRange;
+        }
+
         /// <summary>True when any visible buff on the entity contains one of these fragments.</summary>
         private static bool HasBuffLike(EntityAlive entity, params string[] fragments)
         {
@@ -1397,7 +1428,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     if (string.IsNullOrWhiteSpace(speech)) return;
 
                     Log.Out($"[NPCLLMChat] {_npcName} speaks up: {speech}");
-                    if (_ttsEnabled) _audioPlayer.Speak(speech);
+                    // a warning shouted while he is sneaking is still urgent, but still hushed
+                    bool quiet = PlayerIsSneaking();
+                    if (_ttsEnabled) _audioPlayer.Speak(speech, null, quiet ? 0.45f : 1f, quiet ? 0.9f : 1f);
 
                     var player = GameManager.Instance?.World?.GetPrimaryPlayer() as EntityPlayerLocal;
                     if (player != null) GameManager.ShowTooltip(player, $"{_npcName}: {speech}", false);

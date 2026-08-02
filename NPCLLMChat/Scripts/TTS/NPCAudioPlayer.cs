@@ -149,13 +149,20 @@ namespace NPCLLMChat.TTS
         /// <summary>
         /// Speak the given text using TTS
         /// </summary>
-        public void Speak(string text, Action onComplete = null)
+        /// <param name="volumeScale">
+        /// Loudness for this line alone. Below 1 when she is keeping her voice down - the
+        /// multiplier stays set until the next Speak, so every call passes what it wants.
+        /// </param>
+        /// <param name="rateScale">Speed for this line alone; a whisper is slower as well as softer.</param>
+        public void Speak(string text, Action onComplete = null, float volumeScale = 1f, float rateScale = 1f)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
                 onComplete?.Invoke();
                 return;
             }
+
+            SetVolumeMultiplier(volumeScale);
 
             // Stop any current speech
             if (_isSpeaking)
@@ -171,7 +178,8 @@ namespace NPCLLMChat.TTS
                 text,
                 _voiceId,
                 OnAudioClipReady,
-                OnTTSError
+                OnTTSError,
+                rateScale
             );
         }
 
