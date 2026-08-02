@@ -40,6 +40,9 @@ llmchat persist         - Mark the nearest NPC savable so it survives logout
 llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
 llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
 llmchat hire set <n>    - Set the hire count to match reality (e.g. 1 with one companion)
+llmchat context         - Dump exactly what the nearest NPC is told about the world.
+                          When she says she does not know something she plainly does,
+                          this is the only way to see whether she was ever told it.
 
 TTS Commands:
 llmchat tts             - Show TTS status
@@ -112,6 +115,9 @@ Examples:
                     break;
                 case "persist":
                     MakeNearestNPCPersist();
+                    break;
+                case "context":
+                    DumpNearestNPCContext();
                     break;
                 case "hire":
                     HandleHireCommand(_params);
@@ -444,6 +450,45 @@ Examples:
             Log.Out($"[NPCLLMChat] Set Persist on {npc.EntityName} [id {npc.entityId}] (was savable: {already})");
             output.Output($"{npc.EntityName} marked to persist{(already ? " (it already would have saved)" : " - it would NOT have survived logout before this")}");
             output.Output("Verify with 'llmchat find' - it should now read 'survives logout'");
+        }
+
+        /// <summary>
+        /// Print the world state the nearest NPC is actually working from.
+        ///
+        /// Every "she says she does not know X" turns on one question - was she ever told X? -
+        /// and without this the answer has to be inferred from her memory file and a reading of
+        /// the code, which has been wrong as often as right. Both her journal and the wording
+        /// that carries it are here, since a fact present but badly phrased reads to her exactly
+        /// like a fact that is missing.
+        /// </summary>
+        private void DumpNearestNPCContext()
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                output.Output("No player found");
+                return;
+            }
+
+            EntityAlive npc = FindNearestNPC(player, 15f);
+            var chat = npc?.GetComponent<NPCChatComponent>();
+            if (chat == null)
+            {
+                output.Output("No NPC with a chat component within 15m - stand next to her and try again");
+                return;
+            }
+
+            // Log only, bar a receipt. The console is where the conversation is read, and a few
+            // thousand characters of world state dumped into it buries the thing being debugged.
+            string context = chat.DumpWorldContext();
+            string[] lines = context.Split('\n');
+            Log.Out($"[NPCLLMChat] context| === world context given to {npc.EntityName} ===");
+            foreach (string line in lines) Log.Out($"[NPCLLMChat] context| {line.TrimEnd()}");
+            Log.Out("[NPCLLMChat] context| === end ===");
+
+            output.Output($"Wrote {npc.EntityName}'s world context to the log " +
+                          $"({lines.Length} lines, {context.Length} chars) - console left clear for the conversation.");
         }
 
         private static string Bearing(Vector3 from, Vector3 to)

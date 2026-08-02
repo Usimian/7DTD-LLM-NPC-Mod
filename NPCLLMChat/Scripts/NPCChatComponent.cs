@@ -262,6 +262,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         {
             _isWaitingForResponse = false;
 
+            // The exchange itself only ever appeared in the console, which is not written to the
+            // log - so afterwards there is no record of what was asked or what she said, and
+            // "she did not know about the snow" cannot be checked against what she was told.
+            Log.Out($"[NPCLLMChat] chat| Player: {playerMessage}");
+            Log.Out($"[NPCLLMChat] chat| {_npcName}: {response}");
+
             // Parse response for actions
             NPCAction action = null;
             string dialogueResponse = response;
@@ -1880,6 +1886,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (forCold) return "are dressed for the cold";
             if (forHeat) return "are dressed for the heat";
             return "have nothing on that helps against heat or cold";
+        }
+
+        /// <summary>
+        /// The world state she is actually working from, for the 'llmchat context' command.
+        /// Built fresh on the spot, so it is the same text the next question would carry.
+        /// </summary>
+        public string DumpWorldContext()
+        {
+            return BuildWorldContext();
         }
 
         private string BuildWorldContext()
