@@ -105,12 +105,32 @@ namespace NPCLLMChat.Harmony
                 if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
                 if (alive.entityId == player.entityId) continue;
                 if (!NPCLLMChatMod.IsNPC(alive)) continue;
-                if (Vector3.Distance(player.position, alive.position) > 30f) continue;
                 if (!IsHiredByPlayer(alive)) continue;
-                if (alive.gameObject?.GetComponent<NPCChatComponent>() != null) continue;
 
-                GetOrCreateChatComponent(alive);
-                return;   // she is the only one this applies to
+                // Hold the respawn flag up at any distance. SCore drops it whenever it cannot
+                // resolve her leader, and the world then unloads her permanently - which is most
+                // likely exactly when she is far away, left on Stay, or the player has just
+                // loaded in. Waiting until she is close enough to talk to would leave the flag
+                // unguarded in the very situations that lose her.
+                // Dismissing her is the one way to be rid of her. SCore marks that with
+                // buffOrderDismiss, which LeaderUpdate itself checks before anything else, so
+                // honouring it here means a dismissal still works exactly as it always did -
+                // and nothing else takes her away.
+                if (alive.Buffs != null && alive.Buffs.HasBuff("buffOrderDismiss")) continue;
+
+                if (!alive.bWillRespawn)
+                {
+                    alive.bWillRespawn = true;
+                    Log.Warning($"[NPCLLMChat] {alive.EntityName} [id {alive.entityId}] had bWillRespawn=false " +
+                                $"at {Mathf.RoundToInt(Vector3.Distance(player.position, alive.position))}m - " +
+                                "restored, she would have been unloaded for good");
+                }
+
+                if (Vector3.Distance(player.position, alive.position) <= 30f &&
+                    alive.gameObject?.GetComponent<NPCChatComponent>() == null)
+                {
+                    GetOrCreateChatComponent(alive);
+                }
             }
         }
 

@@ -145,7 +145,9 @@ namespace NPCLLMChat
         private void Update()
         {
             if (Time.unscaledTime < _nextCompanionScan) return;
-            _nextCompanionScan = Time.unscaledTime + 5f;
+            // Once a second, not every five. The sweep also holds her respawn flag up, and the
+            // window that has to cover is however long SCore's leader lookup happens to fail for.
+            _nextCompanionScan = Time.unscaledTime + 1f;
 
             try
             {

@@ -886,15 +886,75 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// not come back, with CurrentHireCount reading 0 afterwards, so the hire was gone before
         /// the save was written. Persist does not care what happens to the hire later.
         /// </summary>
+        /// <summary>
+        /// THIS is why the companion kept vanishing, and why she came back most times but not
+        /// every time.
+        ///
+        /// Vanilla World unloads an entity for good when bWillRespawn is false:
+        ///     if (_forceUnload || (!entity.bWillRespawn &amp;&amp; ...))   -> removed
+        ///
+        /// SCore's EntityAliveSDX.LeaderUpdate opens with
+        ///     var leader = EntityUtilities.GetLeaderOrOwner(entityId);
+        ///     if (leader == null) { Owner = null; bWillRespawn = false; return; }
+        /// and only sets it back to true further down, once the leader has resolved and she is
+        /// on a Follow or Loot order. So any moment the lookup fails - its own leader cache
+        /// expiring on a thirty tick counter, the player not yet registered during a load, her
+        /// sitting on Stay rather than Follow - leaves the flag false. If the world unloads her
+        /// in that window she is gone, and nothing about Persist or the hire state comes into it:
+        /// IsSavedToFile said yes the whole time.
+        ///
+        /// Set every frame rather than on the five second tick, because the window it has to
+        /// cover is however long the leader lookup happens to fail for.
+        /// </summary>
+        private void KeepHerRespawnable()
+        {
+            if (!IsCompanion && !IsHiredCompanion()) return;
+            // dismissing her is the only thing that should ever get rid of her
+            if (_npcEntity.Buffs != null && _npcEntity.Buffs.HasBuff("buffOrderDismiss")) return;
+            if (_npcEntity.bWillRespawn) return;
+
+            _npcEntity.bWillRespawn = true;
+            if (!_loggedRespawnRescue)
+            {
+                _loggedRespawnRescue = true;
+                Log.Warning($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] had bWillRespawn=false - " +
+                            "SCore clears it whenever it cannot resolve her leader, and the world would " +
+                            "have unloaded her for good. Set back to true; this is the vanishing.");
+            }
+        }
+
+        private bool _loggedRespawnRescue;
+
         private void EnsureSurvivesLogout()
         {
             if (_npcEntity?.Buffs == null) return;
-            if (!IsCompanion && !IsHiredCompanion()) return;
-            if (_npcEntity.Buffs.HasCustomVar("Persist") && _npcEntity.Buffs.GetCustomVar("Persist") > 0f) return;
+
+            bool companion = IsCompanion || IsHiredCompanion();
+            float persist = _npcEntity.Buffs.HasCustomVar("Persist")
+                ? _npcEntity.Buffs.GetCustomVar("Persist") : 0f;
+
+            // Say the state out loud once per session. Setting the flag logged, and skipping it
+            // logged nothing at all, so a companion who already had it and a companion who was
+            // never recognised as one looked identical from outside - which is no use when the
+            // question being asked is whether she is safe to log out on.
+            if (!_loggedPersistState)
+            {
+                _loggedPersistState = true;
+                Log.Out($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] logout check: " +
+                        $"companion={companion} (memoryKey={_memoryKey}), Persist={persist}, " +
+                        $"Leader/Owner={IsHiredCompanion()} -> " +
+                        (companion
+                            ? (persist > 0f ? "already safe" : "setting Persist now")
+                            : "NOT TREATED AS COMPANION - she will not be saved"));
+            }
+
+            if (!companion || persist > 0f) return;
 
             _npcEntity.Buffs.SetCustomVar("Persist", 1f);
             Log.Out($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] marked to survive logout (Persist=1)");
         }
+
+        private bool _loggedPersistState;
 
         private void RefreshMemoryKey()
         {
@@ -1041,6 +1101,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private void Update()
         {
             if (_memory == null || _npcEntity == null) return;
+
+            KeepHerRespawnable();
+
             if (Time.unscaledTime < _nextPlaceCheck) return;
             _nextPlaceCheck = Time.unscaledTime + PlaceCheckIntervalSeconds;
 
