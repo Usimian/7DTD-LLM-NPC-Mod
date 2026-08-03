@@ -269,6 +269,56 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// Put her respawn flag back the instant SCore clears it.
+    ///
+    /// EntityAliveSDX.LeaderUpdate begins by looking up her leader and, finding none, sets
+    /// bWillRespawn = false and returns. Vanilla World then unloads her permanently, because
+    /// that flag is the whole of what it consults. The lookup fails for ordinary reasons - a
+    /// thirty tick leader cache expiring, the player not registered yet during a load - so the
+    /// loss is intermittent, which is what made it so hard to pin down.
+    ///
+    /// A postfix here rather than a timer, because LeaderUpdate is the only thing that clears
+    /// the flag: guard it at the source and there is no window at all. A sweep, however fast,
+    /// only narrows the window - and she has been lost enough times already.
+    ///
+    /// Dismissal still works: buffOrderDismiss is left alone, so the one deliberate way to be
+    /// rid of her behaves exactly as before.
+    /// </summary>
+    [HarmonyPatch]
+    public class LeaderUpdateRespawnPatch
+    {
+        static MethodBase TargetMethod()
+        {
+            var type = AccessTools.TypeByName("EntityAliveSDX");
+            return type == null ? null : AccessTools.Method(type, "LeaderUpdate");
+        }
+
+        static bool Prepare()
+        {
+            bool found = TargetMethod() != null;
+            if (!found)
+            {
+                Log.Warning("[NPCLLMChat] EntityAliveSDX.LeaderUpdate not found - companions may " +
+                            "vanish when SCore cannot resolve their leader");
+            }
+            return found;
+        }
+
+        static void Postfix(EntityAlive __instance)
+        {
+            if (__instance == null || __instance.bWillRespawn || __instance.IsDead()) return;
+            if (__instance.Buffs == null) return;
+            if (__instance.Buffs.HasBuff("buffOrderDismiss")) return;
+
+            bool hired = (__instance.Buffs.HasCustomVar("Leader") && __instance.Buffs.GetCustomVar("Leader") > 0f)
+                      || (__instance.Buffs.HasCustomVar("Owner") && __instance.Buffs.GetCustomVar("Owner") > 0f);
+            if (!hired) return;
+
+            __instance.bWillRespawn = true;
+        }
+    }
+
+    /// <summary>
     /// Clean up when NPCs are removed
     /// </summary>
     [HarmonyPatch(typeof(World), nameof(World.RemoveEntity))]
