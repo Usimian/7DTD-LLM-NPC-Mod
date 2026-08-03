@@ -355,6 +355,41 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// Last line: refuse to despawn a living companion, whatever cleared her flag.
+    ///
+    /// World decides with
+    ///     if (e.IsMarkedForUnload() &amp;&amp; !e.isEntityRemote &amp;&amp; !e.bWillRespawn)
+    ///         unloadEntity(e, e.IsDespawned ? Despawned : Killed);
+    ///
+    /// so holding bWillRespawn up already prevents it. This covers the case where something
+    /// clears the flag from a site not patched here - the point is that there should be no
+    /// combination of orders, distance or timing under which a hired companion is deleted.
+    ///
+    /// Narrow on purpose. Only EnumRemoveEntityReason.Despawned, which is the cull; a genuine
+    /// death is Killed and she is dead by then anyway, chunk unloads come through as Unloaded
+    /// and are how she is saved, and a dismissal has already stopped being hired.
+    /// </summary>
+    [HarmonyPatch(typeof(World), nameof(World.unloadEntity))]
+    public class RefuseToDespawnCompanionPatch
+    {
+        static bool Prefix(Entity _e, EnumRemoveEntityReason _reason)
+        {
+            if (_reason != EnumRemoveEntityReason.Despawned) return true;
+
+            var npc = _e as EntityAlive;
+            if (npc == null || npc.IsDead() || npc.Buffs == null) return true;
+            if (npc.Buffs.HasBuff("buffOrderDismiss")) return true;
+            if (!NPCCorePatches.IsHiredByPlayer(npc)) return true;
+
+            npc.bWillRespawn = true;
+            Log.Warning($"[NPCLLMChat] Refused to despawn {npc.EntityName} [id {npc.entityId}] - " +
+                        "she is hired, alive and not dismissed. Something cleared her respawn flag " +
+                        "from a site the patches do not cover; please report this line.");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Clean up when NPCs are removed
     /// </summary>
     [HarmonyPatch(typeof(World), nameof(World.RemoveEntity))]
