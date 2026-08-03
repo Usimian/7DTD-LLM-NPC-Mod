@@ -40,6 +40,8 @@ llmchat persist         - Mark the nearest NPC savable so it survives logout
 llmchat hire            - Show hire state (player hire count, nearest NPC's cvars)
 llmchat hire reset      - Clear a stale hire count (lost companion blocking new hires)
 llmchat hire set <n>    - Set the hire count to match reality (e.g. 1 with one companion)
+llmchat name <name>     - Rename the nearest NPC. Sticks across reloads, and she keeps
+                          everything she remembers (memory is filed by role, not name)
 llmchat context         - Dump exactly what the nearest NPC is told about the world.
                           When she says she does not know something she plainly does,
                           this is the only way to see whether she was ever told it.
@@ -118,6 +120,9 @@ Examples:
                     break;
                 case "context":
                     DumpNearestNPCContext();
+                    break;
+                case "name":
+                    RenameNearestNPC(_params);
                     break;
                 case "hire":
                     HandleHireCommand(_params);
@@ -461,6 +466,45 @@ Examples:
         /// that carries it are here, since a fact present but badly phrased reads to her exactly
         /// like a fact that is missing.
         /// </summary>
+        /// <summary>
+        /// Rename the NPC in front of you. Takes the rest of the line, so two-word names work.
+        /// </summary>
+        private void RenameNearestNPC(List<string> _params)
+        {
+            var output = SingletonMonoBehaviour<SdtdConsole>.Instance;
+            if (_params.Count < 2)
+            {
+                output.Output("Usage: llmchat name <new name>");
+                return;
+            }
+
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null)
+            {
+                output.Output("No player found");
+                return;
+            }
+
+            EntityAlive npc = FindNearestNPC(player, 15f);
+            var chat = npc?.GetComponent<NPCChatComponent>();
+            if (chat == null)
+            {
+                output.Output("No NPC with a chat component within 15m - stand next to her and try again");
+                return;
+            }
+
+            string was = npc.EntityName;
+            string newName = string.Join(" ", _params.GetRange(1, _params.Count - 1).ToArray());
+            if (!chat.Rename(newName))
+            {
+                output.Output("Could not rename - give a name with something in it");
+                return;
+            }
+
+            output.Output($"{was} is now called {npc.EntityName}. She keeps everything she remembers; " +
+                          "her memory is filed by role, not by name.");
+        }
+
         private void DumpNearestNPCContext()
         {
             var output = SingletonMonoBehaviour<SdtdConsole>.Instance;

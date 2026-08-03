@@ -803,6 +803,34 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         }
 
         /// <summary>
+        /// Give her a name of the player's choosing.
+        ///
+        /// The entity's name is what she is told she is called and what the log and the HUD show,
+        /// and the game serialises it with her, so it survives a reload. Her memory is keyed by
+        /// role rather than by name once she is hired, so renaming her does not split or orphan
+        /// anything she remembers - she is the same companion, differently addressed.
+        /// </summary>
+        public bool Rename(string newName)
+        {
+            if (_npcEntity == null || string.IsNullOrWhiteSpace(newName)) return false;
+
+            string clean = newName.Trim();
+            if (clean.Length > 24) clean = clean.Substring(0, 24);
+
+            string was = _npcName;
+            _npcEntity.SetEntityName(clean);
+            _npcName = clean;
+            if (_memory != null)
+            {
+                _memory.npcName = clean;
+                PersistMemory();
+            }
+
+            Log.Out($"[NPCLLMChat] Renamed {was} to {clean} [id {_npcEntity.entityId}]");
+            return true;
+        }
+
+        /// <summary>
         /// Re-read the persona field from the memory file on disk, so hand edits
         /// apply without restarting the game (the mod never writes persona content,
         /// so this cannot lose anything).
