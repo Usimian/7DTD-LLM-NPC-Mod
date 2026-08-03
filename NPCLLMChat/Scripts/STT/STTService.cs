@@ -8,9 +8,8 @@ using UnityEngine.Networking;
 namespace NPCLLMChat.STT
 {
     /// <summary>
-    /// Speech-to-text service with cross-platform support.
-    /// - Windows: Uses Windows Speech Recognition (System.Speech.Recognition) - no server needed
-    /// - Linux: Uses Whisper HTTP server
+    /// Speech-to-text service. Windows and Linux alike talk to the Whisper HTTP server; System.
+    /// Speech is not in the game's Mono runtime, so there is no in-process recogniser anywhere.
     /// </summary>
     public class STTService : MonoBehaviour
     {

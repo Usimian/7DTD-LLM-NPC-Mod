@@ -1,21 +1,18 @@
 namespace NPCLLMChat.STT
 {
     /// <summary>
-    /// STT Provider type
+    /// STT Provider type.
+    ///
+    /// No Windows Speech Recognition option, for the same reason as the TTS side: System.Speech
+    /// is absent from the game's Mono runtime, so recognition cannot happen in process on any
+    /// platform. Windows and Linux both talk to the Whisper server.
     /// </summary>
     public enum STTProvider
     {
-        /// <summary>
-        /// Auto-detect based on platform:
-        /// - Windows: Use Windows Speech Recognition (built-in)
-        /// - Linux: Use Whisper HTTP server
-        /// </summary>
+        /// <summary>Pick for the platform - which is the Whisper server everywhere.</summary>
         Auto,
-        
-        /// <summary>Windows built-in Speech Recognition (Windows only)</summary>
-        Windows,
-        
-        /// <summary>Whisper STT HTTP server (cross-platform, requires server)</summary>
+
+        /// <summary>Whisper STT HTTP server (cross-platform, requires the server running)</summary>
         Whisper
     }
 

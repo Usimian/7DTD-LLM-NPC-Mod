@@ -1,21 +1,20 @@
 namespace NPCLLMChat.TTS
 {
     /// <summary>
-    /// TTS Provider type
+    /// TTS Provider type.
+    ///
+    /// There is no Windows SAPI option and there cannot be one: System.Speech does not exist in
+    /// the Mono runtime the game embeds, so the voice cannot be synthesised inside the process on
+    /// any platform. Windows and Linux both talk to the Piper server, which is what
+    /// setup_servers.bat and setup_servers.sh build. A "Windows" value used to sit here backed by
+    /// a stub whose every method returned "not available".
     /// </summary>
     public enum TTSProvider
     {
-        /// <summary>
-        /// Auto-detect based on platform:
-        /// - Windows: Use Windows SAPI (built-in)
-        /// - Linux: Use Piper HTTP server
-        /// </summary>
+        /// <summary>Pick for the platform - which is the Piper server everywhere.</summary>
         Auto,
-        
-        /// <summary>Windows built-in SAPI (Windows only)</summary>
-        Windows,
-        
-        /// <summary>Piper TTS HTTP server (cross-platform, requires server)</summary>
+
+        /// <summary>Piper TTS HTTP server (cross-platform, requires the server running)</summary>
         Piper
     }
 

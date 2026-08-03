@@ -430,7 +430,7 @@ namespace NPCLLMChat
         {
             return new TTSConfig
             {
-                Provider = TTS.TTSProvider.Auto,  // Auto: Windows on Windows, Piper on Linux
+                Provider = TTS.TTSProvider.Auto,  // Auto resolves to the Piper server on every platform
                 Enabled = true,
                 Endpoint = "http://localhost:5050/synthesize",
                 TimeoutSeconds = 10,
@@ -515,7 +515,7 @@ namespace NPCLLMChat
         {
             return new STTConfig
             {
-                Provider = STT.STTProvider.Auto,  // Auto: Windows on Windows, Whisper on Linux
+                Provider = STT.STTProvider.Auto,  // Auto resolves to the Whisper server on every platform
                 Enabled = true,
                 Endpoint = "http://localhost:5051/transcribe",
                 TimeoutSeconds = 10,

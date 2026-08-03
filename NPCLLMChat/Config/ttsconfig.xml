@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     NPC LLM Chat - Text-to-Speech Configuration
-    
-    Cross-platform support:
-    - Windows 11: Uses Windows SAPI (built-in, no server needed)
-    - Ubuntu 24:  Uses Piper TTS server (requires server running)
-    
-    Provider "Auto" automatically selects based on your platform.
+
+    Windows and Linux both use the Piper TTS server. Run setup_servers.bat
+    (or setup_servers.sh) once and the game starts it for you.
+
+    There is no built-in-Windows-voice option. The game embeds a Mono runtime
+    with no System.Speech in it, so Windows SAPI cannot be reached from inside
+    the mod on any version of Windows. Earlier notes here promised otherwise.
 -->
 <TTSConfig>
     <!-- TTS Server Configuration -->
     <Server>
         <!--
             TTS Provider:
-            - Auto    : Windows SAPI on Windows, Piper on Linux (recommended)
-            - Windows : Force Windows SAPI (Windows only)
-            - Piper   : Force Piper server (requires server running)
+            - Auto  : the Piper server (recommended - this is what it picks)
+            - Piper : the same thing, stated outright
         -->
         <Provider>Auto</Provider>
 

@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     NPC LLM Chat - Speech-to-Text Configuration
-    
-    Cross-platform support:
-    - Windows 11: Uses Windows Speech Recognition (built-in, no server needed)
-    - Ubuntu 24:  Uses Whisper STT server (requires server running)
-    
-    Provider "Auto" automatically selects based on your platform.
+
+    Windows and Linux both use the Whisper STT server. Run setup_servers.bat
+    (or setup_servers.sh) once and the game starts it for you.
+
+    There is no built-in-Windows-recognition option. The game embeds a Mono
+    runtime with no System.Speech in it, so Windows Speech Recognition cannot
+    be reached from inside the mod. Earlier notes here promised otherwise.
 -->
 <STTConfig>
     <!-- STT Server Configuration -->
     <Server>
         <!--
             STT Provider:
-            - Auto    : Windows Speech Recognition on Windows, Whisper on Linux (recommended)
-            - Windows : Force Windows Speech Recognition (Windows only)
-            - Whisper : Force Whisper server (requires server running)
+            - Auto    : the Whisper server (recommended - this is what it picks)
+            - Whisper : the same thing, stated outright
         -->
         <Provider>Auto</Provider>
 

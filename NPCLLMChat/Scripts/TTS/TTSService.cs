@@ -8,9 +8,8 @@ using UnityEngine.Networking;
 namespace NPCLLMChat.TTS
 {
     /// <summary>
-    /// Text-to-speech service with cross-platform support.
-    /// - Windows: Uses Windows SAPI (System.Speech.Synthesis) - no server needed
-    /// - Linux: Uses Piper HTTP server
+    /// Text-to-speech service. Windows and Linux alike talk to the Piper HTTP server; System.
+    /// Speech is not in the game's Mono runtime, so there is no in-process voice on any platform.
     /// </summary>
     public class TTSService : MonoBehaviour
     {
