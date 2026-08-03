@@ -266,6 +266,7 @@ namespace NPCLLMChat.Harmony
                 Log.Warning($"[NPCLLMChat] NPC {entity.EntityName} [id {_entityId}] removed from world at " +
                             $"({(int)entity.position.x}, {(int)entity.position.z}), dead={entity.IsDead()}");
             }
+            NPCContainerCache.Forget(_entityId, entity?.EntityName);
             NPCCorePatches.RemoveChatComponent(_entityId);
         }
     }

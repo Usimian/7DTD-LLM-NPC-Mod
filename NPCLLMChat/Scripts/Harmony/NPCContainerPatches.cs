@@ -39,6 +39,25 @@ namespace NPCLLMChat.Harmony
             if (!string.IsNullOrEmpty(npcName) && _byName.TryGetValue(npcName, out entry)) return entry.Items;
             return null;
         }
+
+        /// <summary>
+        /// Drop what was remembered when the NPC leaves the world.
+        ///
+        /// The array is only live while the container behind it is. Picking her up serialises
+        /// the store into the pickup item and setting her down builds a fresh one, so the array
+        /// held here is detached the moment she is removed - and the by-name fallback, which
+        /// exists to survive the new entity id, would go on serving those contents under it.
+        /// She would state the pack she had before the pickup with complete confidence, which
+        /// is the failure that lost a beer once already. Better a companion who says she needs
+        /// to check than one who is certain and wrong.
+        /// </summary>
+        public static void Forget(int entityId, string npcName)
+        {
+            bool had = _byEntityId.Remove(entityId);
+            if (!string.IsNullOrEmpty(npcName)) had |= _byName.Remove(npcName);
+            if (had) Log.Out($"[NPCLLMChat] Forgot cached store for {npcName ?? "?"} [id {entityId}] - " +
+                             "it left the world, so open her pack once when she is back");
+        }
     }
 
     [HarmonyPatch(typeof(XUiC_LootWindow), nameof(XUiC_LootWindow.SetTileEntityChest))]
