@@ -2284,7 +2284,18 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 // Three separate stores: lootContainer (what the hire UI shows), the vanilla
                 // bag, and the toolbelt slots that hold what she actually equips and uses.
                 var carried = new List<ItemStack>();
-                if (_npcEntity.lootContainer?.items != null) carried.AddRange(_npcEntity.lootContainer.items);
+                // Her pack proper. SCore files it in HarvestManager under her entity id, so
+                // reading lootContainer alone showed only the toolbelt - which is why she knew
+                // what she was carrying right after her pack was opened, and forgot it again
+                // on the next load. It was never that the items had gone; she could not see them.
+                var pack = NPCLLMChat.Harmony.NPCCorePatches.GetNPCPack(_entityId);
+                if (pack?.items != null) carried.AddRange(pack.items);
+                // Only if it is a different store - once the hire UI is open these are the same object
+                if (_npcEntity.lootContainer?.items != null &&
+                    !ReferenceEquals(_npcEntity.lootContainer, pack))
+                {
+                    carried.AddRange(_npcEntity.lootContainer.items);
+                }
                 var ownBag = _npcEntity.bag?.GetSlots();
                 if (ownBag != null) carried.AddRange(ownBag);
                 // Her toolbelt holds XNPCCore's own weapon tokens - gunNPCM60, ammoNPC9mm - which

@@ -102,6 +102,44 @@ namespace NPCLLMChat.Harmony
             }
         }
 
+        private static MethodInfo _harvestGetOrCreate;
+        private static MethodInfo _harvestHas;
+        private static bool _harvestResolved;
+
+        /// <summary>
+        /// SCore keeps an NPC's real pack in HarvestManager - one TileEntityLootContainer per
+        /// entity id - and not in entity.lootContainer, which stays empty until the hire UI
+        /// fills it. Anything that wants to know what she is carrying has to ask here.
+        /// </summary>
+        internal static ITileEntityLootable GetNPCPack(int entityId)
+        {
+            if (!_harvestResolved)
+            {
+                _harvestResolved = true;
+                var harvest = AccessTools.TypeByName("HarvestManager");
+                _harvestGetOrCreate = harvest == null ? null : AccessTools.Method(harvest, "GetOrCreate");
+                _harvestHas = harvest == null ? null : AccessTools.Method(harvest, "Has");
+                if (_harvestGetOrCreate == null)
+                {
+                    Log.Warning("HarvestManager not found - she will not be able to see her own pack");
+                }
+            }
+            if (_harvestGetOrCreate == null) return null;
+
+            try
+            {
+                // Ask Has first: GetOrCreate would manufacture an empty container for every
+                // entity id it is handed, which is not a question worth asking of the world.
+                if (_harvestHas != null && !(bool)_harvestHas.Invoke(null, new object[] { entityId })) return null;
+                return _harvestGetOrCreate.Invoke(null, new object[] { entityId }) as ITileEntityLootable;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not read pack for entity {entityId}: {ex.Message}");
+                return null;
+            }
+        }
+
         internal static bool IsHiredByPlayer(EntityAlive npc)
         {
             if (npc?.Buffs == null) return false;
@@ -405,19 +443,15 @@ namespace NPCLLMChat.Harmony
     [HarmonyPatch]
     public class DropCompanionPackOnDeathPatch
     {
-        private static MethodInfo _getOrCreate;
-
         static MethodBase TargetMethod()
         {
             var sdx = AccessTools.TypeByName("EntityAliveSDX");
-            var harvest = AccessTools.TypeByName("HarvestManager");
-            _getOrCreate = harvest == null ? null : AccessTools.Method(harvest, "GetOrCreate");
             return sdx == null ? null : AccessTools.Method(sdx, "dropItemOnDeath");
         }
 
         static bool Prepare()
         {
-            bool ready = TargetMethod() != null && _getOrCreate != null;
+            bool ready = TargetMethod() != null;
             if (!ready)
             {
                 Log.Warning("Could not hook companion death drops - her pack may be " +
@@ -432,8 +466,7 @@ namespace NPCLLMChat.Harmony
 
             try
             {
-                var container = _getOrCreate.Invoke(null, new object[] { __instance.entityId })
-                                as ITileEntityLootable;
+                var container = NPCCorePatches.GetNPCPack(__instance.entityId);
                 if (container == null || container.IsEmpty())
                 {
                     Log.Out($"{__instance.EntityName} died carrying nothing");
