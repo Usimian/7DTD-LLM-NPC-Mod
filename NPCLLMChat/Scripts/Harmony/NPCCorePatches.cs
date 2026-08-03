@@ -82,6 +82,48 @@ namespace NPCLLMChat.Harmony
             return chatComponent;
         }
 
+        /// <summary>
+        /// Attach the companion's chat component without waiting to be spoken to.
+        ///
+        /// It used to appear only on the first word of a session, and everything that lives on
+        /// its Update went with it: she wrote nothing in her notebook, took no cargo snapshots,
+        /// and - the one that costs real things - was never marked to survive logout. A session
+        /// where the player never happened to say hello left her unprotected at the save.
+        ///
+        /// Only the player's own companion, and only within talking distance. Attaching to every
+        /// NPC in the world would mean a memory file and an update loop for every raider in the
+        /// county, which is a cost with nothing on the other side of it.
+        /// </summary>
+        public static void AttachToNearbyCompanion()
+        {
+            var world = GameManager.Instance?.World;
+            var player = world?.GetPrimaryPlayer();
+            if (world == null || player == null) return;
+
+            foreach (var entity in world.Entities.list)
+            {
+                if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
+                if (alive.entityId == player.entityId) continue;
+                if (!NPCLLMChatMod.IsNPC(alive)) continue;
+                if (Vector3.Distance(player.position, alive.position) > 30f) continue;
+                if (!IsHiredByPlayer(alive)) continue;
+                if (alive.gameObject?.GetComponent<NPCChatComponent>() != null) continue;
+
+                GetOrCreateChatComponent(alive);
+                return;   // she is the only one this applies to
+            }
+        }
+
+        private static bool IsHiredByPlayer(EntityAlive npc)
+        {
+            if (npc?.Buffs == null) return false;
+            foreach (string cvar in new[] { "Leader", "Owner" })
+            {
+                if (npc.Buffs.HasCustomVar(cvar) && npc.Buffs.GetCustomVar(cvar) > 0f) return true;
+            }
+            return false;
+        }
+
         public static void RemoveChatComponent(int entityId)
         {
             _npcChatComponents.Remove(entityId);

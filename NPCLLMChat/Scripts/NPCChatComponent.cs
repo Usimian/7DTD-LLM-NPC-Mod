@@ -2104,6 +2104,13 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             return BuildWorldContext();
         }
 
+        /// <summary>
+        /// Size of the last world context built for any NPC. The settings dialog reads it so the
+        /// context gauge still says something when she is off guarding somewhere - which is
+        /// exactly when a player is most likely to be in the menu looking at it.
+        /// </summary>
+        public static int LastContextChars { get; private set; }
+
         private string BuildWorldContext()
         {
             try
@@ -2394,6 +2401,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                               "not written above, you have simply never come across it, and the honest answer is that " +
                               "you do not know - not a guess, and never a name you have not seen for yourself.");
                 sb.AppendLine("When asked where a place is, point the player to it using the compass direction and rough distance given above (e.g. \"about 400 meters northeast of here\") and say how close it is.");
+                LastContextChars = sb.Length;
                 return sb.ToString();
             }
             catch (Exception ex)

@@ -40,8 +40,8 @@
 
                     <!-- TTS Enable Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Text-to-Speech" font_size="16" style="label_outline"/>
-                        <togglebutton enabled="true" name="toggleTTS" pos="480,0" width="150" height="31" depth="3"
+                        <label pos="0,-20" pivot="Left" text="Text-to-Speech" font_size="16" style="label_outline"/>
+                        <togglebutton enabled="true" name="toggleTTS" pos="480,-5" width="150" height="30" depth="3"
                                       font_size="15" caption="Enabled"/>
                     </panel>
 
@@ -53,29 +53,29 @@
 
                     <!-- Volume Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Volume" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderVolume" pos="180,0" width="450" height="31" depth="3"/>
+                        <label pos="0,-20" pivot="Left" text="Volume" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderVolume" pos="180,-5" width="450" height="30" depth="3"/>
                     </panel>
 
                     <!-- Speech Rate Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Speech Rate" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderSpeechRate" pos="180,0" width="450" height="31" depth="3"/>
+                        <label pos="0,-20" pivot="Left" text="Speech Rate" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderSpeechRate" pos="180,-5" width="450" height="30" depth="3"/>
                     </panel>
 
                     <!-- Companion Voice Row: dropdown listing every voice installed on the TTS server -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Companion Voice" font_size="16" style="label_outline"/>
+                        <label pos="0,-20" pivot="Left" text="Companion Voice" font_size="16" style="label_outline"/>
                         <!-- height must be EVEN: the combobox template centers an internal
                              button at height/2 and the game's Vector2i parser rejects .5 -->
-                        <combobox depth="3" name="cbxCompanionVoice" pos="180,0" width="450" height="30"
+                        <combobox depth="3" name="cbxCompanionVoice" pos="180,-5" width="450" height="30"
                                   type="ComboBoxList`1[System.String]" value_wrap="true"/>
                     </panel>
 
                     <!-- STT Enable Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Speech-to-Text" font_size="16" style="label_outline"/>
-                        <togglebutton enabled="true" name="toggleSTT" pos="480,0" width="150" height="31" depth="3"
+                        <label pos="0,-20" pivot="Left" text="Speech-to-Text" font_size="16" style="label_outline"/>
+                        <togglebutton enabled="true" name="toggleSTT" pos="480,-5" width="150" height="30" depth="3"
                                       font_size="15" caption="Enabled"/>
                     </panel>
 
@@ -83,32 +83,32 @@
                          near capacity and an overflowing panel breaks the window layout.
                          Combobox height must stay EVEN (see the companion voice note). -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="AI Model" font_size="16" style="label_outline"/>
-                        <combobox depth="3" name="cbxProvider" pos="150,0" width="210" height="30"
+                        <label pos="0,-20" pivot="Left" text="AI Model" font_size="16" style="label_outline"/>
+                        <combobox depth="3" name="cbxProvider" pos="150,-5" width="210" height="30"
                                   type="ComboBoxList`1[System.String]" value_wrap="true"/>
                         <!-- Was butted straight against the combobox arrows in a smaller font on
                              a taller box, so the model name sat high and looked like part of the
                              dropdown. Same height and size as its neighbour, with a gap. -->
-                        <textfield enabled="true" name="txtModel" pos="372,0" width="258" height="30" depth="3"
+                        <textfield enabled="true" name="txtModel" pos="372,-5" width="258" height="30" depth="3"
                                    font_size="16" text="llama3.3:70b"/>
                     </panel>
 
                     <!-- Memory Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Memory (3-20)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderMaxHistory" pos="180,0" width="450" height="31" depth="3"/>
+                        <label pos="0,-20" pivot="Left" text="Memory (3-20)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderMaxHistory" pos="180,-5" width="450" height="30" depth="3"/>
                     </panel>
 
                     <!-- Chat Distance Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Chat Distance (3-15m)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderChatDistance" pos="180,0" width="450" height="31" depth="3"/>
+                        <label pos="0,-20" pivot="Left" text="Chat Distance (3-15m)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderChatDistance" pos="180,-5" width="450" height="30" depth="3"/>
                     </panel>
 
                     <!-- Voice Range Row -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Voice Range (5-20m)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderVoiceDistance" pos="180,0" width="450" height="31" depth="3"/>
+                        <label pos="0,-20" pivot="Left" text="Voice Range (5-20m)" font_size="16" style="label_outline"/>
+                        <slider enabled="true" value_text="" name="sliderVoiceDistance" pos="180,-5" width="450" height="30" depth="3"/>
                     </panel>
 
                     <!-- How full the companion's prompt is. Her notebook and the container
@@ -116,8 +116,8 @@
                          does not fail loudly - the model just loses the far end of what she was
                          told. Refreshed each time this dialog opens. -->
                     <panel width="640" height="40">
-                        <label pos="0,0" text="Context Used" font_size="16" style="label_outline"/>
-                        <label name="lblContextUsage" pos="180,0" width="450" height="31"
+                        <label pos="0,-20" pivot="Left" text="Context Used" font_size="16" style="label_outline"/>
+                        <label name="lblContextUsage" pos="180,-20" pivot="Left" width="450" height="31"
                                text="" font_size="16" style="label_outline"/>
                     </panel>
 

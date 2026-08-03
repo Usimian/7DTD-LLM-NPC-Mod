@@ -135,8 +135,9 @@ public class XUiC_NPCLLMChatConfig : XUiController
             if (sliderSpeechRate != null)
                 sliderSpeechRate.ValueFormatter = v => $"{0.5f + v * 1.5f:0.00}x";
 
+            // just the count - "10 messages" wrapped onto two shrunken lines in the value field
             if (sliderMaxHistory != null)
-                sliderMaxHistory.ValueFormatter = v => $"{Mathf.RoundToInt(3f + v * 17f)} messages";
+                sliderMaxHistory.ValueFormatter = v => $"{Mathf.RoundToInt(3f + v * 17f)}";
 
             if (sliderChatDistance != null)
                 sliderChatDistance.ValueFormatter = v => $"{Mathf.RoundToInt(3f + v * 12f)}m";
@@ -161,17 +162,30 @@ public class XUiC_NPCLLMChatConfig : XUiController
             try
             {
                 int window = LLMService.Instance?.ContextWindow ?? 0;
-                var companion = FindCompanion();
-                if (companion == null || window <= 0)
+                if (window <= 0)
                 {
-                    lblContextUsage.Text = "no companion nearby";
+                    lblContextUsage.Text = "unavailable";
                     return;
                 }
 
-                int tokens = LLMService.EstimateTokens(companion.DumpWorldContext().Length);
+                // Measure her directly when she is to hand, otherwise fall back to the last
+                // context anyone built - she is often off guarding when the menu is open, and a
+                // slightly stale number beats refusing to answer.
+                var companion = FindCompanion();
+                int chars = companion != null
+                    ? companion.DumpWorldContext().Length
+                    : NPCChatComponent.LastContextChars;
+                if (chars <= 0)
+                {
+                    lblContextUsage.Text = "no reading yet - talk to her once";
+                    return;
+                }
+
+                string age = companion != null ? "" : " (last reading)";
+                int tokens = LLMService.EstimateTokens(chars);
                 int percent = tokens * 100 / window;
                 string verdict = percent >= 85 ? " - TOO FULL" : percent >= 70 ? " - getting full" : "";
-                lblContextUsage.Text = $"{tokens} / {window} tokens ({percent}%){verdict}";
+                lblContextUsage.Text = $"{tokens} / {window} tokens ({percent}%){verdict}{age}";
             }
             catch (Exception ex)
             {
