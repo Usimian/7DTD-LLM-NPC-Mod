@@ -428,18 +428,25 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine();
             sb.AppendLine("[How to answer - this overrides every style note above]");
 
-            // She denied having a cola that was listed in her own pack, because she had denied it
-            // one turn earlier and stayed consistent with herself rather than re-reading. The
-            // notice existed, buried a long way up in the world state; agreeing with your own
-            // last answer beats a fact you have scrolled past. It goes here instead, last, where
-            // the instructions that actually win are.
-            if (!string.IsNullOrEmpty(_recentlyAdded) && Time.unscaledTime - _recentlyAddedAt < 600f)
+            // She kept denying items that were listed for her in the middle of the world state -
+            // "I checked three times, hon" - counting denials from previous sessions, because her
+            // conversation history outlives a restart. Against three of her own flat statements,
+            // one fact she scrolled past does not stand a chance, so the list is repeated here at
+            // the end where the instructions that win are, every time and not only when something
+            // has just arrived. The arrival notice never fired for the cola anyway: her pack is
+            // baselined on the first read of a session, so anything already in it is not "new".
+            if (!string.IsNullOrEmpty(_packContents))
             {
-                sb.AppendLine($"BEFORE ANYTHING ELSE: {_recentlyAdded} is in your pack now - it arrived in the " +
-                              "last few minutes and the list above is current. If you told him a moment ago that " +
-                              "your pack held nothing new, YOU WERE WRONG and you say so lightly - \"hang on, so " +
-                              "there is\" - rather than insisting. Never deny carrying something that is on the " +
-                              "list, and never claim to have checked and found nothing when it is right there.");
+                sb.AppendLine($"YOUR PACK, RIGHT NOW: {_packContents}. That is read off your own bag this second " +
+                              "and it is not up for debate. If you said anything different earlier - even three " +
+                              "times, even yesterday - you were wrong and this is what is true now. Say so lightly, " +
+                              "\"hang on, so there is\", and never insist you checked and found nothing when the " +
+                              "thing is right there on that list.");
+            }
+            else
+            {
+                sb.AppendLine("YOUR PACK, RIGHT NOW: empty. If you told him earlier you were carrying something, " +
+                              "it has gone since.");
             }
             sb.AppendLine("FIRST: if the player asks about something the world state above actually tells you - " +
                           "what is in your pack, where a place is, the time, the weather, the horde, your health - " +
@@ -1075,6 +1082,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private Dictionary<string, int> _lastPackItems;
         private string _recentlyAdded;
         private float _recentlyAddedAt;
+        // Last computed contents of her pack, repeated at the end of the prompt. She kept
+        // denying items that were listed for her in the middle of it.
+        private string _packContents;
         private float _lastCaffeineTime = -9999f;
         private int _lastCoffeeCount = -1;
 
@@ -2072,15 +2082,16 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         {
             string forCold = Rated(cold, "the cold");
             string forHeat = Rated(heat, "the heat");
-            if (forCold == null && forHeat == null) return "have nothing on that helps against heat or cold";
+            if (forCold == null && forHeat == null) return "has nothing on that helps against heat or cold";
             if (forCold != null && forHeat != null) return $"{forCold}, and {forHeat}";
             return forCold ?? forHeat;
         }
 
+        /// <summary>Reads after "he", so third person singular - it came out "he are" otherwise.</summary>
         private static string Rated(float value, string against)
         {
-            if (value >= 20f) return $"are properly kitted out for {against}";
-            if (value >= 8f) return $"have something on for {against}, though not much";
+            if (value >= 20f) return $"is properly kitted out for {against}";
+            if (value >= 8f) return $"has something on for {against}, though not much";
             return null;
         }
 
@@ -2255,6 +2266,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 _lastPackItems = packNow;
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
+                _packContents = carrying;
                 Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
                         $"lootContainer: {WorldContextHelper.SummarizeStacks(_npcEntity.lootContainer?.items) ?? "(empty)"} | " +
                         $"bag: {WorldContextHelper.SummarizeStacks(ownBag) ?? "(empty)"} | " +
