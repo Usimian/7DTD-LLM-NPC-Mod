@@ -487,8 +487,16 @@ Examples:
             foreach (string line in lines) Log.Out($"[NPCLLMChat] context| {line.TrimEnd()}");
             Log.Out("[NPCLLMChat] context| === end ===");
 
+            int tokens = LLMService.EstimateTokens(context.Length);
+            int window = LLMService.Instance?.ContextWindow ?? 0;
+            string budget = window > 0
+                ? $"about {tokens} of {window} tokens, {tokens * 100 / window}% of the window before history"
+                : $"about {tokens} tokens";
+
             output.Output($"Wrote {npc.EntityName}'s world context to the log " +
-                          $"({lines.Length} lines, {context.Length} chars) - console left clear for the conversation.");
+                          $"({lines.Length} lines, {context.Length} chars; {budget}) - " +
+                          "console left clear for the conversation.");
+            Log.Out($"[NPCLLMChat] context| === end ({budget}) ===");
         }
 
         private static string Bearing(Vector3 from, Vector3 to)

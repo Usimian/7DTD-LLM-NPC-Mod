@@ -106,6 +106,16 @@
                                 min_value="5" max_value="20"/>
                     </panel>
 
+                    <!-- How full the companion's prompt is. Her notebook and the container
+                         contents she remembers both grow with play, and overrunning the window
+                         does not fail loudly - the model just loses the far end of what she was
+                         told. Refreshed each time this dialog opens. -->
+                    <panel width="640" height="40">
+                        <label pos="0,0" text="Context Used" font_size="16" style="label_outline"/>
+                        <label name="lblContextUsage" pos="180,0" width="450" height="31"
+                               text="" font_size="16" style="label_outline"/>
+                    </panel>
+
                     <!-- Spacer -->
                     <rect/>
 

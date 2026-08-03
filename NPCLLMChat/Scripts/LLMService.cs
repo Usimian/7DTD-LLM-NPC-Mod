@@ -116,8 +116,66 @@ namespace NPCLLMChat
                 return;
             }
 
+            int chars = (systemPrompt?.Length ?? 0) + (playerMessage?.Length ?? 0);
+            if (conversationHistory != null)
+            {
+                foreach (var message in conversationHistory) chars += message?.Content?.Length ?? 0;
+            }
+            WarnIfContextTight(chars, "chat");
+
             _pendingRequests.Add(npcId);
             StartCoroutine(SendRequestCoroutine(npcId, systemPrompt, conversationHistory, playerMessage, onResponse, onError));
+        }
+
+        /// <summary>
+        /// Estimated tokens in a prompt of this many characters. Four characters to the token is
+        /// the usual rule of thumb for English and is close enough to warn on - the point is to
+        /// notice the ceiling coming, not to bill for it.
+        /// </summary>
+        public static int EstimateTokens(int chars)
+        {
+            return chars / 4;
+        }
+
+        public int ContextWindow => _numCtx;
+
+        // Only complain when the band changes, or every reply would carry the same warning.
+        private int _lastContextBand = -1;
+
+        /// <summary>
+        /// Say something before the window fills rather than after.
+        ///
+        /// Overrunning it does not fail loudly: the model silently loses whatever falls off, which
+        /// showed up once already as her flatly denying an item that was listed near the end of her
+        /// own prompt. Her notebook and the stored container contents both grow with play, so this
+        /// gets tighter over a long save without anything appearing to change.
+        /// </summary>
+        private void WarnIfContextTight(int chars, string what)
+        {
+            if (_numCtx <= 0) return;
+
+            int tokens = EstimateTokens(chars);
+            int percent = tokens * 100 / _numCtx;
+            int band = percent >= 95 ? 3 : percent >= 85 ? 2 : percent >= 70 ? 1 : 0;
+            if (band == _lastContextBand) return;
+            _lastContextBand = band;
+
+            if (band == 0)
+            {
+                Log.Out($"[NPCLLMChat] Context back under 70% ({tokens} of {_numCtx} tokens)");
+                return;
+            }
+
+            string advice = "Trim what she is told - the stored trader stock is the least useful of it - " +
+                            "or raise NumCtx in llmconfig.xml.";
+            string message = $"[NPCLLMChat] Context {percent}% full on the {what} prompt: about {tokens} tokens " +
+                             $"of {_numCtx} ({chars} chars). ";
+
+            if (band >= 2) Log.Warning(message + (band == 3
+                ? "AT THE LIMIT - the oldest part of the prompt is being dropped, and she will " +
+                  "start missing things she has been told. " + advice
+                : advice));
+            else Log.Out(message + advice);
         }
 
         private IEnumerator SendRequestCoroutine(
@@ -205,6 +263,8 @@ namespace NPCLLMChat
         /// </summary>
         public void SendCompletionRequest(string prompt, float temperature, Action<string> onResponse, Action<string> onError, int budget = 0)
         {
+            // Carries the whole world context too, so it hits the ceiling at the same time
+            WarnIfContextTight(prompt?.Length ?? 0, "completion");
             StartCoroutine(SendCompletionCoroutine(prompt, temperature, onResponse, onError, budget));
         }
 

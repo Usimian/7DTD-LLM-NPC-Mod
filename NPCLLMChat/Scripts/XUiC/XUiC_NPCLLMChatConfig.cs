@@ -47,6 +47,8 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
         private XUiC_SimpleButton btnReloadPersona;
 
+        private XUiV_Label lblContextUsage;
+
         private EntityPlayerLocal _entityPlayerLocal;
 
         // CVar names for persistence
@@ -100,6 +102,8 @@ public class XUiC_NPCLLMChatConfig : XUiController
             txtModel = GetChildById("txtModel") as XUiC_TextInput;
 
             btnReloadPersona = GetChildById("btnReloadPersona") as XUiC_SimpleButton;
+
+            lblContextUsage = GetChildById("lblContextUsage")?.ViewComponent as XUiV_Label;
             if (btnReloadPersona != null) btnReloadPersona.OnPressed += BtnReloadPersona_OnPressed;
 
             // Wire up button events
@@ -112,6 +116,65 @@ public class XUiC_NPCLLMChatConfig : XUiController
             if (btnClearConversations != null) btnClearConversations.OnPressed += BtnClearConversations_OnPressed;
         }
 
+        /// <summary>
+        /// How full the companion's prompt is, measured from the real thing rather than estimated
+        /// in the abstract.
+        ///
+        /// Her notebook and the container contents she keeps track of both grow the longer a save
+        /// runs, and overrunning the window is silent - the model simply loses the far end of what
+        /// she was told, which reads as her having forgotten something she was plainly given. This
+        /// is the number that says how much room is left before that starts.
+        /// </summary>
+        private void ShowContextUsage()
+        {
+            if (lblContextUsage == null) return;
+
+            try
+            {
+                int window = LLMService.Instance?.ContextWindow ?? 0;
+                var companion = FindCompanion();
+                if (companion == null || window <= 0)
+                {
+                    lblContextUsage.Text = "no companion nearby";
+                    return;
+                }
+
+                int tokens = LLMService.EstimateTokens(companion.DumpWorldContext().Length);
+                int percent = tokens * 100 / window;
+                string verdict = percent >= 85 ? " - TOO FULL" : percent >= 70 ? " - getting full" : "";
+                lblContextUsage.Text = $"{tokens} / {window} tokens ({percent}%){verdict}";
+            }
+            catch (Exception ex)
+            {
+                lblContextUsage.Text = "unavailable";
+                Log.Warning($"[NPCLLMChat] Context usage readout failed: {ex.Message}");
+            }
+        }
+
+        /// <summary>The player's companion, if she is loaded and close enough to read.</summary>
+        private NPCChatComponent FindCompanion()
+        {
+            var world = GameManager.Instance?.World;
+            if (world == null || _entityPlayerLocal == null) return null;
+
+            NPCChatComponent nearest = null;
+            float nearestDistance = 30f;
+            foreach (var entity in world.Entities.list)
+            {
+                if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
+                var chat = alive.GetComponent<NPCChatComponent>();
+                if (chat == null || !chat.IsCompanion) continue;
+
+                float distance = Vector3.Distance(_entityPlayerLocal.position, alive.position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearest = chat;
+                }
+            }
+            return nearest;
+        }
+
         public override void OnOpen()
         {
             base.OnOpen();
@@ -122,6 +185,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             // Load current settings from player buffs (or defaults from config)
             LoadSettings();
+            ShowContextUsage();
 
             // Log the actual slider values after loading
             if (sliderVolume != null)
