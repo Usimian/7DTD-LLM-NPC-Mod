@@ -104,6 +104,8 @@ public class XUiC_NPCLLMChatConfig : XUiController
             btnReloadPersona = GetChildById("btnReloadPersona") as XUiC_SimpleButton;
 
             lblContextUsage = GetChildById("lblContextUsage")?.ViewComponent as XUiV_Label;
+
+            ShowRealSliderValues();
             if (btnReloadPersona != null) btnReloadPersona.OnPressed += BtnReloadPersona_OnPressed;
 
             // Wire up button events
@@ -114,6 +116,33 @@ public class XUiC_NPCLLMChatConfig : XUiController
             if (btnTestSTT != null) btnTestSTT.OnPressed += BtnTestSTT_OnPressed;
             if (btnTestLLM != null) btnTestLLM.OnPressed += BtnTestLLM_OnPressed;
             if (btnClearConversations != null) btnClearConversations.OnPressed += BtnClearConversations_OnPressed;
+        }
+
+        /// <summary>
+        /// Label each slider with what it actually means.
+        ///
+        /// XUiC_Slider.Value is Mathf.Clamp01, so the control is always a 0-1 fraction and the
+        /// min_value/max_value attributes in the window XML do nothing at all. The settings were
+        /// being stored correctly - the code maps each range on the way in and out - but the
+        /// number on screen was the raw fraction, so Memory read "0.41" instead of 10 and Chat
+        /// Distance read "0.17" instead of 5 metres. valueFormatter exists for this.
+        /// </summary>
+        private void ShowRealSliderValues()
+        {
+            if (sliderVolume != null)
+                sliderVolume.ValueFormatter = v => $"{Mathf.RoundToInt(v * 100f)}%";
+
+            if (sliderSpeechRate != null)
+                sliderSpeechRate.ValueFormatter = v => $"{0.5f + v * 1.5f:0.00}x";
+
+            if (sliderMaxHistory != null)
+                sliderMaxHistory.ValueFormatter = v => $"{Mathf.RoundToInt(3f + v * 17f)} messages";
+
+            if (sliderChatDistance != null)
+                sliderChatDistance.ValueFormatter = v => $"{Mathf.RoundToInt(3f + v * 12f)}m";
+
+            if (sliderVoiceDistance != null)
+                sliderVoiceDistance.ValueFormatter = v => $"{Mathf.RoundToInt(5f + v * 15f)}m";
         }
 
         /// <summary>

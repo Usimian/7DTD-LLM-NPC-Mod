@@ -30,7 +30,8 @@
                        font_size="24" justify="center"/>
 
                 <!-- Close button -->
-                <simplebutton enabled="true" name="btnClose" pos="665,10" width="30" height="36" depth="4"
+                <!-- was flush against the window edge -->
+                <simplebutton enabled="true" name="btnClose" pos="652,12" width="32" height="32" depth="4"
                               caption="X" font_size="18"/>
 
                 <!-- Settings Grid - 1 column, everything stacks vertically -->
@@ -44,18 +45,22 @@
                                       font_size="15" caption="Enabled"/>
                     </panel>
 
+                    <!-- Sliders carry no min_value/max_value: XUiC_Slider.Value is Clamp01, so
+                         the control is always a 0-1 fraction and those attributes did nothing.
+                         Each real range lives in the controller, which maps it both ways and
+                         sets a ValueFormatter so the number on screen is metres or messages
+                         rather than the bare fraction. -->
+
                     <!-- Volume Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Volume" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderVolume" pos="180,0" width="450" height="31" depth="3"
-                                min_value="0" max_value="100"/>
+                        <slider enabled="true" value_text="" name="sliderVolume" pos="180,0" width="450" height="31" depth="3"/>
                     </panel>
 
                     <!-- Speech Rate Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Speech Rate" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderSpeechRate" pos="180,0" width="450" height="31" depth="3"
-                                min_value="50" max_value="200"/>
+                        <slider enabled="true" value_text="" name="sliderSpeechRate" pos="180,0" width="450" height="31" depth="3"/>
                     </panel>
 
                     <!-- Companion Voice Row: dropdown listing every voice installed on the TTS server -->
@@ -79,31 +84,31 @@
                          Combobox height must stay EVEN (see the companion voice note). -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="AI Model" font_size="16" style="label_outline"/>
-                        <combobox depth="3" name="cbxProvider" pos="150,0" width="230" height="30"
+                        <combobox depth="3" name="cbxProvider" pos="150,0" width="210" height="30"
                                   type="ComboBoxList`1[System.String]" value_wrap="true"/>
-                        <textfield enabled="true" name="txtModel" pos="390,0" width="240" height="31" depth="3"
-                                   font_size="14" text="llama3.3:70b"/>
+                        <!-- Was butted straight against the combobox arrows in a smaller font on
+                             a taller box, so the model name sat high and looked like part of the
+                             dropdown. Same height and size as its neighbour, with a gap. -->
+                        <textfield enabled="true" name="txtModel" pos="372,0" width="258" height="30" depth="3"
+                                   font_size="16" text="llama3.3:70b"/>
                     </panel>
 
                     <!-- Memory Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Memory (3-20)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderMaxHistory" pos="180,0" width="450" height="31" depth="3"
-                                min_value="3" max_value="20"/>
+                        <slider enabled="true" value_text="" name="sliderMaxHistory" pos="180,0" width="450" height="31" depth="3"/>
                     </panel>
 
                     <!-- Chat Distance Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Chat Distance (3-15m)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderChatDistance" pos="180,0" width="450" height="31" depth="3"
-                                min_value="3" max_value="15"/>
+                        <slider enabled="true" value_text="" name="sliderChatDistance" pos="180,0" width="450" height="31" depth="3"/>
                     </panel>
 
                     <!-- Voice Range Row -->
                     <panel width="640" height="40">
                         <label pos="0,0" text="Voice Range (5-20m)" font_size="16" style="label_outline"/>
-                        <slider enabled="true" value_text="" name="sliderVoiceDistance" pos="180,0" width="450" height="31" depth="3"
-                                min_value="5" max_value="20"/>
+                        <slider enabled="true" value_text="" name="sliderVoiceDistance" pos="180,0" width="450" height="31" depth="3"/>
                     </panel>
 
                     <!-- How full the companion's prompt is. Her notebook and the container
