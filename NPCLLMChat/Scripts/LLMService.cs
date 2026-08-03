@@ -137,28 +137,6 @@ namespace NPCLLMChat
             return chars / 4;
         }
 
-        // The companion's chat component used to appear only when she was first spoken to, taking
-        // her travel journal, her cargo snapshots and her survives-logout flag with it. This is
-        // the mod's one always-running MonoBehaviour, so it is the cheapest place to notice her.
-        private float _nextCompanionScan;
-
-        private void Update()
-        {
-            if (Time.unscaledTime < _nextCompanionScan) return;
-            // Once a second, not every five. The sweep also holds her respawn flag up, and the
-            // window that has to cover is however long SCore's leader lookup happens to fail for.
-            _nextCompanionScan = Time.unscaledTime + 1f;
-
-            try
-            {
-                Harmony.NPCCorePatches.AttachToNearbyCompanion();
-            }
-            catch (Exception ex)
-            {
-                Log.Warning($"[NPCLLMChat] Companion scan failed: {ex.Message}");
-            }
-        }
-
         public int ContextWindow => _numCtx;
 
         // Only complain when the band changes, or every reply would carry the same warning.

@@ -82,59 +82,7 @@ namespace NPCLLMChat.Harmony
             return chatComponent;
         }
 
-        /// <summary>
-        /// Attach the companion's chat component without waiting to be spoken to.
-        ///
-        /// It used to appear only on the first word of a session, and everything that lives on
-        /// its Update went with it: she wrote nothing in her notebook, took no cargo snapshots,
-        /// and - the one that costs real things - was never marked to survive logout. A session
-        /// where the player never happened to say hello left her unprotected at the save.
-        ///
-        /// Only the player's own companion, and only within talking distance. Attaching to every
-        /// NPC in the world would mean a memory file and an update loop for every raider in the
-        /// county, which is a cost with nothing on the other side of it.
-        /// </summary>
-        public static void AttachToNearbyCompanion()
-        {
-            var world = GameManager.Instance?.World;
-            var player = world?.GetPrimaryPlayer();
-            if (world == null || player == null) return;
-
-            foreach (var entity in world.Entities.list)
-            {
-                if (!(entity is EntityAlive alive) || alive.IsDead()) continue;
-                if (alive.entityId == player.entityId) continue;
-                if (!NPCLLMChatMod.IsNPC(alive)) continue;
-                if (!IsHiredByPlayer(alive)) continue;
-
-                // Hold the respawn flag up at any distance. SCore drops it whenever it cannot
-                // resolve her leader, and the world then unloads her permanently - which is most
-                // likely exactly when she is far away, left on Stay, or the player has just
-                // loaded in. Waiting until she is close enough to talk to would leave the flag
-                // unguarded in the very situations that lose her.
-                // Dismissing her is the one way to be rid of her. SCore marks that with
-                // buffOrderDismiss, which LeaderUpdate itself checks before anything else, so
-                // honouring it here means a dismissal still works exactly as it always did -
-                // and nothing else takes her away.
-                if (alive.Buffs != null && alive.Buffs.HasBuff("buffOrderDismiss")) continue;
-
-                if (!alive.bWillRespawn)
-                {
-                    alive.bWillRespawn = true;
-                    Log.Warning($"[NPCLLMChat] {alive.EntityName} [id {alive.entityId}] had bWillRespawn=false " +
-                                $"at {Mathf.RoundToInt(Vector3.Distance(player.position, alive.position))}m - " +
-                                "restored, she would have been unloaded for good");
-                }
-
-                if (Vector3.Distance(player.position, alive.position) <= 30f &&
-                    alive.gameObject?.GetComponent<NPCChatComponent>() == null)
-                {
-                    GetOrCreateChatComponent(alive);
-                }
-            }
-        }
-
-        private static bool IsHiredByPlayer(EntityAlive npc)
+        internal static bool IsHiredByPlayer(EntityAlive npc)
         {
             if (npc?.Buffs == null) return false;
             foreach (string cvar in new[] { "Leader", "Owner" })
@@ -306,15 +254,24 @@ namespace NPCLLMChat.Harmony
 
         static void Postfix(EntityAlive __instance)
         {
-            if (__instance == null || __instance.bWillRespawn || __instance.IsDead()) return;
-            if (__instance.Buffs == null) return;
+            if (__instance == null || __instance.IsDead() || __instance.Buffs == null) return;
             if (__instance.Buffs.HasBuff("buffOrderDismiss")) return;
+            if (!NPCCorePatches.IsHiredByPlayer(__instance)) return;
 
-            bool hired = (__instance.Buffs.HasCustomVar("Leader") && __instance.Buffs.GetCustomVar("Leader") > 0f)
-                      || (__instance.Buffs.HasCustomVar("Owner") && __instance.Buffs.GetCustomVar("Owner") > 0f);
-            if (!hired) return;
+            if (!__instance.bWillRespawn)
+            {
+                __instance.bWillRespawn = true;
+                Log.Warning($"[NPCLLMChat] {__instance.EntityName} [id {__instance.entityId}] had " +
+                            "bWillRespawn=false - restored, she would have been unloaded for good");
+            }
 
-            __instance.bWillRespawn = true;
+            // Her chat component is hung here too. This runs as part of the game's own tick on
+            // her, so it is the event that says she exists and is hired - which is the whole of
+            // what a scan was ever asking, only without a clock of our own to be wrong about.
+            if (__instance.gameObject != null && __instance.gameObject.GetComponent<NPCChatComponent>() == null)
+            {
+                NPCCorePatches.GetOrCreateChatComponent(__instance);
+            }
         }
     }
 
