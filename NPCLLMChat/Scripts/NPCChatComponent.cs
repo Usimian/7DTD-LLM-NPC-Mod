@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+using HarmonyLib;
 using UnityEngine;
 using NPCLLMChat.Actions;
 using NPCLLMChat.TTS;
@@ -819,6 +821,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
             string was = _npcName;
             _npcEntity.SetEntityName(clean);
+            SetSDXFirstName(_npcEntity, clean);
             _npcName = clean;
             if (_memory != null)
             {
@@ -828,6 +831,24 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
             Log.Out($"[NPCLLMChat] Renamed {was} to {clean} [id {_npcEntity.entityId}]");
             return true;
+        }
+
+        /// <summary>
+        /// EntityAliveSDX overrides EntityName as a getter over its own private _strMyName, and
+        /// only falls back to the base entityName when that is empty. Hers is not empty - it is
+        /// how she got a name in the first place - so Entity.SetEntityName alone is invisible.
+        /// Write _strMyName as well. SCore serialises it, so the new name survives a reload.
+        /// </summary>
+        private static void SetSDXFirstName(EntityAlive npc, string name)
+        {
+            var field = AccessTools.Field(npc.GetType(), "_strMyName");
+            if (field == null)
+            {
+                Log.Warning("[NPCLLMChat] No _strMyName on " + npc.GetType().Name +
+                            " - the name may not show on her nameplate");
+                return;
+            }
+            field.SetValue(npc, name);
         }
 
         /// <summary>
