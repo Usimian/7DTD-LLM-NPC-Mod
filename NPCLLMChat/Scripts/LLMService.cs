@@ -57,9 +57,9 @@ namespace NPCLLMChat
             _numGpuLayers = config.NumGPULayers;
             _numCtx = config.NumCtx;
 
-            Log.Out($"[NPCLLMChat] LLMService initialized - Endpoint: {_endpoint}, Model: {_model}, " +
+            Log.Out($"LLMService initialized - Endpoint: {_endpoint}, Model: {_model}, " +
                     $"auth: {(string.IsNullOrEmpty(_apiKey) ? "none (local)" : "api key set")}");
-            Log.Out($"[NPCLLMChat] GPU Layers: {(_numGpuLayers > 0 ? _numGpuLayers.ToString() : "auto")}, Context: {_numCtx}");
+            Log.Out($"GPU Layers: {(_numGpuLayers > 0 ? _numGpuLayers.ToString() : "auto")}, Context: {_numCtx}");
         }
 
         public float LastResponseTimeMs => _lastResponseTimeMs;
@@ -80,7 +80,7 @@ namespace NPCLLMChat
             if (string.IsNullOrEmpty(endpoint)) return;
             _endpoint = endpoint;
             _apiKey = ResolveApiKey(new LLMConfig { ApiKey = _apiKey });
-            Log.Out($"[NPCLLMChat] LLM endpoint changed to: {_endpoint}");
+            Log.Out($"LLM endpoint changed to: {_endpoint}");
         }
 
         public void SetModel(string modelName)
@@ -88,7 +88,7 @@ namespace NPCLLMChat
             if (!string.IsNullOrEmpty(modelName))
             {
                 _model = modelName;
-                Log.Out($"[NPCLLMChat] LLM model changed to: {_model}");
+                Log.Out($"LLM model changed to: {_model}");
             }
         }
 
@@ -162,7 +162,7 @@ namespace NPCLLMChat
 
             if (band == 0)
             {
-                Log.Out($"[NPCLLMChat] Context back under 70% ({tokens} of {_numCtx} tokens)");
+                Log.Out($"Context back under 70% ({tokens} of {_numCtx} tokens)");
                 return;
             }
 
@@ -215,10 +215,10 @@ namespace NPCLLMChat
                 ApplyHeaders(request);
                 request.timeout = _timeoutSeconds;
 
-                Log.Out($"[NPCLLMChat] Sending request to LLM for NPC {npcId}");
-                Log.Out($"[NPCLLMChat] Endpoint: {_endpoint}");
-                Log.Out($"[NPCLLMChat] Model: {_model}");
-                Log.Out($"[NPCLLMChat] Request body (first 200 chars): {requestBody.Substring(0, Math.Min(200, requestBody.Length))}");
+                Log.Out($"Sending request to LLM for NPC {npcId}");
+                Log.Out($"Endpoint: {_endpoint}");
+                Log.Out($"Model: {_model}");
+                Log.Out($"Request body (first 200 chars): {requestBody.Substring(0, Math.Min(200, requestBody.Length))}");
 
                 yield return request.SendWebRequest();
 
@@ -234,7 +234,7 @@ namespace NPCLLMChat
                     string response = ParseResponse(request.downloadHandler.text);
                     if (!string.IsNullOrEmpty(response))
                     {
-                        Log.Out($"[NPCLLMChat] Got response for NPC {npcId} in {_lastResponseTimeMs:F0}ms: {response.Substring(0, Math.Min(50, response.Length))}...");
+                        Log.Out($"Got response for NPC {npcId} in {_lastResponseTimeMs:F0}ms: {response.Substring(0, Math.Min(50, response.Length))}...");
                         onResponse?.Invoke(response);
                     }
                     else
@@ -245,9 +245,9 @@ namespace NPCLLMChat
                 else
                 {
                     string error = $"LLM request failed: {request.error}";
-                    Log.Warning($"[NPCLLMChat] {error}");
-                    Log.Warning($"[NPCLLMChat] Response code: {request.responseCode}");
-                    Log.Warning($"[NPCLLMChat] Response text: {request.downloadHandler?.text}");
+                    Log.Warning($"{error}");
+                    Log.Warning($"Response code: {request.responseCode}");
+                    Log.Warning($"Response text: {request.downloadHandler?.text}");
                     onError?.Invoke(error);
                 }
             }
@@ -399,14 +399,14 @@ namespace NPCLLMChat
                     key = System.IO.File.ReadAllText(keyFile).Trim();
                     if (!string.IsNullOrEmpty(key))
                     {
-                        Log.Out("[NPCLLMChat] API key loaded from ~/.config/npcllm/api_key");
+                        Log.Out("API key loaded from ~/.config/npcllm/api_key");
                         return key;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Could not read API key file: {ex.Message}");
+                Log.Warning($"Could not read API key file: {ex.Message}");
             }
 
             return config.ApiKey ?? "";

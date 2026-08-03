@@ -41,13 +41,13 @@ namespace NPCLLMChat.Harmony
         {
             if (npc == null)
             {
-                Log.Warning("[NPCLLMChat] GetOrCreateChatComponent: npc is null");
+                Log.Warning("GetOrCreateChatComponent: npc is null");
                 return null;
             }
 
             if (npc.gameObject == null)
             {
-                Log.Warning($"[NPCLLMChat] GetOrCreateChatComponent: GameObject is null for {npc.EntityName}");
+                Log.Warning($"GetOrCreateChatComponent: GameObject is null for {npc.EntityName}");
                 return null;
             }
 
@@ -64,14 +64,14 @@ namespace NPCLLMChat.Harmony
                 {
                     try
                     {
-                        Log.Out($"[NPCLLMChat] Adding NPCChatComponent to {npc.EntityName} (type: {npc.GetType().Name})");
+                        Log.Out($"Adding NPCChatComponent to {npc.EntityName} (type: {npc.GetType().Name})");
                         chatComponent = npc.gameObject.AddComponent<NPCChatComponent>();
                         chatComponent.Initialize(npc, _config);
-                        Log.Out($"[NPCLLMChat] Successfully initialized chat component for {npc.EntityName}");
+                        Log.Out($"Successfully initialized chat component for {npc.EntityName}");
                     }
                     catch (System.Exception ex)
                     {
-                        Log.Error($"[NPCLLMChat] Failed to add NPCChatComponent: {ex.Message}");
+                        Log.Error($"Failed to add NPCChatComponent: {ex.Message}");
                         return null;
                     }
                 }
@@ -96,7 +96,7 @@ namespace NPCLLMChat.Harmony
             bool worthSaying = count == 1 || count == 10 || count == 100 || count == 1000 || count % 10000 == 0;
             if (worthSaying)
             {
-                Log.Warning($"[NPCLLMChat] {npc.EntityName} [id {npc.entityId}] bWillRespawn was cleared " +
+                Log.Warning($"{npc.EntityName} [id {npc.entityId}] bWillRespawn was cleared " +
                             $"({count}x) - SCore does this on every order that is not Follow or Loot. " +
                             "Restored; without this she would be unloaded and lost.");
             }
@@ -225,7 +225,7 @@ namespace NPCLLMChat.Harmony
             // Process the message with player reference for actions
             chatComponent.ProcessPlayerMessage(message, player, response =>
             {
-                Log.Out($"[NPCLLMChat] {chatComponent.NPCName}: {response}");
+                Log.Out($"{chatComponent.NPCName}: {response}");
 
                 // Show response on screen (important when TTS unavailable)
                 if (!string.IsNullOrWhiteSpace(response) && player is EntityPlayerLocal localPlayer)
@@ -266,7 +266,7 @@ namespace NPCLLMChat.Harmony
             bool found = TargetMethod() != null;
             if (!found)
             {
-                Log.Warning("[NPCLLMChat] EntityAliveSDX.LeaderUpdate not found - companions may " +
+                Log.Warning("EntityAliveSDX.LeaderUpdate not found - companions may " +
                             "vanish when SCore cannot resolve their leader");
             }
             return found;
@@ -281,8 +281,7 @@ namespace NPCLLMChat.Harmony
             if (!__instance.bWillRespawn)
             {
                 __instance.bWillRespawn = true;
-                Log.Warning($"[NPCLLMChat] {__instance.EntityName} [id {__instance.entityId}] had " +
-                            "bWillRespawn=false - restored, she would have been unloaded for good");
+                NPCCorePatches.NoteRespawnRescue(__instance);
             }
 
             // Her chat component is hung here too. This runs as part of the game's own tick on
@@ -335,7 +334,7 @@ namespace NPCLLMChat.Harmony
             bool ready = TargetMethod() != null && _entityField != null;
             if (!ready)
             {
-                Log.Warning("[NPCLLMChat] NPCLeaderComponent.OnUpdateLive not found - a companion " +
+                Log.Warning("NPCLeaderComponent.OnUpdateLive not found - a companion " +
                             "left on Stay or Guard may be unloaded and lost");
             }
             return ready;
@@ -382,7 +381,7 @@ namespace NPCLLMChat.Harmony
             if (!NPCCorePatches.IsHiredByPlayer(npc)) return true;
 
             npc.bWillRespawn = true;
-            Log.Warning($"[NPCLLMChat] Refused to despawn {npc.EntityName} [id {npc.entityId}] - " +
+            Log.Warning($"Refused to despawn {npc.EntityName} [id {npc.entityId}] - " +
                         "she is hired, alive and not dismissed. Something cleared her respawn flag " +
                         "from a site the patches do not cover; please report this line.");
             return false;
@@ -421,7 +420,7 @@ namespace NPCLLMChat.Harmony
             bool ready = TargetMethod() != null && _getOrCreate != null;
             if (!ready)
             {
-                Log.Warning("[NPCLLMChat] Could not hook companion death drops - her pack may be " +
+                Log.Warning("Could not hook companion death drops - her pack may be " +
                             "lost when she dies");
             }
             return ready;
@@ -437,19 +436,19 @@ namespace NPCLLMChat.Harmony
                                 as ITileEntityLootable;
                 if (container == null || container.IsEmpty())
                 {
-                    Log.Out($"[NPCLLMChat] {__instance.EntityName} died carrying nothing");
+                    Log.Out($"{__instance.EntityName} died carrying nothing");
                     return false;
                 }
 
                 string carried = WorldContextHelper.SummarizeStacks(container.items) ?? "(nothing)";
                 GameManager.Instance.DropContentOfLootContainerServer(
                     BlockValue.Air, new Vector3i(__instance.position), __instance.entityId, container);
-                Log.Warning($"[NPCLLMChat] {__instance.EntityName} died at " +
+                Log.Warning($"{__instance.EntityName} died at " +
                             $"({(int)__instance.position.x}, {(int)__instance.position.z}) - dropped: {carried}");
             }
             catch (Exception ex)
             {
-                Log.Error($"[NPCLLMChat] Failed to drop {__instance.EntityName}'s pack: {ex.Message}");
+                Log.Error($"Failed to drop {__instance.EntityName}'s pack: {ex.Message}");
                 return true;   // let SCore have its roll rather than drop nothing at all
             }
             return false;
@@ -471,7 +470,7 @@ namespace NPCLLMChat.Harmony
             var entity = world?.GetEntity(_entityId) as EntityAlive;
             if (entity != null && entity.GetComponent<NPCChatComponent>() != null)
             {
-                Log.Warning($"[NPCLLMChat] NPC {entity.EntityName} [id {_entityId}] removed from world at " +
+                Log.Warning($"NPC {entity.EntityName} [id {_entityId}] removed from world at " +
                             $"({(int)entity.position.x}, {(int)entity.position.z}), dead={entity.IsDead()}");
             }
             NPCContainerCache.Forget(_entityId, entity?.EntityName);

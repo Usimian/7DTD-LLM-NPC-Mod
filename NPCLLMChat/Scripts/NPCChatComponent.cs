@@ -94,14 +94,14 @@ namespace NPCLLMChat
                 _audioPlayer = gameObject.AddComponent<NPCAudioPlayer>();
                 _audioPlayer.Initialize(npcEntity, ttsConfig);
                 _ttsEnabled = true;
-                Log.Out($"[NPCLLMChat] TTS enabled for NPC: {_npcName}");
+                Log.Out($"TTS enabled for NPC: {_npcName}");
             }
             else
             {
                 _ttsEnabled = false;
             }
 
-            Log.Out($"[NPCLLMChat] Initialized chat component for NPC: {_npcName} (ID: {_entityId})");
+            Log.Out($"Initialized chat component for NPC: {_npcName} (ID: {_entityId})");
         }
 
         private string GetNPCName()
@@ -181,7 +181,7 @@ namespace NPCLLMChat
         {
             if (_isWaitingForResponse)
             {
-                Log.Out($"[NPCLLMChat] NPC {_npcName} is still thinking...");
+                Log.Out($"NPC {_npcName} is still thinking...");
                 return;
             }
 
@@ -267,8 +267,8 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             // The exchange itself only ever appeared in the console, which is not written to the
             // log - so afterwards there is no record of what was asked or what she said, and
             // "she did not know about the snow" cannot be checked against what she was told.
-            Log.Out($"[NPCLLMChat] chat| Player: {playerMessage}");
-            Log.Out($"[NPCLLMChat] chat| {_npcName}: {response}");
+            Log.Out($"chat| Player: {playerMessage}");
+            Log.Out($"chat| {_npcName}: {response}");
 
             // Parse response for actions
             NPCAction action = null;
@@ -290,7 +290,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 {
                     if (ActionParser.Contradicts(ordered, action.Type))
                     {
-                        Log.Out($"[NPCLLMChat] Ordered {ordered}, but she said otherwise - not forcing it");
+                        Log.Out($"Ordered {ordered}, but she said otherwise - not forcing it");
                     }
                     else
                     {
@@ -299,14 +299,14 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
 
-                Log.Out($"[NPCLLMChat] Parsed action: {action?.Type ?? NPCActionType.None}" +
+                Log.Out($"Parsed action: {action?.Type ?? NPCActionType.None}" +
                         (ordered != NPCActionType.None ? $" (ordered: {ordered})" : ""));
             }
 
             // She is allowed to let something pass without answering
             if (IsSilence(dialogueResponse))
             {
-                Log.Out($"[NPCLLMChat] {_npcName} chose not to answer");
+                Log.Out($"{_npcName} chose not to answer");
                 _currentResponse = "";
                 onComplete?.Invoke("");
                 OnResponseComplete?.Invoke("");
@@ -340,7 +340,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"[NPCLLMChat] Action execution failed: {ex.Message}");
+                    Log.Error($"Action execution failed: {ex.Message}");
                 }
             }
 
@@ -397,7 +397,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             OnError?.Invoke(error);
             OnResponseComplete?.Invoke(fallback);
 
-            Log.Warning($"[NPCLLMChat] Error for NPC {_npcName}: {error}. Using fallback.");
+            Log.Warning($"Error for NPC {_npcName}: {error}. Using fallback.");
         }
 
         // Only a runaway-reply backstop. The prompt governs ordinary length; this used to sit
@@ -505,7 +505,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             _memory.rapport = Mathf.Clamp(_memory.rapport + delta, -1f, 1f);
             if (Mathf.Abs(_memory.rapport - before) > 0.001f)
             {
-                Log.Out($"[NPCLLMChat] {_npcName} rapport {before:F2} -> {_memory.rapport:F2} ({why})");
+                Log.Out($"{_npcName} rapport {before:F2} -> {_memory.rapport:F2} ({why})");
             }
         }
 
@@ -829,7 +829,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 PersistMemory();
             }
 
-            Log.Out($"[NPCLLMChat] Renamed {was} to {clean} [id {_npcEntity.entityId}]");
+            Log.Out($"Renamed {was} to {clean} [id {_npcEntity.entityId}]");
             return true;
         }
 
@@ -844,7 +844,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var field = AccessTools.Field(npc.GetType(), "_strMyName");
             if (field == null)
             {
-                Log.Warning("[NPCLLMChat] No _strMyName on " + npc.GetType().Name +
+                Log.Warning("No _strMyName on " + npc.GetType().Name +
                             " - the name may not show on her nameplate");
                 return;
             }
@@ -862,7 +862,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var fromDisk = NPCMemoryStore.Load(_memoryKey);
             if (fromDisk == null) return false;
             _memory.persona = fromDisk.persona;
-            Log.Out($"[NPCLLMChat] {_npcName} persona reloaded ({_memory.persona?.Length ?? 0} chars)");
+            Log.Out($"{_npcName} persona reloaded ({_memory.persona?.Length ?? 0} chars)");
             return true;
         }
 
@@ -912,7 +912,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     memory = MergeMemories(memory, named);
                     NPCMemoryStore.DeleteFile(_npcName);
                     NPCMemoryStore.Save(CompanionMemoryKey, memory);
-                    Log.Out($"[NPCLLMChat] Folded {_npcName}'s memory into the companion memory");
+                    Log.Out($"Folded {_npcName}'s memory into the companion memory");
                 }
             }
             return memory ?? new NPCMemory { npcName = _npcName };
@@ -950,7 +950,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (!_loggedPersistState)
             {
                 _loggedPersistState = true;
-                Log.Out($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] logout check: " +
+                Log.Out($"{_npcName} [id {_npcEntity.entityId}] logout check: " +
                         $"companion={companion} (memoryKey={_memoryKey}), Persist={persist}, " +
                         $"Leader/Owner={IsHiredCompanion()} -> " +
                         (companion
@@ -961,7 +961,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (!companion || persist > 0f) return;
 
             _npcEntity.Buffs.SetCustomVar("Persist", 1f);
-            Log.Out($"[NPCLLMChat] {_npcName} [id {_npcEntity.entityId}] marked to survive logout (Persist=1)");
+            Log.Out($"{_npcName} [id {_npcEntity.entityId}] marked to survive logout (Persist=1)");
         }
 
         private bool _loggedPersistState;
@@ -970,7 +970,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         {
             if (_memoryKey == CompanionMemoryKey || !IsHiredCompanion()) return;
 
-            Log.Out($"[NPCLLMChat] {_npcName} is now the player's companion - unifying memory");
+            Log.Out($"{_npcName} is now the player's companion - unifying memory");
             string oldKey = _memoryKey;
             _memoryKey = CompanionMemoryKey;
 
@@ -1050,7 +1050,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 _memory.markedPlaces.RemoveAt(0);
             }
             NPCMemoryStore.Save(_memoryKey, _memory);
-            Log.Out($"[NPCLLMChat] {_npcName} marked place '{label}' at ({(int)_npcEntity.position.x}, {(int)_npcEntity.position.z})");
+            Log.Out($"{_npcName} marked place '{label}' at ({(int)_npcEntity.position.x}, {(int)_npcEntity.position.z})");
         }
 
         // ========== Long-term memory summarization ==========
@@ -1096,12 +1096,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     _memory.longTermMemory = summary.Trim();
                     _memory.pendingSummary.RemoveRange(0, Math.Min(batchCount, _memory.pendingSummary.Count));
                     NPCMemoryStore.Save(_memoryKey, _memory);
-                    Log.Out($"[NPCLLMChat] {_npcName} long-term memory updated ({_memory.longTermMemory.Length} chars)");
+                    Log.Out($"{_npcName} long-term memory updated ({_memory.longTermMemory.Length} chars)");
                 },
                 error =>
                 {
                     _isSummarizing = false;
-                    Log.Warning($"[NPCLLMChat] Summarization failed (will retry later): {error}");
+                    Log.Warning($"Summarization failed (will retry later): {error}");
                 },
                 SummaryTokenBudget);
         }
@@ -1136,7 +1136,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             catch (Exception ex)
             {
                 // World/POI APIs can be touchy during load/unload; never break the NPC over the journal
-                Log.Warning($"[NPCLLMChat] Travel journal update failed: {ex.Message}");
+                Log.Warning($"Travel journal update failed: {ex.Message}");
                 _nextPlaceCheck = Time.unscaledTime + 60f;
             }
         }
@@ -1517,7 +1517,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private void Remark(string trigger, string situation)
         {
             _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
-            Log.Out($"[NPCLLMChat] {_npcName} remark trigger: {trigger}");
+            Log.Out($"{_npcName} remark trigger: {trigger}");
             SpeakUnprompted(situation);
         }
 
@@ -1562,7 +1562,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     string speech = Shorten(StripStageDirections(line));
                     if (string.IsNullOrWhiteSpace(speech)) return;
 
-                    Log.Out($"[NPCLLMChat] {_npcName} speaks up: {speech}");
+                    Log.Out($"{_npcName} speaks up: {speech}");
                     // a warning shouted while he is sneaking is still urgent, but still hushed
                     bool quiet = PlayerIsSneaking();
                     if (_ttsEnabled) _audioPlayer.Speak(speech, null, quiet ? 0.45f : 1f, quiet ? 0.9f : 1f);
@@ -1573,7 +1573,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 error =>
                 {
                     _remarkPending = false;
-                    Log.Warning($"[NPCLLMChat] Unprompted remark failed: {error}");
+                    Log.Warning($"Unprompted remark failed: {error}");
                 });
         }
 
@@ -1616,7 +1616,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (!hasGear) return;
 
             _warnedUnhired = true;
-            Log.Warning($"[NPCLLMChat] {_npcName} is carrying gear but is NOT hired - will wander off and despawn with it");
+            Log.Warning($"{_npcName} is carrying gear but is NOT hired - will wander off and despawn with it");
             var player = GameManager.Instance?.World?.GetPrimaryPlayer() as EntityPlayerLocal;
             if (player != null)
             {
@@ -1725,7 +1725,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     : Vector2.Distance(new Vector2(snap.x, snap.z), herePos) < 40f));
             if (dropped > 0)
             {
-                Log.Out($"[NPCLLMChat] Dropped {dropped} stale storage entr{(dropped == 1 ? "y" : "ies")}");
+                Log.Out($"Dropped {dropped} stale storage entr{(dropped == 1 ? "y" : "ies")}");
                 changed = true;
             }
 
@@ -1898,7 +1898,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 {
                     _memory.placesVisited.RemoveAt(0);
                 }
-                Log.Out($"[NPCLLMChat] {_npcName} travel journal: arrived at {place} (Day {day} {time})");
+                Log.Out($"{_npcName} travel journal: arrived at {place} (Day {day} {time})");
             }
             NPCMemoryStore.Save(_memoryKey, _memory);
         }
@@ -1971,7 +1971,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
             journal.Add(new PlaceVisit { place = name, day = day, time = time, x = x, z = z });
             while (journal.Count > cap) journal.RemoveAt(0);
-            Log.Out($"[NPCLLMChat] {_npcName} noted a new {kind}: {name} at ({x}, {z}) on Day {day} {time}");
+            Log.Out($"{_npcName} noted a new {kind}: {name} at ({x}, {z}) on Day {day} {time}");
             return true;
         }
 
@@ -2000,7 +2000,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (key != _lastAfflictions)
             {
                 _lastAfflictions = key;
-                Log.Out($"[NPCLLMChat] Player afflictions in context: {key}");
+                Log.Out($"Player afflictions in context: {key}");
             }
             if (ailments.Count == 0) return "";
 
@@ -2133,7 +2133,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (kitKey != _lastKitKey)
             {
                 _lastKitKey = kitKey;
-                Log.Out($"[NPCLLMChat] Player thermal protection - cold {hisCold:F1} heat {hisHeat:F1}");
+                Log.Out($"Player thermal protection - cold {hisCold:F1} heat {hisHeat:F1}");
             }
 
             sb.AppendLine($"How the player is turned out for weather: he {KitVerdict(hisCold, hisHeat)}. " +
@@ -2377,7 +2377,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (carrying != _lastLoggedPack)
                 {
                     _lastLoggedPack = carrying;
-                    Log.Out($"[NPCLLMChat] {_npcName} pack: {carrying ?? "(empty)"}");
+                    Log.Out($"{_npcName} pack: {carrying ?? "(empty)"}");
                 }
 
                 string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
@@ -2504,7 +2504,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] World context failed: {ex.Message}");
+                Log.Warning($"World context failed: {ex.Message}");
                 return "";
             }
         }

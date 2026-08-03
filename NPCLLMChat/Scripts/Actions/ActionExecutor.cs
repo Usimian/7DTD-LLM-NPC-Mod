@@ -238,22 +238,22 @@ namespace NPCLLMChat.Actions
                     if (executeMethod != null)
                     {
                         bool result = (bool)executeMethod.Invoke(null, new object[] { npc.entityId, command, player });
-                        Log.Out($"[NPCLLMChat] SCore ExecuteCMD '{command}' for NPC {npc.entityId}: {(result ? "success" : "failed")}");
+                        Log.Out($"SCore ExecuteCMD '{command}' for NPC {npc.entityId}: {(result ? "success" : "failed")}");
                         return result;
                     }
                     else
                     {
-                        Log.Warning("[NPCLLMChat] ExecuteCMD method not found in EntityUtilities");
+                        Log.Warning("ExecuteCMD method not found in EntityUtilities");
                     }
                 }
                 else
                 {
-                    Log.Out("[NPCLLMChat] SCore EntityUtilities not found - using fallback behavior");
+                    Log.Out("SCore EntityUtilities not found - using fallback behavior");
                 }
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] SCore command failed: {ex.Message}");
+                Log.Warning($"SCore command failed: {ex.Message}");
             }
             return false;
         }

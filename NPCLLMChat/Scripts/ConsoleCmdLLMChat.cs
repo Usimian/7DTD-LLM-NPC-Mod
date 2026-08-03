@@ -341,7 +341,7 @@ Examples:
             System.Action<string> output = line =>
             {
                 console.Output(line);
-                Log.Out($"[NPCLLMChat] find| {line}");
+                Log.Out($"find| {line}");
             };
 
             var world = GameManager.Instance?.World;
@@ -452,7 +452,7 @@ Examples:
 
             bool already = npc.Buffs.HasCustomVar("Leader") || npc.Buffs.HasCustomVar("Persist");
             npc.Buffs.SetCustomVar("Persist", 1f);
-            Log.Out($"[NPCLLMChat] Set Persist on {npc.EntityName} [id {npc.entityId}] (was savable: {already})");
+            Log.Out($"Set Persist on {npc.EntityName} [id {npc.entityId}] (was savable: {already})");
             output.Output($"{npc.EntityName} marked to persist{(already ? " (it already would have saved)" : " - it would NOT have survived logout before this")}");
             output.Output("Verify with 'llmchat find' - it should now read 'survives logout'");
         }
@@ -527,9 +527,9 @@ Examples:
             // thousand characters of world state dumped into it buries the thing being debugged.
             string context = chat.DumpWorldContext();
             string[] lines = context.Split('\n');
-            Log.Out($"[NPCLLMChat] context| === world context given to {npc.EntityName} ===");
-            foreach (string line in lines) Log.Out($"[NPCLLMChat] context| {line.TrimEnd()}");
-            Log.Out("[NPCLLMChat] context| === end ===");
+            Log.Out($"context| === world context given to {npc.EntityName} ===");
+            foreach (string line in lines) Log.Out($"context| {line.TrimEnd()}");
+            Log.Out("context| === end ===");
 
             int tokens = LLMService.EstimateTokens(context.Length);
             int window = LLMService.Instance?.ContextWindow ?? 0;
@@ -540,7 +540,7 @@ Examples:
             output.Output($"Wrote {npc.EntityName}'s world context to the log " +
                           $"({lines.Length} lines, {context.Length} chars; {budget}) - " +
                           "console left clear for the conversation.");
-            Log.Out($"[NPCLLMChat] context| === end ({budget}) ===");
+            Log.Out($"context| === end ({budget}) ===");
         }
 
         private static string Bearing(Vector3 from, Vector3 to)
@@ -722,28 +722,28 @@ Examples:
             }
 
             output.Output("Testing TTS synthesis...");
-            Log.Out("[NPCLLMChat] TestTTS() called");
+            Log.Out("TestTTS() called");
 
             // Create a test audio source at player position
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             if (player == null)
             {
                 output.Output("No player found for audio test");
-                Log.Warning("[NPCLLMChat] TestTTS: No player found");
+                Log.Warning("TestTTS: No player found");
                 return;
             }
 
             string testText = "Hey survivor, the wasteland is rough but we will make it through together.";
             string testVoice = NPCLLMChatMod.TTSConfig?.CompanionVoice;
             output.Output($"Testing with companion voice: {testVoice ?? "(default)"}");
-            Log.Out($"[NPCLLMChat] TestTTS: Calling Synthesize with voice {testVoice}, text: {testText}");
+            Log.Out($"TestTTS: Calling Synthesize with voice {testVoice}, text: {testText}");
 
             tts.Synthesize(
                 testText,
                 testVoice,
                 clip =>
                 {
-                    Log.Out($"[NPCLLMChat] TestTTS: SUCCESS! Generated clip: {clip?.length ?? 0}s");
+                    Log.Out($"TestTTS: SUCCESS! Generated clip: {clip?.length ?? 0}s");
                     output.Output($"[SUCCESS] Generated {clip.length:F1}s audio clip");
 
                     // Play at player position with 2D audio for guaranteed audibility
@@ -766,7 +766,7 @@ Examples:
                 },
                 error =>
                 {
-                    Log.Warning($"[NPCLLMChat] TestTTS: ERROR - {error}");
+                    Log.Warning($"TestTTS: ERROR - {error}");
                     output.Output($"[ERROR] TTS failed: {error}");
                     output.Output("Make sure piper_server.py is running on port 5050");
                 }

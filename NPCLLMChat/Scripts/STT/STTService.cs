@@ -61,12 +61,12 @@ namespace NPCLLMChat.STT
 
             if (!_config.Enabled)
             {
-                Log.Out("[NPCLLMChat] STTService disabled in config");
+                Log.Out("STTService disabled in config");
                 return;
             }
 
-            Log.Out($"[NPCLLMChat] STTService initializing on {PlatformHelper.PlatformName}");
-            Log.Out($"[NPCLLMChat] Push-to-talk key: {_config.PushToTalkKey}");
+            Log.Out($"STTService initializing on {PlatformHelper.PlatformName}");
+            Log.Out($"Push-to-talk key: {_config.PushToTalkKey}");
 
             // Determine provider based on config and platform
             DetermineProvider();
@@ -82,7 +82,7 @@ namespace NPCLLMChat.STT
 
         private IEnumerator InitializeWhisper()
         {
-            Log.Out($"[NPCLLMChat] STT checking Whisper server at {_config.Endpoint}");
+            Log.Out($"STT checking Whisper server at {_config.Endpoint}");
 
             string healthUrl = _config.Endpoint.Replace("/transcribe", "/health");
 
@@ -94,21 +94,21 @@ namespace NPCLLMChat.STT
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     _whisperServerAvailable = true;
-                    Log.Out("[NPCLLMChat] STT using Whisper server");
+                    Log.Out("STT using Whisper server");
 
                     try
                     {
                         string json = request.downloadHandler.text;
                         if (json.Contains("model"))
-                            Log.Out($"[NPCLLMChat] Whisper health: {json}");
+                            Log.Out($"Whisper health: {json}");
                     }
                     catch { }
                 }
                 else
                 {
                     _whisperServerAvailable = false;
-                    Log.Warning($"[NPCLLMChat] Whisper STT server not available: {request.error}");
-                    Log.Warning("[NPCLLMChat] Start with: python whisper_server.py --port 5051");
+                    Log.Warning($"Whisper STT server not available: {request.error}");
+                    Log.Warning("Start with: python whisper_server.py --port 5051");
                 }
             }
         }
@@ -204,7 +204,7 @@ namespace NPCLLMChat.STT
 
                     if (!string.IsNullOrEmpty(transcribedText))
                     {
-                        Log.Out($"[NPCLLMChat] Whisper STT completed in {_lastTranscriptionTimeMs:F0}ms: \"{transcribedText}\"");
+                        Log.Out($"Whisper STT completed in {_lastTranscriptionTimeMs:F0}ms: \"{transcribedText}\"");
                         request.OnSuccess?.Invoke(transcribedText);
                     }
                     else

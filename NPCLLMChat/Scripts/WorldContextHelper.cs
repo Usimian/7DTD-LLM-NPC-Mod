@@ -121,7 +121,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Visibility check failed: {ex.Message}");
+                Log.Warning($"Visibility check failed: {ex.Message}");
             }
 
             return range;
@@ -201,7 +201,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Biome lookup failed: {ex.Message}");
+                Log.Warning($"Biome lookup failed: {ex.Message}");
                 return null;
             }
         }
@@ -247,7 +247,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Thermal protection read failed: {ex.Message}");
+                Log.Warning($"Thermal protection read failed: {ex.Message}");
             }
         }
 
@@ -281,12 +281,12 @@ namespace NPCLLMChat
 
                 _poiCache = named;
                 _poiCacheTime = Time.unscaledTime;
-                Log.Out($"[NPCLLMChat] POI cache rebuilt: {named.Count} named buildings of {all.Count} prefabs");
+                Log.Out($"POI cache rebuilt: {named.Count} named buildings of {all.Count} prefabs");
                 return _poiCache;
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] POI lookup failed: {ex.Message}");
+                Log.Warning($"POI lookup failed: {ex.Message}");
                 return null;
             }
         }
@@ -387,7 +387,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Quest lookup failed: {ex.Message}");
+                Log.Warning($"Quest lookup failed: {ex.Message}");
                 return null;
             }
         }
@@ -650,7 +650,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Surroundings lookup failed: {ex.Message}");
+                Log.Warning($"Surroundings lookup failed: {ex.Message}");
                 return null;
             }
         }
@@ -703,7 +703,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Nearby people lookup failed: {ex.Message}");
+                Log.Warning($"Nearby people lookup failed: {ex.Message}");
                 return null;
             }
         }

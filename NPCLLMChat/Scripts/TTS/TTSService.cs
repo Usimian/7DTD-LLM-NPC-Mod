@@ -61,11 +61,11 @@ namespace NPCLLMChat.TTS
 
             if (!_config.Enabled)
             {
-                Log.Out("[NPCLLMChat] TTSService disabled in config");
+                Log.Out("TTSService disabled in config");
                 return;
             }
 
-            Log.Out($"[NPCLLMChat] TTSService initializing on {PlatformHelper.PlatformName}");
+            Log.Out($"TTSService initializing on {PlatformHelper.PlatformName}");
 
             // Determine provider based on config and platform
             DetermineProvider();
@@ -81,7 +81,7 @@ namespace NPCLLMChat.TTS
 
         private IEnumerator InitializePiper()
         {
-            Log.Out($"[NPCLLMChat] TTS checking Piper server at {_config.Endpoint}");
+            Log.Out($"TTS checking Piper server at {_config.Endpoint}");
             
             string healthUrl = _config.Endpoint.Replace("/synthesize", "/health");
 
@@ -93,13 +93,13 @@ namespace NPCLLMChat.TTS
                 if (request.result == UnityWebRequest.Result.Success)
                 {
                     _piperServerAvailable = true;
-                    Log.Out("[NPCLLMChat] TTS using Piper server");
+                    Log.Out("TTS using Piper server");
                 }
                 else
                 {
                     _piperServerAvailable = false;
-                    Log.Warning($"[NPCLLMChat] Piper TTS server not available: {request.error}");
-                    Log.Warning("[NPCLLMChat] Start with: python piper_server.py --port 5050");
+                    Log.Warning($"Piper TTS server not available: {request.error}");
+                    Log.Warning("Start with: python piper_server.py --port 5050");
                 }
             }
         }
@@ -252,7 +252,7 @@ namespace NPCLLMChat.TTS
 
                         if (clip != null)
                         {
-                            Log.Out($"[NPCLLMChat] Piper TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
+                            Log.Out($"Piper TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
                             request.OnSuccess?.Invoke(clip);
                         }
                         else
@@ -322,7 +322,7 @@ namespace NPCLLMChat.TTS
 
             if (clip != null)
             {
-                Log.Out($"[NPCLLMChat] TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
+                Log.Out($"TTS completed in {_lastSynthesisTimeMs:F0}ms ({clip.length:F1}s)");
                 onSuccess?.Invoke(clip);
             }
             else
@@ -394,7 +394,7 @@ namespace NPCLLMChat.TTS
             }
             catch (Exception ex)
             {
-                Log.Error($"[NPCLLMChat] WAV parse error: {ex.Message}");
+                Log.Error($"WAV parse error: {ex.Message}");
                 return null;
             }
         }
@@ -443,7 +443,7 @@ namespace NPCLLMChat.TTS
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning($"[NPCLLMChat] Could not parse voice list: {ex.Message}");
+                    Log.Warning($"Could not parse voice list: {ex.Message}");
                     ids = null;
                 }
                 onResult?.Invoke(ids);

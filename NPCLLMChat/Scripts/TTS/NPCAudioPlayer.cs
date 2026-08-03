@@ -59,7 +59,7 @@ namespace NPCLLMChat.TTS
             // Determine voice based on NPC type
             _voiceId = DetermineVoice(npc);
 
-            Log.Out($"[NPCLLMChat] NPCAudioPlayer initialized for NPC {npc.entityId} with voice {_voiceId}");
+            Log.Out($"NPCAudioPlayer initialized for NPC {npc.entityId} with voice {_voiceId}");
         }
 
         /// <summary>
@@ -118,7 +118,7 @@ namespace NPCLLMChat.TTS
         {
             if (_npcEntity == null) return;
             _voiceId = DetermineVoice(_npcEntity);
-            Log.Out($"[NPCLLMChat] Voice for NPC {_npcEntity.entityId} is now {_voiceId}");
+            Log.Out($"Voice for NPC {_npcEntity.entityId} is now {_voiceId}");
         }
 
         /// <summary>
@@ -190,14 +190,14 @@ namespace NPCLLMChat.TTS
         {
             if (clip == null)
             {
-                Log.Warning("[NPCLLMChat] Received null AudioClip");
+                Log.Warning("Received null AudioClip");
                 _onSpeechComplete?.Invoke();
                 return;
             }
 
             if (_audioSource == null)
             {
-                Log.Warning("[NPCLLMChat] AudioSource is null");
+                Log.Warning("AudioSource is null");
                 _onSpeechComplete?.Invoke();
                 return;
             }
@@ -207,7 +207,7 @@ namespace NPCLLMChat.TTS
             _audioSource.Play();
             _isSpeaking = true;
 
-            Log.Out($"[NPCLLMChat] NPC speaking: \"{_currentText.Substring(0, Math.Min(30, _currentText.Length))}...\" ({clip.length:F1}s)");
+            Log.Out($"NPC speaking: \"{_currentText.Substring(0, Math.Min(30, _currentText.Length))}...\" ({clip.length:F1}s)");
         }
 
         /// <summary>
@@ -215,7 +215,7 @@ namespace NPCLLMChat.TTS
         /// </summary>
         private void OnTTSError(string error)
         {
-            Log.Warning($"[NPCLLMChat] TTS failed: {error}");
+            Log.Warning($"TTS failed: {error}");
             _isSpeaking = false;
             _onSpeechComplete?.Invoke();
         }

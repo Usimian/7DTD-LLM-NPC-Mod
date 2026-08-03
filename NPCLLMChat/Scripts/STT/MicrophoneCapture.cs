@@ -71,7 +71,7 @@ namespace NPCLLMChat.STT
                 }
                 else
                 {
-                    Log.Warning($"[NPCLLMChat] Invalid push-to-talk key '{_config.PushToTalkKey}', using V");
+                    Log.Warning($"Invalid push-to-talk key '{_config.PushToTalkKey}', using V");
                     _pushToTalkKeyCode = KeyCode.V;
                 }
             }
@@ -81,13 +81,13 @@ namespace NPCLLMChat.STT
             if (devices.Length > 0)
             {
                 _selectedDevice = devices[0];
-                Log.Out($"[NPCLLMChat] MicrophoneCapture initialized - Device: {_selectedDevice}");
-                Log.Out($"[NPCLLMChat] Push-to-talk key: {_pushToTalkKeyCode}");
+                Log.Out($"MicrophoneCapture initialized - Device: {_selectedDevice}");
+                Log.Out($"Push-to-talk key: {_pushToTalkKeyCode}");
                 _isInitialized = true;
             }
             else
             {
-                Log.Warning("[NPCLLMChat] No microphone devices found!");
+                Log.Warning("No microphone devices found!");
                 _isInitialized = false;
             }
         }
@@ -112,11 +112,11 @@ namespace NPCLLMChat.STT
                     device.Contains(deviceName))
                 {
                     _selectedDevice = device;
-                    Log.Out($"[NPCLLMChat] Selected microphone: {_selectedDevice}");
+                    Log.Out($"Selected microphone: {_selectedDevice}");
                     return true;
                 }
             }
-            Log.Warning($"[NPCLLMChat] Microphone device not found: {deviceName}");
+            Log.Warning($"Microphone device not found: {deviceName}");
             return false;
         }
 
@@ -132,7 +132,6 @@ namespace NPCLLMChat.STT
                 // Check if user released the key - stop immediately
                 if (UnityEngine.Input.GetKeyUp(_pushToTalkKeyCode))
                 {
-                    Log.Out($"[NPCLLMChat] V key released detected at {RecordingDuration:F2}s");
                     StopRecordingAndTranscribe();
                     return;
                 }
@@ -146,7 +145,6 @@ namespace NPCLLMChat.STT
                 // Push-to-talk start
                 if (UnityEngine.Input.GetKeyDown(_pushToTalkKeyCode))
                 {
-                    Log.Out("[NPCLLMChat] V key pressed detected");
                     StartRecording();
                 }
             }
@@ -154,7 +152,7 @@ namespace NPCLLMChat.STT
             // Auto-stop if recording too long
             if (_isRecording && RecordingDuration >= _config.MaxRecordingSeconds)
             {
-                Log.Out("[NPCLLMChat] Max recording duration reached, stopping...");
+                Log.Out("Max recording duration reached, stopping...");
                 StopRecordingAndTranscribe();
             }
 
@@ -192,13 +190,13 @@ namespace NPCLLMChat.STT
         {
             if (_isRecording)
             {
-                Log.Warning("[NPCLLMChat] Already recording");
+                Log.Warning("Already recording");
                 return;
             }
 
             if (string.IsNullOrEmpty(_selectedDevice))
             {
-                Log.Error("[NPCLLMChat] No microphone device selected");
+                Log.Error("No microphone device selected");
                 OnTranscriptionError?.Invoke("No microphone available");
                 return;
             }
@@ -214,7 +212,7 @@ namespace NPCLLMChat.STT
 
             if (_recordingClip == null)
             {
-                Log.Error("[NPCLLMChat] Failed to start microphone recording");
+                Log.Error("Failed to start microphone recording");
                 OnTranscriptionError?.Invoke("Failed to start microphone");
                 return;
             }
@@ -222,7 +220,7 @@ namespace NPCLLMChat.STT
             _isRecording = true;
             _recordingStartTime = Time.time;
 
-            Log.Out("[NPCLLMChat] Recording started...");
+            Log.Out("Recording started...");
             OnRecordingStarted?.Invoke();
         }
 
@@ -245,14 +243,14 @@ namespace NPCLLMChat.STT
             Microphone.End(_selectedDevice);
 
             float recordingDuration = Time.time - _recordingStartTime;
-            Log.Out($"[NPCLLMChat] Recording stopped ({recordingDuration:F1}s)");
+            Log.Out($"Recording stopped ({recordingDuration:F1}s)");
 
             OnRecordingStopped?.Invoke();
 
             // Check if we got any audio
             if (samplePosition <= 0 || _recordingClip == null)
             {
-                Log.Warning("[NPCLLMChat] No audio recorded");
+                Log.Warning("No audio recorded");
                 OnTranscriptionError?.Invoke("No audio recorded");
                 CleanupRecording();
                 return;
@@ -265,25 +263,25 @@ namespace NPCLLMChat.STT
 
                 if (wavData == null || wavData.Length < 100)
                 {
-                    Log.Warning("[NPCLLMChat] Failed to convert audio to WAV");
+                    Log.Warning("Failed to convert audio to WAV");
                     OnTranscriptionError?.Invoke("Failed to process audio");
                     CleanupRecording();
                     return;
                 }
 
-                Log.Out($"[NPCLLMChat] Sending {wavData.Length} bytes to STT server...");
+                Log.Out($"Sending {wavData.Length} bytes to STT server...");
 
                 // Send to STT service
                 STTService.Instance.Transcribe(
                     wavData,
                     text =>
                     {
-                        Log.Out($"[NPCLLMChat] Transcription: \"{text}\"");
+                        Log.Out($"Transcription: \"{text}\"");
                         OnTranscriptionComplete?.Invoke(text);
                     },
                     error =>
                     {
-                        Log.Warning($"[NPCLLMChat] Transcription failed: {error}");
+                        Log.Warning($"Transcription failed: {error}");
 
                         // Show error to player
                         var p = GameManager.Instance?.World?.GetPrimaryPlayer();
@@ -298,7 +296,7 @@ namespace NPCLLMChat.STT
             }
             catch (Exception ex)
             {
-                Log.Error($"[NPCLLMChat] Error processing recording: {ex.Message}");
+                Log.Error($"Error processing recording: {ex.Message}");
                 OnTranscriptionError?.Invoke($"Error: {ex.Message}");
             }
 
@@ -316,7 +314,7 @@ namespace NPCLLMChat.STT
             Microphone.End(_selectedDevice);
             _isRecording = false;
             CleanupRecording();
-            Log.Out("[NPCLLMChat] Recording cancelled");
+            Log.Out("Recording cancelled");
             OnRecordingStopped?.Invoke();
         }
 
@@ -419,12 +417,12 @@ namespace NPCLLMChat.STT
         {
             if (string.IsNullOrEmpty(_selectedDevice))
             {
-                Log.Error("[NPCLLMChat] No microphone device for test");
+                Log.Error("No microphone device for test");
                 onComplete?.Invoke(null);
                 yield break;
             }
 
-            Log.Out($"[NPCLLMChat] Test recording for {durationSeconds}s...");
+            Log.Out($"Test recording for {durationSeconds}s...");
 
             AudioClip testClip = Microphone.Start(
                 _selectedDevice,
@@ -435,7 +433,7 @@ namespace NPCLLMChat.STT
 
             if (testClip == null)
             {
-                Log.Error("[NPCLLMChat] Failed to start test recording");
+                Log.Error("Failed to start test recording");
                 onComplete?.Invoke(null);
                 yield break;
             }
@@ -447,7 +445,7 @@ namespace NPCLLMChat.STT
 
             if (samplePosition <= 0)
             {
-                Log.Warning("[NPCLLMChat] Test recording got no samples");
+                Log.Warning("Test recording got no samples");
                 Destroy(testClip);
                 onComplete?.Invoke(null);
                 yield break;
@@ -456,7 +454,7 @@ namespace NPCLLMChat.STT
             byte[] wavData = ConvertToWav(testClip, samplePosition);
             Destroy(testClip);
 
-            Log.Out($"[NPCLLMChat] Test recording complete: {wavData?.Length ?? 0} bytes");
+            Log.Out($"Test recording complete: {wavData?.Length ?? 0} bytes");
             onComplete?.Invoke(wavData);
         }
 

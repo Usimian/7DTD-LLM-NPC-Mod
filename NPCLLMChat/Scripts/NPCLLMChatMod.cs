@@ -46,7 +46,7 @@ namespace NPCLLMChat
             if (!string.IsNullOrEmpty(savedEndpoint))
             {
                 LLMService.Instance.SetEndpoint(savedEndpoint);
-                Log.Out($"[NPCLLMChat] Using player-configured endpoint: {savedEndpoint}");
+                Log.Out($"Using player-configured endpoint: {savedEndpoint}");
             }
 
             // Check if player has overridden the model in PlayerPrefs
@@ -54,7 +54,7 @@ namespace NPCLLMChat
             if (!string.IsNullOrEmpty(savedModel))
             {
                 LLMService.Instance.SetModel(savedModel);
-                Log.Out($"[NPCLLMChat] Using player-configured model: {savedModel}");
+                Log.Out($"Using player-configured model: {savedModel}");
             }
 
             // Load TTS configuration and initialize TTS service
@@ -115,16 +115,16 @@ namespace NPCLLMChat
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                Log.Warning("[NPCLLMChat] Voice transcription returned empty text");
+                Log.Warning("Voice transcription returned empty text");
                 return;
             }
 
-            Log.Out($"[NPCLLMChat] Voice transcribed: \"{text}\"");
+            Log.Out($"Voice transcribed: \"{text}\"");
 
             var player = GameManager.Instance?.World?.GetPrimaryPlayer();
             if (player == null)
             {
-                Log.Warning("[NPCLLMChat] No player found for voice input");
+                Log.Warning("No player found for voice input");
                 return;
             }
 
@@ -132,8 +132,8 @@ namespace NPCLLMChat
             EntityAlive nearestNPC = FindNearestNPC(player, 15f);
             if (nearestNPC == null)
             {
-                Log.Out("[NPCLLMChat] No NPC nearby to talk to via voice");
-                Log.Out($"[NPCLLMChat] Checked {GameManager.Instance?.World?.Entities?.list?.Count ?? 0} entities");
+                Log.Out("No NPC nearby to talk to via voice");
+                Log.Out($"Checked {GameManager.Instance?.World?.Entities?.list?.Count ?? 0} entities");
                 // Show feedback to player
                 GameManager.ShowTooltip(player, "No NPC nearby to talk to", false);
                 return;
@@ -143,11 +143,11 @@ namespace NPCLLMChat
             var chatComponent = Harmony.NPCCorePatches.GetOrCreateChatComponent(nearestNPC);
             if (chatComponent == null)
             {
-                Log.Warning("[NPCLLMChat] Failed to get chat component for NPC");
+                Log.Warning("Failed to get chat component for NPC");
                 return;
             }
 
-            Log.Out($"[NPCLLMChat] Voice message to {chatComponent.NPCName}: \"{text}\"");
+            Log.Out($"Voice message to {chatComponent.NPCName}: \"{text}\"");
 
             // Show what we heard
             GameManager.ShowTooltip(player, $"You: {text}", false);
@@ -155,7 +155,7 @@ namespace NPCLLMChat
             // Send message to NPC
             chatComponent.ProcessPlayerMessage(text, player, response =>
             {
-                Log.Out($"[NPCLLMChat] {chatComponent.NPCName} responded: {response}");
+                Log.Out($"{chatComponent.NPCName} responded: {response}");
                 
                 // Show NPC response as tooltip
                 if (!string.IsNullOrWhiteSpace(response))
@@ -172,12 +172,10 @@ namespace NPCLLMChat
         {
             EntityAlive closest = null;
             float closestDist = maxDistance;
-            int npcCount = 0;
 
             var world = GameManager.Instance?.World;
             if (world == null) return null;
 
-            Log.Out("[NPCLLMChat] Scanning entities for NPCs...");
             foreach (var entity in world.Entities.list)
             {
                 if (entity is EntityAlive alive && alive.entityId != player.entityId)
@@ -187,7 +185,6 @@ namespace NPCLLMChat
 
                     if (isNPC)
                     {
-                        npcCount++;
                         if (dist < closestDist)
                         {
                             closest = alive;
@@ -391,19 +388,19 @@ namespace NPCLLMChat
                         }
                     }
                     if (config.Pronunciations.Count > 0)
-                        Log.Out($"[NPCLLMChat] Loaded {config.Pronunciations.Count} pronunciation fix(es)");
+                        Log.Out($"Loaded {config.Pronunciations.Count} pronunciation fix(es)");
                 }
 
                 // Audio levels chosen in the in-game settings override the XML defaults
                 if (UnityEngine.PlayerPrefs.HasKey("NPCLLMChat_Volume"))
                 {
                     config.Volume = UnityEngine.PlayerPrefs.GetFloat("NPCLLMChat_Volume");
-                    Log.Out($"[NPCLLMChat] Using player-configured volume: {config.Volume:P0}");
+                    Log.Out($"Using player-configured volume: {config.Volume:P0}");
                 }
                 if (UnityEngine.PlayerPrefs.HasKey("NPCLLMChat_SpeechRate"))
                 {
                     config.SpeechRate = UnityEngine.PlayerPrefs.GetFloat("NPCLLMChat_SpeechRate");
-                    Log.Out($"[NPCLLMChat] Using player-configured speech rate: {config.SpeechRate}");
+                    Log.Out($"Using player-configured speech rate: {config.SpeechRate}");
                 }
 
                 // Companion voice chosen in the in-game settings overrides the XML default
@@ -411,7 +408,7 @@ namespace NPCLLMChat
                 if (!string.IsNullOrEmpty(savedCompanionVoice))
                 {
                     config.CompanionVoice = savedCompanionVoice;
-                    Log.Out($"[NPCLLMChat] Using player-configured companion voice: {savedCompanionVoice}");
+                    Log.Out($"Using player-configured companion voice: {savedCompanionVoice}");
                 }
 
                 Log.Out($"TTS configuration loaded - Provider: {config.Provider}, Enabled: {config.Enabled}");

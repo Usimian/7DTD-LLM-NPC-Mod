@@ -117,14 +117,14 @@ namespace NPCLLMChat
                     var memory = JsonConvert.DeserializeObject<NPCMemory>(File.ReadAllText(file));
                     if (memory != null)
                     {
-                        Log.Out($"[NPCLLMChat] Loaded memory for {npcName}: {memory.messages.Count} messages, {memory.placesVisited.Count} places");
+                        Log.Out($"Loaded memory for {npcName}: {memory.messages.Count} messages, {memory.placesVisited.Count} places");
                         return memory;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Failed to load memory for {npcName}: {ex.Message}");
+                Log.Warning($"Failed to load memory for {npcName}: {ex.Message}");
             }
             return null;
         }
@@ -138,7 +138,7 @@ namespace NPCLLMChat
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] Failed to save memory for {npcName}: {ex.Message}");
+                Log.Warning($"Failed to save memory for {npcName}: {ex.Message}");
             }
         }
 
@@ -201,7 +201,7 @@ namespace NPCLLMChat
             {
                 File.Delete(file);
             }
-            Log.Out($"[NPCLLMChat] Migrated legacy memory {Path.GetFileName(newest)} -> {Path.GetFileName(targetFile)} ({matches.Count} legacy file(s) removed)");
+            Log.Out($"Migrated legacy memory {Path.GetFileName(newest)} -> {Path.GetFileName(targetFile)} ({matches.Count} legacy file(s) removed)");
         }
     }
 }

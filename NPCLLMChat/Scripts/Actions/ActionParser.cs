@@ -259,7 +259,7 @@ namespace NPCLLMChat.Actions
             }
             catch (Exception ex)
             {
-                Log.Out($"[NPCLLMChat] JSON parse failed: {ex.Message}");
+                Log.Out($"JSON parse failed: {ex.Message}");
                 return null;
             }
         }

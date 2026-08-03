@@ -183,7 +183,7 @@ public class XUiC_NPCLLMChatConfig : XUiController
             catch (Exception ex)
             {
                 lblContextUsage.Text = "unavailable";
-                Log.Warning($"[NPCLLMChat] Context usage readout failed: {ex.Message}");
+                Log.Warning($"Context usage readout failed: {ex.Message}");
             }
         }
 
@@ -617,11 +617,11 @@ public class XUiC_NPCLLMChatConfig : XUiController
                     }
                     else
                     {
-                        UnityEngine.Debug.LogWarning("[NPCLLMChat] AudioClip or player is null!");
+                        Log.Warning("AudioClip or player is null!");
                     }
                 },
                 error => {
-                    UnityEngine.Debug.LogError($"[NPCLLMChat] TTS test error: {error}");
+                    Log.Error($"TTS test error: {error}");
                     GameManager.ShowTooltip(_entityPlayerLocal, $"TTS test failed: {error}", false);
                 }
             );

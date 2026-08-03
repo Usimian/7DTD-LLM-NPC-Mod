@@ -55,7 +55,7 @@ namespace NPCLLMChat.Harmony
         {
             bool had = _byEntityId.Remove(entityId);
             if (!string.IsNullOrEmpty(npcName)) had |= _byName.Remove(npcName);
-            if (had) Log.Out($"[NPCLLMChat] Forgot cached store for {npcName ?? "?"} [id {entityId}] - " +
+            if (had) Log.Out($"Forgot cached store for {npcName ?? "?"} [id {entityId}] - " +
                              "it left the world, so open her pack once when she is back");
         }
     }
@@ -80,17 +80,14 @@ namespace NPCLLMChat.Harmony
             // player-placed crates out - but a hired companion's pack is player storage too, so
             // the one container this exists to capture was the one being thrown away. Crates are
             // already excluded by the title: "Wood Storage Crate Insecure" is not her name.
-            if (!IsStoreOf(npc, _lootContainerName))
-            {
-                Log.Out($"[NPCLLMChat] Not attributing container '{_lootContainerName}' to " +
-                        $"{npc.EntityName ?? "?"} - not her store");
-                return;
-            }
+            // Every crate, corpse bag and drone in the world comes through here, so the
+            // rejection is the ordinary case and says nothing worth logging.
+            if (!IsStoreOf(npc, _lootContainerName)) return;
 
             int entityId = npc.entityId;
             string npcName = npc.EntityName;
             NPCContainerCache.Remember(entityId, npcName, _lootContainerName, _te.items);
-            Log.Out($"[NPCLLMChat] Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}] " +
+            Log.Out($"Cached container '{_lootContainerName}' for {npcName ?? "?"} [id {entityId}] " +
                     $"(playerStorage={_te.bPlayerStorage}): {WorldContextHelper.SummarizeStacks(_te.items) ?? "(empty)"}");
         }
 

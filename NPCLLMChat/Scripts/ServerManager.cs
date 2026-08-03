@@ -23,11 +23,11 @@ namespace NPCLLMChat
             string modPath = GetModPath();
             if (string.IsNullOrEmpty(modPath))
             {
-                Log.Warning("[NPCLLMChat] ServerManager: Could not determine mod path");
+                Log.Warning("ServerManager: Could not determine mod path");
                 return;
             }
 
-            Log.Out($"[NPCLLMChat] ServerManager: Mod path = {modPath}");
+            Log.Out($"ServerManager: Mod path = {modPath}");
 
             // Check if Ollama is running (don't auto-start - causes Steam hang issues)
             CheckOllamaStatus();
@@ -37,12 +37,12 @@ namespace NPCLLMChat
             // Under Steam's Linux runtime the game can't exec host Python at all, so
             // externally-managed servers are the normal case there.
             if (IsPortListening(5050))
-                Log.Out("[NPCLLMChat] ServerManager: Piper TTS already running on port 5050, using it");
+                Log.Out("ServerManager: Piper TTS already running on port 5050, using it");
             else
                 StartPiperServer(modPath);
 
             if (IsPortListening(5051))
-                Log.Out("[NPCLLMChat] ServerManager: Whisper STT already running on port 5051, using it");
+                Log.Out("ServerManager: Whisper STT already running on port 5051, using it");
             else
                 StartWhisperServer(modPath);
         }
@@ -72,14 +72,14 @@ namespace NPCLLMChat
                 string piperDir = FindServerDirectory("piper-server", modPath);
                 if (piperDir == null)
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: piper-server not found. Install alongside the mod or set NPCLLM_SERVERS_PATH");
+                    Log.Warning("ServerManager: piper-server not found. Install alongside the mod or set NPCLLM_SERVERS_PATH");
                     return;
                 }
 
                 string piperScript = Path.Combine(piperDir, "piper_server.py");
                 if (!File.Exists(piperScript))
                 {
-                    Log.Warning($"[NPCLLMChat] ServerManager: piper_server.py not found at {piperScript}");
+                    Log.Warning($"ServerManager: piper_server.py not found at {piperScript}");
                     return;
                 }
 
@@ -88,11 +88,11 @@ namespace NPCLLMChat
                 string sitePackages;
                 if (!FindPythonEnvironment(piperDir, out pythonExe, out sitePackages))
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: Python not found. Please install Python 3.9+");
+                    Log.Warning("ServerManager: Python not found. Please install Python 3.9+");
                     return;
                 }
 
-                Log.Out($"[NPCLLMChat] ServerManager: Starting Piper TTS server (using {pythonExe})...");
+                Log.Out($"ServerManager: Starting Piper TTS server (using {pythonExe})...");
 
                 var startInfo = new ProcessStartInfo
                 {
@@ -112,11 +112,11 @@ namespace NPCLLMChat
                 }
 
                 piperProcess = Process.Start(startInfo);
-                Log.Out($"[NPCLLMChat] ServerManager: Piper TTS started (PID: {piperProcess?.Id})");
+                Log.Out($"ServerManager: Piper TTS started (PID: {piperProcess?.Id})");
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] ServerManager: Failed to start Piper: {ex.Message}");
+                Log.Warning($"ServerManager: Failed to start Piper: {ex.Message}");
             }
         }
 
@@ -128,14 +128,14 @@ namespace NPCLLMChat
                 string whisperDir = FindServerDirectory("whisper-server", modPath);
                 if (whisperDir == null)
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: whisper-server not found. Install alongside the mod or set NPCLLM_SERVERS_PATH");
+                    Log.Warning("ServerManager: whisper-server not found. Install alongside the mod or set NPCLLM_SERVERS_PATH");
                     return;
                 }
 
                 string whisperScript = Path.Combine(whisperDir, "whisper_server.py");
                 if (!File.Exists(whisperScript))
                 {
-                    Log.Warning($"[NPCLLMChat] ServerManager: whisper_server.py not found at {whisperScript}");
+                    Log.Warning($"ServerManager: whisper_server.py not found at {whisperScript}");
                     return;
                 }
 
@@ -144,11 +144,11 @@ namespace NPCLLMChat
                 string sitePackages;
                 if (!FindPythonEnvironment(whisperDir, out pythonExe, out sitePackages))
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: Python not found. Please install Python 3.9+");
+                    Log.Warning("ServerManager: Python not found. Please install Python 3.9+");
                     return;
                 }
 
-                Log.Out($"[NPCLLMChat] ServerManager: Starting Whisper STT server (using {pythonExe})...");
+                Log.Out($"ServerManager: Starting Whisper STT server (using {pythonExe})...");
 
                 var startInfo = new ProcessStartInfo
                 {
@@ -168,10 +168,10 @@ namespace NPCLLMChat
                 }
 
                 whisperProcess = Process.Start(startInfo);
-                Log.Out($"[NPCLLMChat] ServerManager: Whisper STT started (PID: {whisperProcess?.Id})");
+                Log.Out($"ServerManager: Whisper STT started (PID: {whisperProcess?.Id})");
                 
                 // Wait for Whisper server to be ready (it needs time to load the model)
-                Log.Out("[NPCLLMChat] ServerManager: Waiting for Whisper to initialize (loading model)...");
+                Log.Out("ServerManager: Waiting for Whisper to initialize (loading model)...");
                 System.Threading.Thread.Sleep(5000);  // Initial wait for Python to start
                 
                 // Check if server is responding
@@ -189,7 +189,7 @@ namespace NPCLLMChat
                             {
                                 whisperReady = true;
                                 client.Close();
-                                Log.Out("[NPCLLMChat] ServerManager: Whisper STT is accepting connections!");
+                                Log.Out("ServerManager: Whisper STT is accepting connections!");
                             }
                         }
                     }
@@ -206,13 +206,13 @@ namespace NPCLLMChat
                 
                 if (!whisperReady)
                 {
-                    Log.Warning("[NPCLLMChat] ServerManager: Whisper STT failed to start - check if faster-whisper is installed");
-                    Log.Warning("[NPCLLMChat] ServerManager: Run setup_servers.bat to install dependencies");
+                    Log.Warning("ServerManager: Whisper STT failed to start - check if faster-whisper is installed");
+                    Log.Warning("ServerManager: Run setup_servers.bat to install dependencies");
                 }
             }
             catch (Exception ex)
             {
-                Log.Warning($"[NPCLLMChat] ServerManager: Failed to start Whisper: {ex.Message}");
+                Log.Warning($"ServerManager: Failed to start Whisper: {ex.Message}");
             }
         }
 
@@ -228,7 +228,7 @@ namespace NPCLLMChat
                     
                     if (success && client.Connected)
                     {
-                        Log.Out("[NPCLLMChat] ServerManager: Ollama is running");
+                        Log.Out("ServerManager: Ollama is running");
                         client.Close();
                         return;
                     }
@@ -237,14 +237,14 @@ namespace NPCLLMChat
             catch { }
 
             // Ollama is not running - warn user
-            Log.Warning("[NPCLLMChat] ServerManager: Ollama is NOT running!");
-            Log.Warning("[NPCLLMChat] ServerManager: NPCs will not respond until Ollama is started.");
-            Log.Warning("[NPCLLMChat] ServerManager: Run 'ollama serve' or enable the Ollama service/auto-start.");
+            Log.Warning("ServerManager: Ollama is NOT running!");
+            Log.Warning("ServerManager: NPCs will not respond until Ollama is started.");
+            Log.Warning("ServerManager: Run 'ollama serve' or enable the Ollama service/auto-start.");
         }
 
         public static void StopServers()
         {
-            Log.Out("[NPCLLMChat] ServerManager: Stopping servers...");
+            Log.Out("ServerManager: Stopping servers...");
             
             // Kill Piper TTS directly (no child processes)
             if (piperProcess != null)
@@ -254,7 +254,7 @@ namespace NPCLLMChat
                     if (!piperProcess.HasExited)
                     {
                         piperProcess.Kill();
-                        Log.Out("[NPCLLMChat] ServerManager: Piper TTS killed");
+                        Log.Out("ServerManager: Piper TTS killed");
                     }
                 }
                 catch { }
@@ -269,7 +269,7 @@ namespace NPCLLMChat
                     if (!whisperProcess.HasExited)
                     {
                         whisperProcess.Kill();
-                        Log.Out("[NPCLLMChat] ServerManager: Whisper STT killed");
+                        Log.Out("ServerManager: Whisper STT killed");
                     }
                 }
                 catch { }
@@ -277,7 +277,7 @@ namespace NPCLLMChat
             }
 
             serversStarted = false;
-            Log.Out("[NPCLLMChat] ServerManager: Servers stopped.");
+            Log.Out("ServerManager: Servers stopped.");
         }
         
         private static bool FindPythonEnvironment(string serverDir, out string pythonExe, out string sitePackages)
@@ -294,7 +294,7 @@ namespace NPCLLMChat
                 if (File.Exists(venvPython))
                 {
                     pythonExe = venvPython;
-                    Log.Out($"[NPCLLMChat] ServerManager: Using venv Python at {pythonExe}");
+                    Log.Out($"ServerManager: Using venv Python at {pythonExe}");
                     return true;
                 }
             }
@@ -304,7 +304,7 @@ namespace NPCLLMChat
             if (Directory.Exists(bundledSitePackages))
             {
                 sitePackages = bundledSitePackages;
-                Log.Out($"[NPCLLMChat] ServerManager: Found bundled packages at {sitePackages}");
+                Log.Out($"ServerManager: Found bundled packages at {sitePackages}");
             }
             else if (!PlatformHelper.IsWindows)
             {
@@ -318,7 +318,7 @@ namespace NPCLLMChat
                         if (Directory.Exists(sp))
                         {
                             sitePackages = sp;
-                            Log.Out($"[NPCLLMChat] ServerManager: Found bundled packages at {sitePackages}");
+                            Log.Out($"ServerManager: Found bundled packages at {sitePackages}");
                             break;
                         }
                     }
@@ -364,7 +364,7 @@ namespace NPCLLMChat
                     if (testProcess.ExitCode == 0)
                     {
                         pythonExe = path;
-                        Log.Out($"[NPCLLMChat] ServerManager: Found Python at {pythonExe}");
+                        Log.Out($"ServerManager: Found Python at {pythonExe}");
                         return true;
                     }
                 }
@@ -402,7 +402,7 @@ namespace NPCLLMChat
                 string serverPath = Path.Combine(basePath, serverName);
                 if (Directory.Exists(serverPath))
                 {
-                    Log.Out($"[NPCLLMChat] ServerManager: Found {serverName} at {serverPath}");
+                    Log.Out($"ServerManager: Found {serverName} at {serverPath}");
                     return serverPath;
                 }
             }
