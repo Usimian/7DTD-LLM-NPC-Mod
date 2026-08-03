@@ -82,6 +82,26 @@ namespace NPCLLMChat.Harmony
             return chatComponent;
         }
 
+        // Every tick of a Stay order clears the flag, so this fires constantly once it starts -
+        // report the first, then only when the count crosses a power of ten, so the log says it
+        // is happening and roughly how much without becoming the log.
+        private static readonly Dictionary<int, int> _respawnRescues = new Dictionary<int, int>();
+
+        internal static void NoteRespawnRescue(EntityAlive npc)
+        {
+            _respawnRescues.TryGetValue(npc.entityId, out int count);
+            count++;
+            _respawnRescues[npc.entityId] = count;
+
+            bool worthSaying = count == 1 || count == 10 || count == 100 || count == 1000 || count % 10000 == 0;
+            if (worthSaying)
+            {
+                Log.Warning($"[NPCLLMChat] {npc.EntityName} [id {npc.entityId}] bWillRespawn was cleared " +
+                            $"({count}x) - SCore does this on every order that is not Follow or Loot. " +
+                            "Restored; without this she would be unloaded and lost.");
+            }
+        }
+
         internal static bool IsHiredByPlayer(EntityAlive npc)
         {
             if (npc?.Buffs == null) return false;
@@ -272,6 +292,65 @@ namespace NPCLLMChat.Harmony
             {
                 NPCCorePatches.GetOrCreateChatComponent(__instance);
             }
+        }
+    }
+
+    /// <summary>
+    /// The actual vanishing: a companion told to stay is marked not to come back.
+    ///
+    /// NPCLeaderComponent.OnUpdateLive ends with
+    ///     var order = EntityUtilities.GetCurrentOrder(entityId);
+    ///     if (order == Orders.Follow || order == Orders.Loot) { HandleFollowOrder(...); return; }
+    ///     _entity.bWillRespawn = false;
+    ///
+    /// so every order that is not Follow or Loot - Stay, Guard - clears the flag on every tick,
+    /// and vanilla World then unloads her permanently. Leave her guarding the base and walk far
+    /// enough for the chunk to unload and she is gone, with her gear. Keep her following and she
+    /// is fine, which is exactly the pattern: lost when left behind, never when tagging along.
+    ///
+    /// This is a different class from EntityAliveSDX.LeaderUpdate. SCore moved the leader logic
+    /// into a component and left the old method behind, so the earlier patch guarded a path her
+    /// entity no longer runs - which is why it never once reported a rescue while she kept
+    /// disappearing.
+    ///
+    /// Dismissal still works: OnUpdateLive returns early on buffOrderDismiss without touching the
+    /// flag, and the two remaining clears in SCore are the deliberate unload paths that also strip
+    /// her from the player's Companions list.
+    /// </summary>
+    [HarmonyPatch]
+    public class LeaderComponentRespawnPatch
+    {
+        private static FieldInfo _entityField;
+
+        static MethodBase TargetMethod()
+        {
+            var type = AccessTools.TypeByName("NPCLeaderComponent");
+            if (type == null) return null;
+            _entityField = AccessTools.Field(type, "_entity");
+            return AccessTools.Method(type, "OnUpdateLive");
+        }
+
+        static bool Prepare()
+        {
+            bool ready = TargetMethod() != null && _entityField != null;
+            if (!ready)
+            {
+                Log.Warning("[NPCLLMChat] NPCLeaderComponent.OnUpdateLive not found - a companion " +
+                            "left on Stay or Guard may be unloaded and lost");
+            }
+            return ready;
+        }
+
+        static void Postfix(object __instance)
+        {
+            var npc = _entityField?.GetValue(__instance) as EntityAlive;
+            if (npc == null || npc.IsDead() || npc.Buffs == null) return;
+            if (npc.Buffs.HasBuff("buffOrderDismiss")) return;
+            if (!NPCCorePatches.IsHiredByPlayer(npc)) return;
+            if (npc.bWillRespawn) return;
+
+            npc.bWillRespawn = true;
+            NPCCorePatches.NoteRespawnRescue(npc);
         }
     }
 
