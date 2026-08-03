@@ -384,8 +384,16 @@ namespace NPCLLMChat.Harmony
             if (npc == null || npc.IsDead() || npc.Buffs == null) return;
             if (npc.Buffs.HasBuff("buffOrderDismiss")) return;
             if (!NPCCorePatches.IsHiredByPlayer(npc)) return;
-            if (npc.bWillRespawn) return;
 
+            // Her chat component hangs off the older EntityAliveSDX.LeaderUpdate path only.
+            // Both paths run today, but SCore has plainly moved its leader logic here, and a
+            // companion placed from the item is a new entity that needs the component again.
+            if (npc.gameObject != null && npc.gameObject.GetComponent<NPCChatComponent>() == null)
+            {
+                NPCCorePatches.GetOrCreateChatComponent(npc);
+            }
+
+            if (npc.bWillRespawn) return;
             npc.bWillRespawn = true;
             NPCCorePatches.NoteRespawnRescue(npc);
         }
@@ -411,18 +419,38 @@ namespace NPCLLMChat.Harmony
     {
         static bool Prefix(Entity _e, EnumRemoveEntityReason _reason)
         {
-            if (_reason != EnumRemoveEntityReason.Despawned) return true;
-
             var npc = _e as EntityAlive;
-            if (npc == null || npc.IsDead() || npc.Buffs == null) return true;
-            if (npc.Buffs.HasBuff("buffOrderDismiss")) return true;
+            if (npc == null || npc.Buffs == null) return true;
             if (!NPCCorePatches.IsHiredByPlayer(npc)) return true;
+
+            // Every exit, not just the one this patch blocks. World.RemoveEntity is only one
+            // road out of the world - the marked-for-unload sweep and UnloadEntities both call
+            // unloadEntity directly, so a companion could leave with nothing in the log at all.
+            // That is exactly the hole she went through on 2026-08-03: no removal recorded, and
+            // no way afterwards to tell which path took her.
+            Log.Warning($"UNLOAD {npc.EntityName} [id {npc.entityId}] reason={_reason} at " +
+                        $"({(int)npc.position.x}, {(int)npc.position.z}) " +
+                        $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
+                        $"savedToFile={SafeIsSavedToFile(npc)} dismissed={npc.Buffs.HasBuff("buffOrderDismiss")}");
+
+            if (_reason != EnumRemoveEntityReason.Despawned) return true;
+            if (npc.IsDead()) return true;
+            if (npc.Buffs.HasBuff("buffOrderDismiss")) return true;
 
             npc.bWillRespawn = true;
             Log.Warning($"Refused to despawn {npc.EntityName} [id {npc.entityId}] - " +
                         "she is hired, alive and not dismissed. Something cleared her respawn flag " +
                         "from a site the patches do not cover; please report this line.");
             return false;
+        }
+
+        /// <summary>
+        /// The save gate, asked without being able to throw inside a log line.
+        /// </summary>
+        internal static string SafeIsSavedToFile(Entity e)
+        {
+            try { return e.IsSavedToFile().ToString(); }
+            catch (Exception ex) { return "threw:" + ex.GetType().Name; }
         }
     }
 
@@ -485,6 +513,99 @@ namespace NPCLLMChat.Harmony
                 return true;   // let SCore have its roll rather than drop nothing at all
             }
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Chunk.Write asks IsSavedToFile of every entity it holds, and only writes the ones that
+    /// say yes. If a companion is in the world at shutdown and absent from the save afterwards,
+    /// this is where the two stories part - so record her answer, and which custom var carried
+    /// it. Asked once per chunk write, so it speaks only when the verdict changes or is false.
+    /// </summary>
+    [HarmonyPatch]
+    public class SaveGateWatchPatch
+    {
+        private static readonly Dictionary<int, bool> _lastVerdict = new Dictionary<int, bool>();
+
+        static MethodBase TargetMethod()
+        {
+            var sdx = AccessTools.TypeByName("EntityAliveSDX");
+            return sdx == null ? null : AccessTools.Method(sdx, "IsSavedToFile");
+        }
+
+        static bool Prepare()
+        {
+            bool found = TargetMethod() != null;
+            if (!found) Log.Warning("EntityAliveSDX.IsSavedToFile not found - cannot watch the save gate");
+            return found;
+        }
+
+        static void Postfix(EntityAlive __instance, bool __result)
+        {
+            if (__instance?.Buffs == null || !NPCCorePatches.IsHiredByPlayer(__instance)) return;
+
+            int id = __instance.entityId;
+            if (_lastVerdict.TryGetValue(id, out bool was) && was == __result && __result) return;
+            _lastVerdict[id] = __result;
+
+            string carried = __instance.Buffs.HasCustomVar("Leader") ? "Leader"
+                           : __instance.Buffs.HasCustomVar("Persist") ? "Persist"
+                           : "neither";
+            Log.Warning($"SAVE GATE {__instance.EntityName} [id {id}] -> {__result} " +
+                        $"(carried by {carried}, spawnerSource={__instance.GetSpawnerSource()})");
+        }
+    }
+
+    /// <summary>
+    /// Placing her from the item makes a brand new entity with a brand new id - EntityFactory
+    /// .CreateEntity, not a restore - so every pick-up-and-put-down changes who she is as far as
+    /// anything keyed by id is concerned. Record the new id at the moment it appears.
+    /// </summary>
+    [HarmonyPatch(typeof(World), nameof(World.SpawnEntityInWorld))]
+    public class SpawnWatchPatch
+    {
+        static void Postfix(Entity _entity)
+        {
+            var npc = _entity as EntityAlive;
+            if (npc == null || npc.Buffs == null) return;
+            if (!(npc.GetType().Name.Contains("SDX") || NPCCorePatches.IsHiredByPlayer(npc))) return;
+
+            Log.Warning($"SPAWNED {npc.EntityName} [id {npc.entityId}] at " +
+                        $"({(int)npc.position.x}, {(int)npc.position.z}) " +
+                        $"hired={NPCCorePatches.IsHiredByPlayer(npc)} " +
+                        $"bWillRespawn={npc.bWillRespawn} " +
+                        $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
+        }
+    }
+
+    /// <summary>
+    /// A roll call on the game's own save, which is the only moment that decides what the next
+    /// session inherits. No clock of ours: this fires when the world writes, several times an
+    /// hour, and answers the question the 2026-08-03 log could not - was she still in the world
+    /// at the last save before the quit, and did the gate agree to write her?
+    /// </summary>
+    [HarmonyPatch(typeof(RegionFileManager), nameof(RegionFileManager.WaitSaveDone))]
+    public class SaveRollCallPatch
+    {
+        static void Postfix()
+        {
+            var world = GameManager.Instance?.World;
+            if (world?.Entities?.list == null) return;
+
+            int companions = 0;
+            foreach (var e in world.Entities.list)
+            {
+                var npc = e as EntityAlive;
+                if (npc == null || npc.Buffs == null || !NPCCorePatches.IsHiredByPlayer(npc)) continue;
+                companions++;
+                Log.Warning($"ROLL CALL {npc.EntityName} [id {npc.entityId}] in world at " +
+                            $"({(int)npc.position.x}, {(int)npc.position.z}) " +
+                            $"chunk({World.toChunkXZ((int)npc.position.x)}, {World.toChunkXZ((int)npc.position.z)}) " +
+                            $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
+                            $"addedToChunk={npc.addedToChunk} " +
+                            $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
+            }
+            if (companions == 0) Log.Warning("ROLL CALL - no hired companion in the world at save");
         }
     }
 
