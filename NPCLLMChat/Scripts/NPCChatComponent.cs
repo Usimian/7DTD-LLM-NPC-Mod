@@ -427,6 +427,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine(DescribeRapport());
             sb.AppendLine();
             sb.AppendLine("[How to answer - this overrides every style note above]");
+
+            // She denied having a cola that was listed in her own pack, because she had denied it
+            // one turn earlier and stayed consistent with herself rather than re-reading. The
+            // notice existed, buried a long way up in the world state; agreeing with your own
+            // last answer beats a fact you have scrolled past. It goes here instead, last, where
+            // the instructions that actually win are.
+            if (!string.IsNullOrEmpty(_recentlyAdded) && Time.unscaledTime - _recentlyAddedAt < 600f)
+            {
+                sb.AppendLine($"BEFORE ANYTHING ELSE: {_recentlyAdded} is in your pack now - it arrived in the " +
+                              "last few minutes and the list above is current. If you told him a moment ago that " +
+                              "your pack held nothing new, YOU WERE WRONG and you say so lightly - \"hang on, so " +
+                              "there is\" - rather than insisting. Never deny carrying something that is on the " +
+                              "list, and never claim to have checked and found nothing when it is right there.");
+            }
             sb.AppendLine("FIRST: if the player asks about something the world state above actually tells you - " +
                           "what is in your pack, where a place is, the time, the weather, the horde, your health - " +
                           "ANSWER IT from those facts. Read the list before you reply. No mood, no tiredness and " +
