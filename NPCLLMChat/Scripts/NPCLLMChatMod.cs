@@ -184,7 +184,6 @@ namespace NPCLLMChat
                 {
                     float dist = UnityEngine.Vector3.Distance(player.position, alive.position);
                     bool isNPC = IsNPC(alive);
-                    Log.Out($"[NPCLLMChat] Entity: {alive.EntityName} (type: {alive.GetType().Name}) at {dist:F1}m - IsNPC: {isNPC}");
 
                     if (isNPC)
                     {
@@ -198,7 +197,6 @@ namespace NPCLLMChat
                 }
             }
 
-            Log.Out($"[NPCLLMChat] Found {npcCount} NPCs total, closest: {closest?.EntityName ?? "none"} at {closestDist:F1}m");
             return closest;
         }
 

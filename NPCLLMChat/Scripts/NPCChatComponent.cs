@@ -1107,6 +1107,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         // Last computed contents of her pack, repeated at the end of the prompt. She kept
         // denying items that were listed for her in the middle of it.
         private string _packContents;
+        private string _lastLoggedPack = "\0";
         private float _lastCaffeineTime = -9999f;
         private int _lastCoffeeCount = -1;
 
@@ -2133,6 +2134,18 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// </summary>
         public static int LastContextChars { get; private set; }
 
+        /// <summary>
+        /// XNPCCore gives its NPCs stand-in weapons and ammo (gunNPCM60, ammoNPC9mmBulletBall)
+        /// that make them fire; they are not possessions and should not be listed as such.
+        /// </summary>
+        private static bool IsNPCToken(ItemStack stack)
+        {
+            string id = stack?.itemValue?.ItemClass?.GetItemName() ?? "";
+            return id.StartsWith("gunNPC", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("ammoNPC", StringComparison.OrdinalIgnoreCase)
+                || id.StartsWith("meleeNPC", StringComparison.OrdinalIgnoreCase);
+        }
+
         private string BuildWorldContext()
         {
             try
@@ -2225,8 +2238,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 if (_npcEntity.lootContainer?.items != null) carried.AddRange(_npcEntity.lootContainer.items);
                 var ownBag = _npcEntity.bag?.GetSlots();
                 if (ownBag != null) carried.AddRange(ownBag);
+                // Her toolbelt holds XNPCCore's own weapon tokens - gunNPCM60, ammoNPC9mm - which
+                // exist to make her shoot rather than as things she is carrying. Listing them had
+                // her reporting two M60s: gunNPCM60 prettifies to "M60" while the real gun the
+                // player handed her localises to "M60 Machine Gun", so they summarised as separate
+                // items. Her weapon has its own line already, and the prompt states her ammo never
+                // runs out, so the tokens have no business in her pack.
                 var belt = _npcEntity.inventory?.CloneItemStack();
-                if (belt != null) carried.AddRange(belt);
+                if (belt != null)
+                {
+                    foreach (var stack in belt)
+                    {
+                        if (!IsNPCToken(stack)) carried.Add(stack);
+                    }
+                }
                 // SCore NPCs derive from EntityTrader, and the companion UI can route items
                 // into the trader-side inventory rather than the loot container
                 var traderStock = (_npcEntity as EntityTrader)?.TileEntityTrader?.TraderData?.PrimaryInventory;
@@ -2296,13 +2321,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                 string carrying = WorldContextHelper.SummarizeStacks(carried);
                 _packContents = carrying;
-                Log.Out($"[NPCLLMChat] {_npcName} inventory by source -> " +
-                        $"lootContainer: {WorldContextHelper.SummarizeStacks(_npcEntity.lootContainer?.items) ?? "(empty)"} | " +
-                        $"bag: {WorldContextHelper.SummarizeStacks(ownBag) ?? "(empty)"} | " +
-                        $"belt: {WorldContextHelper.SummarizeStacks(belt) ?? "(empty)"} | " +
-                        $"trader: {WorldContextHelper.SummarizeStacks(traderStock) ?? "(empty)"} | " +
-                        $"own container: {WorldContextHelper.SummarizeStacks(ownContainer) ?? "(none found)"} | " +
-                        $"opened store: {WorldContextHelper.SummarizeStacks(opened) ?? "(never opened)"}");
+
+                // Only when it changes. This fired on every context build - several times a
+                // minute, whether or not anything had moved - for a line that is only of
+                // interest when the contents differ from last time.
+                if (carrying != _lastLoggedPack)
+                {
+                    _lastLoggedPack = carrying;
+                    Log.Out($"[NPCLLMChat] {_npcName} pack: {carrying ?? "(empty)"}");
+                }
 
                 string wielded = _npcEntity.inventory?.holdingItem?.GetLocalizedItemName();
                 if (!string.IsNullOrEmpty(wielded) && wielded != "Air")

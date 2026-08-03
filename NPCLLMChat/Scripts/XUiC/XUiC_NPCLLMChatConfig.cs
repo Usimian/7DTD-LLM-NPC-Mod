@@ -85,19 +85,12 @@ public class XUiC_NPCLLMChatConfig : XUiController
             sliderChatDistance = GetChildById("sliderChatDistance") as XUiC_Slider;
             sliderVoiceDistance = GetChildById("sliderVoiceDistance") as XUiC_Slider;
 
-            // Debug: Log which sliders were found
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderVolume = {(sliderVolume != null ? "found" : "NULL")}");
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderSpeechRate = {(sliderSpeechRate != null ? "found" : "NULL")}");
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderMaxHistory = {(sliderMaxHistory != null ? "found" : "NULL")}");
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderChatDistance = {(sliderChatDistance != null ? "found" : "NULL")}");
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: sliderVoiceDistance = {(sliderVoiceDistance != null ? "found" : "NULL")}");
+
 
 
             cbxCompanionVoice = GetChildById("cbxCompanionVoice") as XUiC_ComboBoxList<string>;
             cbxProvider = GetChildById("cbxProvider") as XUiC_ComboBoxList<string>;
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: cbxProvider = {(cbxProvider != null ? "found" : "NULL")}");
             if (cbxProvider != null) cbxProvider.OnValueChanged += CbxProvider_OnValueChanged;
-            UnityEngine.Debug.Log($"[NPCLLMChat] Init: cbxCompanionVoice = {(cbxCompanionVoice != null ? "found" : "NULL")}");
 
             txtModel = GetChildById("txtModel") as XUiC_TextInput;
 
@@ -224,17 +217,11 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
             _entityPlayerLocal = xui.playerUI.entityPlayer;
 
-            UnityEngine.Debug.Log($"[NPCLLMChat] OnOpen called, about to load settings");
 
             // Load current settings from player buffs (or defaults from config)
             LoadSettings();
             ShowContextUsage();
 
-            // Log the actual slider values after loading
-            if (sliderVolume != null)
-                UnityEngine.Debug.Log($"[NPCLLMChat] OnOpen: After LoadSettings, sliderVolume.Value = {sliderVolume.Value}");
-            if (sliderSpeechRate != null)
-                UnityEngine.Debug.Log($"[NPCLLMChat] OnOpen: After LoadSettings, sliderSpeechRate.Value = {sliderSpeechRate.Value}");
         }
 
         private void LoadSettings()
@@ -255,7 +242,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 // TTSService also stores volume as 0.0-1.0, so use directly
                 float volumeNormalized = GetFloatPref(CVAR_VOLUME, TTSService.Instance?.Config?.Volume ?? 0.8f);
                 sliderVolume.Value = volumeNormalized;
-                UnityEngine.Debug.Log($"[NPCLLMChat] LoadSettings: Setting sliderVolume.Value to {volumeNormalized}");
             }
 
             if (sliderSpeechRate != null)
@@ -266,7 +252,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 float speechRate = GetFloatPref(CVAR_SPEECH_RATE, TTSService.Instance?.Config?.SpeechRate ?? 1.0f);
                 float sliderNormalized = (speechRate - 0.5f) / 1.5f;  // Map 0.5-2.0 to 0.0-1.0
                 sliderSpeechRate.Value = sliderNormalized;
-                UnityEngine.Debug.Log($"[NPCLLMChat] LoadSettings: Speech rate={speechRate}, setting slider to normalized {sliderNormalized}");
             }
 
             // Companion voice dropdown: show the saved choice immediately, then swap in
@@ -338,7 +323,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
         {
             if (_entityPlayerLocal == null) return;
 
-            UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings called");
 
             var buffs = _entityPlayerLocal.Buffs;
 
@@ -356,13 +340,11 @@ public class XUiC_NPCLLMChatConfig : XUiController
             {
                 // Slider value is already 0.0-1.0 (normalized), use directly
                 float volumeNormalized = sliderVolume.Value;
-                UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: sliderVolume.Value={volumeNormalized}");
 
                 SetFloatPref(CVAR_VOLUME, volumeNormalized);
                 if (TTSService.Instance != null)
                 {
                     TTSService.Instance.Config.Volume = volumeNormalized;
-                    UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: Set TTSService volume to {volumeNormalized}");
                 }
             }
 
@@ -371,13 +353,11 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 // Slider value is 0.0-1.0 (normalized), convert back to 0.5-2.0 range
                 float sliderNormalized = sliderSpeechRate.Value;
                 float speechRate = 0.5f + (sliderNormalized * 1.5f);  // Map 0.0-1.0 to 0.5-2.0
-                UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: sliderSpeechRate.Value={sliderNormalized}, converting to rate={speechRate}");
 
                 SetFloatPref(CVAR_SPEECH_RATE, speechRate);
                 if (TTSService.Instance != null)
                 {
                     TTSService.Instance.Config.SpeechRate = speechRate;
-                    UnityEngine.Debug.Log($"[NPCLLMChat] SaveSettings: Set TTSService speech rate to {speechRate}");
                 }
             }
 
@@ -401,7 +381,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
                     TTSService.Instance.Config.CompanionVoice = companionVoice;
                 }
                 RefreshActiveVoices();
-                UnityEngine.Debug.Log($"[NPCLLMChat] Companion voice set to: {companionVoice}");
             }
 
             // Save STT settings
@@ -453,7 +432,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
                 if (LLMService.Instance != null)
                 {
                     LLMService.Instance.SetModel(newModel);
-                    UnityEngine.Debug.Log($"[NPCLLMChat] Updated LLMService model to: {newModel}");
                 }
             }
 
@@ -628,7 +606,6 @@ public class XUiC_NPCLLMChatConfig : XUiController
                     // Play the audio using coroutine on the player entity
                     if (audioClip != null && _entityPlayerLocal != null)
                     {
-                        UnityEngine.Debug.Log($"[NPCLLMChat] Test audio clip received: {audioClip.name}, length: {audioClip.length}s, samples: {audioClip.samples}");
                         float volume = sliderVolume?.Value / 100f ?? 0.8f;
 
                         // Try using the game's main thread to ensure audio plays
@@ -652,12 +629,10 @@ public class XUiC_NPCLLMChatConfig : XUiController
 
         private System.Collections.IEnumerator PlayTestAudio(AudioClip clip, float volume)
         {
-            UnityEngine.Debug.Log($"[NPCLLMChat] PlayTestAudio coroutine started, volume: {volume}");
 
             // Create a temporary GameObject for playing the audio
             GameObject tempAudio = new GameObject("TempTestAudio");
             tempAudio.transform.position = _entityPlayerLocal.position;
-            UnityEngine.Debug.Log($"[NPCLLMChat] Created temp audio GameObject at position: {_entityPlayerLocal.position}");
 
             AudioSource source = tempAudio.AddComponent<AudioSource>();
             source.clip = clip;
@@ -672,15 +647,12 @@ public class XUiC_NPCLLMChatConfig : XUiController
             source.bypassReverbZones = true;
             source.priority = 0;  // Highest priority
 
-            UnityEngine.Debug.Log($"[NPCLLMChat] AudioSource configured, calling Play()");
             source.Play();
 
-            UnityEngine.Debug.Log($"[NPCLLMChat] AudioSource.isPlaying: {source.isPlaying}, time: {source.time}");
 
             // Wait for audio to finish
             yield return new WaitForSeconds(clip.length);
 
-            UnityEngine.Debug.Log("[NPCLLMChat] Audio playback complete, cleaning up");
 
             // Cleanup
             UnityEngine.Object.Destroy(tempAudio);
