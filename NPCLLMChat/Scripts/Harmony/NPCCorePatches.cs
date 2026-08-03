@@ -390,6 +390,73 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// Everything she was carrying drops where she fell.
+    ///
+    /// SCore's dropItemOnDeath rolls against lootDropProb, which XNPCCore sets between 0.03 and
+    /// 0.2 - so a companion's whole pack usually evaporated with her. Worse, the drop it makes
+    /// passes a null container and her belongings are not in the entity's lootContainer at all:
+    /// SCore keeps them in HarvestManager, a TileEntityLootContainer per entity id. Forcing the
+    /// probability would have spilled an empty bag.
+    ///
+    /// So the roll is replaced. Her real container is fetched from HarvestManager and dropped
+    /// outright, which leaves death meaning something - she is gone, and a replacement inherits
+    /// her memory but not her body - while a corpse run gets the gear back. Nothing is created;
+    /// this only stops the game deleting what she was already holding.
+    /// </summary>
+    [HarmonyPatch]
+    public class DropCompanionPackOnDeathPatch
+    {
+        private static MethodInfo _getOrCreate;
+
+        static MethodBase TargetMethod()
+        {
+            var sdx = AccessTools.TypeByName("EntityAliveSDX");
+            var harvest = AccessTools.TypeByName("HarvestManager");
+            _getOrCreate = harvest == null ? null : AccessTools.Method(harvest, "GetOrCreate");
+            return sdx == null ? null : AccessTools.Method(sdx, "dropItemOnDeath");
+        }
+
+        static bool Prepare()
+        {
+            bool ready = TargetMethod() != null && _getOrCreate != null;
+            if (!ready)
+            {
+                Log.Warning("[NPCLLMChat] Could not hook companion death drops - her pack may be " +
+                            "lost when she dies");
+            }
+            return ready;
+        }
+
+        static bool Prefix(EntityAlive __instance)
+        {
+            if (__instance == null || !NPCCorePatches.IsHiredByPlayer(__instance)) return true;
+
+            try
+            {
+                var container = _getOrCreate.Invoke(null, new object[] { __instance.entityId })
+                                as ITileEntityLootable;
+                if (container == null || container.IsEmpty())
+                {
+                    Log.Out($"[NPCLLMChat] {__instance.EntityName} died carrying nothing");
+                    return false;
+                }
+
+                string carried = WorldContextHelper.SummarizeStacks(container.items) ?? "(nothing)";
+                GameManager.Instance.DropContentOfLootContainerServer(
+                    BlockValue.Air, new Vector3i(__instance.position), __instance.entityId, container);
+                Log.Warning($"[NPCLLMChat] {__instance.EntityName} died at " +
+                            $"({(int)__instance.position.x}, {(int)__instance.position.z}) - dropped: {carried}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"[NPCLLMChat] Failed to drop {__instance.EntityName}'s pack: {ex.Message}");
+                return true;   // let SCore have its roll rather than drop nothing at all
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Clean up when NPCs are removed
     /// </summary>
     [HarmonyPatch(typeof(World), nameof(World.RemoveEntity))]
