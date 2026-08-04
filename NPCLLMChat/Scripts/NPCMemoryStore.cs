@@ -93,6 +93,11 @@ namespace NPCLLMChat
 
         private static string FileFor(string npcName) => Path.Combine(MemoryDir, $"npc_{Sanitize(npcName)}.json");
 
+        // The copy from before the most recent write. The game keeps .bak beside every save file
+        // it owns and SCore does the same; this is the one file the mod exists to protect and it
+        // had none.
+        private static string BackupFor(string npcName) => FileFor(npcName) + ".bak";
+
         private static string Sanitize(string name)
         {
             var sb = new StringBuilder(name.Length);
@@ -103,38 +108,88 @@ namespace NPCLLMChat
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Returning null here means the caller starts her blank and the next save writes that
+        /// blank over whatever was on disk - so a file that exists but will not parse must never
+        /// simply fail. It is set aside under its own name, the backup is tried, and only a save
+        /// with genuinely nothing in it returns null.
+        /// </summary>
         public static NPCMemory Load(string npcName)
         {
-            try
+            string file = FileFor(npcName);
+            if (!File.Exists(file))
             {
-                string file = FileFor(npcName);
-                if (!File.Exists(file))
-                {
-                    MigrateLegacyFile(npcName, file);
-                }
-                if (File.Exists(file))
-                {
-                    var memory = JsonConvert.DeserializeObject<NPCMemory>(File.ReadAllText(file));
-                    if (memory != null)
-                    {
-                        Log.Out($"Loaded memory for {npcName}: {memory.messages.Count} messages, {memory.placesVisited.Count} places");
-                        return memory;
-                    }
-                }
+                try { MigrateLegacyFile(npcName, file); }
+                catch (Exception ex) { Log.Warning($"Legacy memory migration failed for {npcName}: {ex.Message}"); }
             }
-            catch (Exception ex)
+
+            var memory = ReadOrNull(file);
+            if (memory != null)
             {
-                Log.Warning($"Failed to load memory for {npcName}: {ex.Message}");
+                Log.Out($"Loaded memory for {npcName}: {memory.messages.Count} messages, {memory.placesVisited.Count} places");
+                return memory;
             }
+
+            // It is there and unreadable. Move it out of the way rather than let it be
+            // overwritten - a half-written file is still most of her, and hand-recoverable.
+            if (File.Exists(file)) Quarantine(file);
+
+            memory = ReadOrNull(BackupFor(npcName));
+            if (memory != null)
+            {
+                Log.Warning($"Recovered {npcName} from backup: {memory.messages.Count} messages, " +
+                            $"{memory.placesVisited.Count} places. The main file would not parse and has been " +
+                            "kept alongside it.");
+                return memory;
+            }
+
             return null;
         }
 
+        private static NPCMemory ReadOrNull(string path)
+        {
+            try
+            {
+                if (!File.Exists(path)) return null;
+                return JsonConvert.DeserializeObject<NPCMemory>(File.ReadAllText(path));
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not read {Path.GetFileName(path)}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static void Quarantine(string file)
+        {
+            try
+            {
+                string kept = file + ".corrupt-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                File.Move(file, kept);
+                Log.Warning($"Set aside unreadable memory as {Path.GetFileName(kept)}");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not set aside {Path.GetFileName(file)}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Written to one side and swapped into place, so an interrupted write cannot leave a
+        /// half-file where her memory used to be. The displaced copy becomes the backup.
+        /// </summary>
         public static void Save(string npcName, NPCMemory memory)
         {
             try
             {
                 Directory.CreateDirectory(MemoryDir);
-                File.WriteAllText(FileFor(npcName), JsonConvert.SerializeObject(memory));
+                string file = FileFor(npcName);
+                string temp = file + ".tmp";
+
+                File.WriteAllText(temp, JsonConvert.SerializeObject(memory));
+
+                if (File.Exists(file)) File.Replace(temp, file, BackupFor(npcName));
+                else File.Move(temp, file);
             }
             catch (Exception ex)
             {
@@ -149,14 +204,19 @@ namespace NPCLLMChat
             Save(npcName, memory);
         }
 
+        /// <summary>
+        /// The backup goes with it. Leaving one behind would let Load resurrect a memory that had
+        /// been deliberately folded into another and deleted - the rename and hire paths both do
+        /// exactly that.
+        /// </summary>
         public static void DeleteFile(string npcName)
         {
-            try
+            string file = FileFor(npcName);
+            foreach (string path in new[] { file, BackupFor(npcName), file + ".tmp" })
             {
-                string file = FileFor(npcName);
-                if (File.Exists(file)) File.Delete(file);
+                try { if (File.Exists(path)) File.Delete(path); }
+                catch (Exception ex) { Log.Warning($"Could not delete {Path.GetFileName(path)}: {ex.Message}"); }
             }
-            catch { }
         }
 
         /// <summary>
