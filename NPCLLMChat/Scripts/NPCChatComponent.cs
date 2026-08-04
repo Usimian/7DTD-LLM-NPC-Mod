@@ -1460,6 +1460,23 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             {
                 bool starving = stats.Food != null && stats.Food.ValuePercentUI < 0.2f;
                 bool parched = stats.Water != null && stats.Water.ValuePercentUI < 0.2f;
+
+                // She stayed quiet at 9% food and the logs could not say why: the unprompted
+                // path never logs its prompt and the chat path truncates at 200 characters, so
+                // neither showed what she was told. Say the numbers out loud, throttled, and only
+                // when one of them is low - this reaching the log at all proves the check runs.
+                float foodPct = stats.Food != null ? stats.Food.ValuePercentUI : -1f;
+                float waterPct = stats.Water != null ? stats.Water.ValuePercentUI : -1f;
+                if ((foodPct >= 0f && foodPct < 0.25f) || (waterPct >= 0f && waterPct < 0.25f))
+                {
+                    if (Ready("empty-debug", 60f))
+                    {
+                        Log.Warning($"EMPTY CHECK food={foodPct:F3} water={waterPct:F3} " +
+                                    $"starving={starving} parched={parched} " +
+                                    $"(Food stat {(stats.Food == null ? "MISSING" : stats.Food.Value + "/" + stats.Food.Max)})");
+                    }
+                }
+
                 if ((starving || parched) && Ready("player-empty", 900f))
                 {
                     Remark("player-empty", starving
