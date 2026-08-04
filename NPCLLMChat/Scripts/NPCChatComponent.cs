@@ -1449,12 +1449,18 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             }
 
             // 7. the player is running out of food or water
+            //
+            // Ready arms the cooldown as a side effect, so it has to be the LAST test - every
+            // other trigger here puts its condition first for that reason. This one asked Ready
+            // behind a stats != null that is always true, so a well fed player burned the fifteen
+            // minute cooldown on every pass and she could only speak if the meter happened to be
+            // under a fifth at the instant it lapsed. At 13% food she said nothing at all.
             var stats = player?.Stats;
-            if (stats != null && Ready("player-empty", 900f))
+            if (stats != null)
             {
                 bool starving = stats.Food != null && stats.Food.ValuePercentUI < 0.2f;
                 bool parched = stats.Water != null && stats.Water.ValuePercentUI < 0.2f;
-                if (starving || parched)
+                if ((starving || parched) && Ready("player-empty", 900f))
                 {
                     Remark("player-empty", starving
                         ? "The player is running on empty and needs to eat. Tell them, shortly."
