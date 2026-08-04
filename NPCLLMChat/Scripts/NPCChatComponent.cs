@@ -1532,10 +1532,46 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
             }
 
-            // 8. the thing she wants. Last, so anything happening now beats it, and rare enough
-            // that she is a companion who wants something rather than a quest marker with a
-            // voice: an hour of real time, and never twice on the same in-game day.
+            // 8. the thing she wants. Noticing it move comes before mentioning it again - being
+            // noticed is most of what a goal is for, and a companion who says "you got them"
+            // beats one who repeats what she is after.
             ChooseGoalIfNone();
+
+            float now;
+            var moved = MeasureGoal(out now);
+            if (moved != null)
+            {
+                if (now >= GoalMet)
+                {
+                    moved.met = true;
+                    moved.metDay = day;
+                    moved.measure = now;
+                    _memory.goalsMet.Add(moved);
+                    _memory.goal = null;
+                    PersistMemory();
+                    Log.Out($"{_npcName} got what she wanted: {moved.want} (Day {day})");
+                    Remark("goal-met", $"He has finally sorted it: {moved.want}. You wanted this because " +
+                                       $"{moved.because}. One line, pleased and a bit surprised, and do not " +
+                                       "immediately want something else.");
+                    return;
+                }
+
+                if (now > moved.measure + GoalStep && Ready("goal-progress", 1200f))
+                {
+                    float was = moved.measure;
+                    moved.measure = now;
+                    PersistMemory();
+                    Remark("goal-progress", $"Something you wanted has moved: {moved.want}. He is closer " +
+                                            "than he was, not there yet. One short line noticing it - the " +
+                                            "point is that you noticed, not that you are still asking.",
+                           said => { moved.progress = said; PersistMemory(); });
+                    Log.Out($"{_npcName} noticed progress on \"{moved.want}\": {was:F0} -> {now:F0}");
+                    return;
+                }
+
+                if (now > moved.measure) { moved.measure = now; PersistMemory(); }
+            }
+
             var goal = _memory?.goal;
             if (goal != null && !goal.met && goal.lastRaised != day && Ready("goal", 3600f))
             {
@@ -1599,11 +1635,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             return true;
         }
 
-        private void Remark(string trigger, string situation)
+        private void Remark(string trigger, string situation, Action<string> onSaid = null)
         {
             _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
             Log.Out($"{_npcName} remark trigger: {trigger}");
-            SpeakUnprompted(situation);
+            SpeakUnprompted(situation, onSaid);
         }
 
         /// <summary>
@@ -1786,6 +1822,52 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             _memory.goal = picked;
             PersistMemory();
             Log.Out($"{_npcName} has decided she wants {picked.want} - because {picked.because}");
+        }
+
+        // Thermal resist she calls kitted out, and the step worth remarking on. Both arbitrary,
+        // both easy to move: the first session that has her congratulating him over a scarf will
+        // say so.
+        private const float GoalMet = 30f;
+        private const float GoalStep = 8f;
+
+        /// <summary>
+        /// Where the goal stands, on its own terms, as a number she can watch move. Returns the
+        /// live goal and its current measure, or null when there is nothing measurable - a want
+        /// she cannot check up on is one she can only repeat, which is the nagging failure mode.
+        /// </summary>
+        private Goal MeasureGoal(out float now)
+        {
+            now = 0f;
+            var goal = _memory?.goal;
+            if (goal == null || goal.met || string.IsNullOrEmpty(goal.kind)) return null;
+
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null) return null;
+
+            if (goal.kind.StartsWith("gear-"))
+            {
+                string biome = goal.kind.Substring(5);
+                float cold, heat;
+                WorldContextHelper.GetThermalProtection(player, out cold, out heat);
+                now = biome == "snow" ? cold : heat;
+                return goal;
+            }
+
+            if (goal.kind.StartsWith("revisit-"))
+            {
+                // Standing there again is halfway; standing there again after a fight that did
+                // not go badly is the whole of it.
+                string place = goal.kind.Substring(8);
+                if (!string.Equals(_currentPlace, place, StringComparison.OrdinalIgnoreCase)) return null;
+
+                bool settled = _memory.episodes.Exists(e =>
+                    string.Equals(e.place, place, StringComparison.OrdinalIgnoreCase) &&
+                    e.day > goal.setDay && !e.closeCall);
+                now = settled ? GoalMet : GoalMet / 2f;
+                return goal;
+            }
+
+            return null;
         }
 
         private bool AlreadyChased(string kind)

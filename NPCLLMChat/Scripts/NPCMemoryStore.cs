@@ -79,6 +79,8 @@ namespace NPCLLMChat
         public int setDay;
         public int lastRaised;   // in-game day, so she does not nag
         public string progress;  // her own line, last time it moved
+        public float measure;    // what she was measuring last time, so she can tell it moved
+        public int metDay;
         public bool met;
     }
 
