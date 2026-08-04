@@ -42,7 +42,21 @@ namespace NPCLLMChat.Harmony
             }
 
             foreach (string f in failed) Log.Error($"PATCH FAILED {f}");
-            Log.Warning($"PATCHES ARMED: {applied.Count} applied, {failed.Count} failed" +
+
+            // Which build is actually running. The assembly is loaded once at process start, so
+            // rebuilding while the game is open changes nothing until it is relaunched - and on
+            // 2026-08-04 a test session was spent on a DLL that was five minutes stale, with
+            // nothing in the log to say so.
+            string built = "unknown";
+            try
+            {
+                string path = Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                    built = System.IO.File.GetLastWriteTime(path).ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            catch { }
+
+            Log.Warning($"PATCHES ARMED: {applied.Count} applied, {failed.Count} failed | DLL built {built}" +
                         (applied.Count > 0 ? " [" + string.Join(", ", applied.ToArray()) + "]" : ""));
         }
 
