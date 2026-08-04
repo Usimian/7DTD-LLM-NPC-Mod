@@ -759,6 +759,69 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// The vehicle, in the end.
+    ///
+    /// SCore patches EntityVehicle.DetachEntity and calls EntityUtilities.Respawn from it, which
+    /// pulls every companion out of her chunk and teleports her to the player. Getting off a bike
+    /// is harmless - the next tick puts her back. Logging out is not: the game detaches the player
+    /// during shutdown, so the removal lands between the last good save and SaveAndCleanupWorld,
+    /// and RemoveEntityFromChunk marks the chunk modified, which guarantees the shutdown save
+    /// rewrites it. Her chunk goes to disk without her, and there is no tick left to fix it.
+    ///
+    /// Caught on 2026-08-04 at 10:49:38 with the caller stack:
+    ///     Chunk.RemoveEntityFromChunk &lt;- EntityUtilities.Respawn &lt;- EntityVehicle_DetactEntity
+    ///
+    /// Clearing addedToChunk is not enough here because it depends on a tick that never comes.
+    /// She is put back into the chunk she is standing in, now, before anything can save.
+    /// </summary>
+    [HarmonyPatch]
+    public class RespawnKeepsChunkPatch
+    {
+        static MethodBase TargetMethod()
+        {
+            var type = AccessTools.TypeByName("EntityUtilities");
+            return type == null ? null : AccessTools.Method(type, "Respawn");
+        }
+
+        static bool Prepare()
+        {
+            bool found = TargetMethod() != null;
+            if (!found) Log.Warning("EntityUtilities.Respawn not found - a companion may be lost when you dismount or log out");
+            return found;
+        }
+
+        static void Postfix()
+        {
+            var world = GameManager.Instance?.World;
+            if (world?.Entities?.list == null) return;
+
+            foreach (var e in world.Entities.list)
+            {
+                var npc = e as EntityAlive;
+                if (!NPCCorePatches.LooksLikeCompanion(npc)) continue;
+                if (npc.IsDead() || npc.IsMarkedForUnload()) continue;
+
+                int cx = World.toChunkXZ((int)npc.position.x);
+                int cz = World.toChunkXZ((int)npc.position.z);
+                var chunk = world.GetChunkSync(cx, cz) as Chunk;
+                if (chunk == null) continue;              // nothing loaded there; the tick can handle it
+
+                bool present = false;
+                foreach (var band in chunk.entityLists)
+                {
+                    if (band.Contains(npc)) { present = true; break; }
+                }
+                if (present) continue;
+
+                chunk.AddEntityToChunk(npc);
+                Log.Warning($"CHUNK RESTORED {npc.EntityName} [id {npc.entityId}] put back into " +
+                            $"chunk({cx}, {cz}) after Respawn took her out - without this she is " +
+                            "absent from the save that follows a dismount or a logout.");
+            }
+        }
+    }
+
+    /// <summary>
     /// The last dark stretch of the chain. Everything the other watchers can see said she was
     /// healthy at the final save - in a chunk, gate agreeing to write her - and she still did not
     /// come back, and never even reached SpawnEntityInWorld on the next load. So the question is
