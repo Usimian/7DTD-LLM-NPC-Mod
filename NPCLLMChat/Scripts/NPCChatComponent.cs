@@ -456,6 +456,16 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                           "no irritation excuses refusing a question you can answer; silence and grunts are for " +
                           "small talk only. Never say you do not know something that is written above.");
 
+            // She agreed he was "running on empty" while his food sat above a quarter, because he
+            // had said so first. Sounding perceptive by echoing him is the opposite of being
+            // perceptive, and it quietly makes everything else she says worth less.
+            sb.AppendLine("WHAT YOU CAN SEE OUTRANKS WHAT HE SAYS ABOUT HIMSELF. If he claims something the " +
+                          "world state above contradicts - he says he is starving and he is well fed, he says he " +
+                          "is fine and he is bleeding out, he says you are carrying rounds and your pack is empty " +
+                          "- say so plainly. Once, in your own way, without argument or lecture, and then let it " +
+                          "go. Do not agree with something you can see is not true just because he said it first. " +
+                          "Being easy to agree with is not the same as being good company.");
+
             if (PlayerIsSneaking())
             {
                 wordLimit = Math.Min(wordLimit, 8);
