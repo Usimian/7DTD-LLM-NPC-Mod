@@ -65,6 +65,23 @@ namespace NPCLLMChat
         public string note;      // her own line, in her own words, said at the time
     }
 
+    /// <summary>
+    /// Something she wants. One at a time - a companion with a backlog is a task list. She has
+    /// to have arrived at it from something the two of them actually did, which is the whole
+    /// difference between a goal that is hers and a goal that was assigned.
+    /// </summary>
+    [Serializable]
+    public class Goal
+    {
+        public string want;      // "proper cold gear for the two of us"
+        public string because;   // the evidence, in her words
+        public string kind;      // the rule that produced it, so it is not chosen twice
+        public int setDay;
+        public int lastRaised;   // in-game day, so she does not nag
+        public string progress;  // her own line, last time it moved
+        public bool met;
+    }
+
     [Serializable]
     public class NPCMemory
     {
@@ -90,6 +107,9 @@ namespace NPCLLMChat
         public List<MarkedPlace> markedPlaces = new List<MarkedPlace>();
         // Fights and horde nights worth remembering afterwards
         public List<Episode> episodes = new List<Episode>();
+        // What she is currently after, and the ones she has already seen through
+        public Goal goal;
+        public List<Goal> goalsMet = new List<Goal>();
         // Last-seen contents of the player's vehicles, drone, and storage containers
         public List<CargoSnapshot> cargoSnapshots = new List<CargoSnapshot>();
         // How the player has treated her, -1 (prickly) to +1 (close). Relationships carry over

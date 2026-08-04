@@ -1522,6 +1522,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                     }
                 }
 
+                // 8. the thing she wants, raised rarely and last - see below
                 if ((starving || parched) && Ready("player-empty", 900f))
                 {
                     Remark("player-empty", starving
@@ -1529,6 +1530,22 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                         : "The player is badly dehydrated and needs water. Tell them, shortly.");
                     return;
                 }
+            }
+
+            // 8. the thing she wants. Last, so anything happening now beats it, and rare enough
+            // that she is a companion who wants something rather than a quest marker with a
+            // voice: an hour of real time, and never twice on the same in-game day.
+            ChooseGoalIfNone();
+            var goal = _memory?.goal;
+            if (goal != null && !goal.met && goal.lastRaised != day && Ready("goal", 3600f))
+            {
+                goal.lastRaised = day;
+                PersistMemory();
+                Remark("goal", $"There is something you have been wanting: {goal.want}, because " +
+                               $"{goal.because}. Say it once, the way it comes up between two people who " +
+                               "have been travelling a while - not a request, not a plan, just the thing " +
+                               "you want. Short.");
+                return;
             }
         }
 
@@ -1707,6 +1724,74 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         private bool _closeCallThisFight;
         private const int NotableFightSize = 6;
         private const int MaxEpisodes = 30;
+
+        /// <summary>
+        /// She settles on something she wants, from evidence rather than a list. Only when she
+        /// has none, only once she has seen enough to justify it, and never more than one - the
+        /// point is that she arrived at it, so a goal she cannot trace to something the two of
+        /// them did is worse than no goal at all.
+        /// </summary>
+        private void ChooseGoalIfNone()
+        {
+            if (_memory == null || _memory.goal != null) return;
+
+            var player = GameManager.Instance?.World?.GetPrimaryPlayer();
+            if (player == null) return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+
+            Goal picked = null;
+
+            // She has stood in a biome that would have hurt him, and he still is not dressed for it
+            var harsh = _memory.biomesSeen?.Find(b =>
+                !string.IsNullOrEmpty(WorldContextHelper.BiomeHazard(b.place)));
+            if (harsh != null && !AlreadyChased("gear-" + harsh.place))
+            {
+                float cold, heat;
+                WorldContextHelper.GetThermalProtection(player, out cold, out heat);
+                bool exposed = harsh.place == "snow" ? cold < 30f : heat < 30f;
+                if (exposed)
+                {
+                    picked = new Goal
+                    {
+                        want = harsh.place == "snow"
+                            ? "proper cold weather gear for the pair of you"
+                            : "gear that will stand the heat out there",
+                        because = $"you walked into the {harsh.place} on Day {harsh.day} and he was not dressed for it",
+                        kind = "gear-" + harsh.place
+                    };
+                }
+            }
+
+            // Somewhere that nearly took him off her
+            if (picked == null)
+            {
+                var bad = _memory.episodes?.Find(e => e.closeCall && !AlreadyChased("revisit-" + e.place));
+                if (bad != null)
+                {
+                    picked = new Goal
+                    {
+                        want = $"to go back to {bad.place} properly armed and finish it",
+                        because = $"{bad.enemies} of them had him there on Day {bad.day} and he nearly went down",
+                        kind = "revisit-" + bad.place
+                    };
+                }
+            }
+
+            if (picked == null) return;
+
+            picked.setDay = day;
+            picked.lastRaised = 0;
+            _memory.goal = picked;
+            PersistMemory();
+            Log.Out($"{_npcName} has decided she wants {picked.want} - because {picked.because}");
+        }
+
+        private bool AlreadyChased(string kind)
+        {
+            return _memory?.goalsMet != null && _memory.goalsMet.Exists(g => g.kind == kind);
+        }
 
         /// <summary>The worst thing that happened where they are standing, if anything did.</summary>
         private Episode NotableEpisodeHere()
@@ -2649,6 +2734,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
 
                 sb.AppendLine(DescribeWhatAilsHim(thePlayer));
+
+                // State, never an instruction to raise it. Someone who wants cold gear talks
+                // about the weather differently, and that colouring is most of the value - the
+                // remark trigger is the small part.
+                if (_memory?.goal != null && !_memory.goal.met)
+                {
+                    sb.AppendLine($"[Something you want] You want {_memory.goal.want}, because " +
+                                  $"{_memory.goal.because}." +
+                                  (string.IsNullOrEmpty(_memory.goal.progress)
+                                      ? " Nothing has come of it yet."
+                                      : $" Last time it moved you said: \"{_memory.goal.progress}\"") +
+                                  " Do not bring this up unasked here - it colours how you see things, " +
+                                  "that is all.");
+                }
 
                 string beenThrough = DescribeEpisodes();
                 if (!string.IsNullOrEmpty(beenThrough))
