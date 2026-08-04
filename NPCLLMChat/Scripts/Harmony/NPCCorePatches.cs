@@ -20,15 +20,30 @@ namespace NPCLLMChat.Harmony
             _config = config;
             _harmony = new HarmonyLib.Harmony("com.npcllmchat.patches");
 
-            try
+            // Deliberately NOT PatchAll. It is all-or-nothing: one patch class that throws while
+            // resolving its target aborts the lot, and on 2026-08-04 an ambiguous Chunk.read
+            // lookup did exactly that - the mod ran for three sessions with no patches at all,
+            // no respawn rescue, no chat component, and a companion was lost to it. Each class
+            // is applied on its own so a broken watcher costs only that watcher.
+            var applied = new List<string>();
+            var failed = new List<string>();
+
+            foreach (var type in AccessTools.GetTypesFromAssembly(Assembly.GetExecutingAssembly()))
             {
-                _harmony.PatchAll(Assembly.GetExecutingAssembly());
-                Log.Out("Harmony patches applied successfully");
+                try
+                {
+                    var patched = _harmony.CreateClassProcessor(type).Patch();
+                    if (patched != null && patched.Count > 0) applied.Add(type.Name);
+                }
+                catch (Exception ex)
+                {
+                    failed.Add($"{type.Name}: {ex.InnerException?.Message ?? ex.Message}");
+                }
             }
-            catch (Exception ex)
-            {
-                Log.Error($"Failed to apply Harmony patches: {ex.Message}");
-            }
+
+            foreach (string f in failed) Log.Error($"PATCH FAILED {f}");
+            Log.Warning($"PATCHES ARMED: {applied.Count} applied, {failed.Count} failed" +
+                        (applied.Count > 0 ? " [" + string.Join(", ", applied.ToArray()) + "]" : ""));
         }
 
         public static void Shutdown()
@@ -652,12 +667,29 @@ namespace NPCLLMChat.Harmony
     [HarmonyPatch]
     public class ChunkRecycledPatch
     {
+        // Chunk.read is overloaded, and AccessTools.Method THROWS AmbiguousMatchException rather
+        // than returning null - which took down PatchAll and left the mod with no patches at all
+        // for three sessions on 2026-08-04. Name the signature, and never let a lookup here throw.
         static IEnumerable<MethodBase> TargetMethods()
         {
-            foreach (string name in new[] { "Reset", "OnLoadedFromCache", "read" })
+            var found = new List<MethodBase>();
+            Add(found, "Reset", new Type[0]);
+            Add(found, "OnLoadedFromCache", new Type[0]);
+            Add(found, "read", new[] { typeof(PooledBinaryReader), typeof(uint), typeof(bool) });
+            return found;
+        }
+
+        static void Add(List<MethodBase> into, string name, Type[] args)
+        {
+            try
             {
-                var m = AccessTools.Method(typeof(Chunk), name);
-                if (m != null) yield return m;
+                var m = AccessTools.Method(typeof(Chunk), name, args);
+                if (m != null) into.Add(m);
+                else Log.Warning($"Chunk.{name} not found - a companion may not re-register with a recycled chunk");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"Could not resolve Chunk.{name}: {ex.Message}");
             }
         }
 
