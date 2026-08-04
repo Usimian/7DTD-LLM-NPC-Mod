@@ -637,10 +637,21 @@ namespace NPCLLMChat.Harmony
 
         static void Postfix(World __instance)
         {
-            if (__instance?.Entities?.list == null) return;
+            RollCall(__instance, false);
+        }
+
+        /// <summary>
+        /// The autosave is the heartbeat, but World.Save is the one that matters: it inlines its
+        /// own worldState write rather than calling SaveWorldState, so the shutdown save would
+        /// pass unremarked. Always speak there, unchanged or not - "she was still here at the
+        /// last save" is the fact worth having when the next session opens without her.
+        /// </summary>
+        internal static void RollCall(World world, bool force)
+        {
+            if (world?.Entities?.list == null) return;
 
             var call = new List<string>();
-            foreach (var e in __instance.Entities.list)
+            foreach (var e in world.Entities.list)
             {
                 var npc = e as EntityAlive;
                 if (!NPCCorePatches.LooksLikeCompanion(npc)) continue;
@@ -652,9 +663,21 @@ namespace NPCLLMChat.Harmony
             }
 
             string now = call.Count == 0 ? "nobody" : string.Join(" | ", call.ToArray());
-            if (now == _lastCall) return;
+            if (now == _lastCall && !force) return;
             _lastCall = now;
-            Log.Warning("ROLL CALL " + now);
+            Log.Warning((force ? "ROLL CALL (final save) " : "ROLL CALL ") + now);
+        }
+    }
+
+    /// <summary>
+    /// The last word before the world closes.
+    /// </summary>
+    [HarmonyPatch(typeof(World), nameof(World.Save))]
+    public class FinalRollCallPatch
+    {
+        static void Postfix(World __instance)
+        {
+            SaveRollCallPatch.RollCall(__instance, true);
         }
     }
 
