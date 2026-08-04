@@ -14,6 +14,18 @@ namespace NPCLLMChat
         private static float _poiCacheTime = -9999f;
         private const float PoiCacheSeconds = 300f;
 
+        /// <summary>
+        /// The cache is static and keyed on nothing but a clock that does not reset between
+        /// worlds, so loading a different save would leave her describing the previous world's
+        /// buildings - by name, with directions - until the five minutes lapsed. Called when a
+        /// game starts.
+        /// </summary>
+        public static void ForgetWorld()
+        {
+            _poiCache = null;
+            _poiCacheTime = -9999f;
+        }
+
         public static void GetGameDayTime(out int day, out string time)
         {
             day = 0;

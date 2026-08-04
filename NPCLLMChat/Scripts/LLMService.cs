@@ -374,7 +374,7 @@ namespace NPCLLMChat
             return $@"{{
                 ""model"": ""{_model}"",
                 ""messages"": [{messages}],
-                ""temperature"": {_temperature},
+                ""temperature"": {_temperature.ToString(System.Globalization.CultureInfo.InvariantCulture)},
                 ""max_tokens"": {tokenBudget}
             }}";
         }

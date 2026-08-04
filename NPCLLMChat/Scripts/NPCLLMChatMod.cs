@@ -84,6 +84,10 @@ namespace NPCLLMChat
 
         private static void GameStartDoneHandler(ref ModEvents.SGameStartDoneData data)
         {
+            // Before the _initialized guard: the patches are applied once per process, but a new
+            // world needs the POI cache dropped whether or not this is the first game of the run.
+            WorldContextHelper.ForgetWorld();
+
             if (_initialized) return;
 
             Log.Out("Game started - initializing Harmony patches...");
