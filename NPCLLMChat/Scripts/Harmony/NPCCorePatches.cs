@@ -140,6 +140,22 @@ namespace NPCLLMChat.Harmony
             }
         }
 
+        /// <summary>
+        /// For logging only, and deliberately looser than IsHiredByPlayer, which wants the cvar
+        /// present AND above zero. SCore removes "Leader" outright on the Loot order, and
+        /// EntityUtilities.GetLeader removes it whenever the leader entity is momentarily not in
+        /// the world - during load, for one. A strict test falls silent in precisely the window
+        /// worth watching, which is how a companion left on 2026-08-03 with an empty log.
+        ///
+        /// Buffs only: this is called from the chunk save thread, so no Unity API here.
+        /// </summary>
+        internal static bool LooksLikeCompanion(EntityAlive npc)
+        {
+            if (npc?.Buffs == null) return false;
+            return npc.Buffs.HasCustomVar("Leader") || npc.Buffs.HasCustomVar("Owner") ||
+                   npc.Buffs.HasCustomVar("Persist");
+        }
+
         internal static bool IsHiredByPlayer(EntityAlive npc)
         {
             if (npc?.Buffs == null) return false;
@@ -345,10 +361,13 @@ namespace NPCLLMChat.Harmony
     /// enough for the chunk to unload and she is gone, with her gear. Keep her following and she
     /// is fine, which is exactly the pattern: lost when left behind, never when tagging along.
     ///
-    /// This is a different class from EntityAliveSDX.LeaderUpdate. SCore moved the leader logic
-    /// into a component and left the old method behind, so the earlier patch guarded a path her
-    /// entity no longer runs - which is why it never once reported a rescue while she kept
-    /// disappearing.
+    /// Which entities this covers, corrected 2026-08-04: NPCLeaderComponent is built only by
+    /// EntityAliveSDXV4, and EntityAliveSDXV4 is a sibling of EntityAliveSDX - both derive from
+    /// EntityTrader - not a base of it. XNPCCore declares Class="EntityAliveSDX, SCore", so this
+    /// patch has never fired for the companion in this game; every rescue in the logs came from
+    /// LeaderUpdateRespawnPatch on the older path, including the 21,163 in one session. The
+    /// earlier note here had that the wrong way round. Kept because SCore is plainly migrating
+    /// toward V4 and the same bug lives in both.
     ///
     /// Dismissal still works: OnUpdateLive returns early on buffOrderDismiss without touching the
     /// flag, and the two remaining clears in SCore are the deliberate unload paths that also strip
@@ -385,9 +404,11 @@ namespace NPCLLMChat.Harmony
             if (npc.Buffs.HasBuff("buffOrderDismiss")) return;
             if (!NPCCorePatches.IsHiredByPlayer(npc)) return;
 
-            // Her chat component hangs off the older EntityAliveSDX.LeaderUpdate path only.
-            // Both paths run today, but SCore has plainly moved its leader logic here, and a
-            // companion placed from the item is a new entity that needs the component again.
+            // NPCLeaderComponent is constructed only by EntityAliveSDXV4, a sibling of
+            // EntityAliveSDX rather than a base of it, so this never runs for an XNPCCore
+            // companion - that mod declares Class="EntityAliveSDX, SCore". Everything keeping
+            // her alive today comes through LeaderUpdateRespawnPatch instead. Kept for V4 NPCs,
+            // and so the day SCore moves her class the component still finds her.
             if (npc.gameObject != null && npc.gameObject.GetComponent<NPCChatComponent>() == null)
             {
                 NPCCorePatches.GetOrCreateChatComponent(npc);
@@ -420,8 +441,7 @@ namespace NPCLLMChat.Harmony
         static bool Prefix(Entity _e, EnumRemoveEntityReason _reason)
         {
             var npc = _e as EntityAlive;
-            if (npc == null || npc.Buffs == null) return true;
-            if (!NPCCorePatches.IsHiredByPlayer(npc)) return true;
+            if (!NPCCorePatches.LooksLikeCompanion(npc)) return true;
 
             // Every exit, not just the one this patch blocks. World.RemoveEntity is only one
             // road out of the world - the marked-for-unload sweep and UnloadEntities both call
@@ -433,9 +453,12 @@ namespace NPCLLMChat.Harmony
                         $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
                         $"savedToFile={SafeIsSavedToFile(npc)} dismissed={npc.Buffs.HasBuff("buffOrderDismiss")}");
 
+            // The refusal itself stays strict: only a companion that is genuinely still hired
+            // gets held in the world against the game's wishes.
             if (_reason != EnumRemoveEntityReason.Despawned) return true;
             if (npc.IsDead()) return true;
             if (npc.Buffs.HasBuff("buffOrderDismiss")) return true;
+            if (!NPCCorePatches.IsHiredByPlayer(npc)) return true;
 
             npc.bWillRespawn = true;
             Log.Warning($"Refused to despawn {npc.EntityName} [id {npc.entityId}] - " +
@@ -517,15 +540,21 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
-    /// Chunk.Write asks IsSavedToFile of every entity it holds, and only writes the ones that
-    /// say yes. If a companion is in the world at shutdown and absent from the save afterwards,
-    /// this is where the two stories part - so record her answer, and which custom var carried
-    /// it. Asked once per chunk write, so it speaks only when the verdict changes or is false.
+    /// Chunk.Write asks IsSavedToFile of every entity it holds and writes only the ones that say
+    /// yes. If a companion is in the world at shutdown and absent from the save afterwards, this
+    /// is where the two stories part.
+    ///
+    /// Runs on the chunk save thread - RegionFileManager starts a real one - as well as the main
+    /// thread, so the seen-map is locked and nothing here touches a Unity API. Chunk.Write asks
+    /// twice per entity per write, and SaveRandomChunks keeps writing, so it speaks only when the
+    /// answer changes. A standing "False" would otherwise flood the log in exactly the state
+    /// being hunted, which is the mistake the previous commit was written to undo.
     /// </summary>
     [HarmonyPatch]
     public class SaveGateWatchPatch
     {
         private static readonly Dictionary<int, bool> _lastVerdict = new Dictionary<int, bool>();
+        private static readonly object _lock = new object();
 
         static MethodBase TargetMethod()
         {
@@ -542,17 +571,25 @@ namespace NPCLLMChat.Harmony
 
         static void Postfix(EntityAlive __instance, bool __result)
         {
-            if (__instance?.Buffs == null || !NPCCorePatches.IsHiredByPlayer(__instance)) return;
+            if (!NPCCorePatches.LooksLikeCompanion(__instance)) return;
 
             int id = __instance.entityId;
-            if (_lastVerdict.TryGetValue(id, out bool was) && was == __result && __result) return;
-            _lastVerdict[id] = __result;
+            lock (_lock)
+            {
+                if (_lastVerdict.TryGetValue(id, out bool was) && was == __result) return;
+                _lastVerdict[id] = __result;
+            }
 
             string carried = __instance.Buffs.HasCustomVar("Leader") ? "Leader"
                            : __instance.Buffs.HasCustomVar("Persist") ? "Persist"
                            : "neither";
-            Log.Warning($"SAVE GATE {__instance.EntityName} [id {id}] -> {__result} " +
+            Log.Warning($"SAVE GATE [id {id}] -> {__result} " +
                         $"(carried by {carried}, spawnerSource={__instance.GetSpawnerSource()})");
+        }
+
+        internal static void Forget(int entityId)
+        {
+            lock (_lock) { _lastVerdict.Remove(entityId); }
         }
     }
 
@@ -568,7 +605,12 @@ namespace NPCLLMChat.Harmony
         {
             var npc = _entity as EntityAlive;
             if (npc == null || npc.Buffs == null) return;
-            if (!(npc.GetType().Name.Contains("SDX") || NPCCorePatches.IsHiredByPlayer(npc))) return;
+            // Not every SDX entity - that is SCore's enemies, bandits and flying zombies too, a
+            // warning apiece on a horde night. A placement is hired a moment later, by
+            // SetLeaderAndOwner after the spawn, so accept a companion item's InitialInventory
+            // mark as well as the cvars that are not set yet.
+            if (!NPCCorePatches.LooksLikeCompanion(npc) &&
+                !npc.Buffs.HasCustomVar("InitialInventory")) return;
 
             Log.Warning($"SPAWNED {npc.EntityName} [id {npc.entityId}] at " +
                         $"({(int)npc.position.x}, {(int)npc.position.z}) " +
@@ -579,33 +621,40 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
-    /// A roll call on the game's own save, which is the only moment that decides what the next
-    /// session inherits. No clock of ours: this fires when the world writes, several times an
-    /// hour, and answers the question the 2026-08-03 log could not - was she still in the world
-    /// at the last save before the quit, and did the gate agree to write her?
+    /// A roll call on the game's own autosave. GameManager runs a 30 second countdown and calls
+    /// World.SaveWorldState, so this is the game's clock rather than one of ours, and it ticks
+    /// throughout play. RegionFileManager.WaitSaveDone looked like the natural hook and is not:
+    /// it is reached only from the pause menu and shutdown, five times in a 79 minute session
+    /// and four of those in one burst - it could never bracket a disappearance mid-session.
+    ///
+    /// Speaks only when the answer changes. A settled companion writes one line and then nothing
+    /// until she moves chunk, loses a flag, or goes; the moment she goes is a line of its own.
     /// </summary>
-    [HarmonyPatch(typeof(RegionFileManager), nameof(RegionFileManager.WaitSaveDone))]
+    [HarmonyPatch(typeof(World), nameof(World.SaveWorldState))]
     public class SaveRollCallPatch
     {
-        static void Postfix()
-        {
-            var world = GameManager.Instance?.World;
-            if (world?.Entities?.list == null) return;
+        private static string _lastCall;
 
-            int companions = 0;
-            foreach (var e in world.Entities.list)
+        static void Postfix(World __instance)
+        {
+            if (__instance?.Entities?.list == null) return;
+
+            var call = new List<string>();
+            foreach (var e in __instance.Entities.list)
             {
                 var npc = e as EntityAlive;
-                if (npc == null || npc.Buffs == null || !NPCCorePatches.IsHiredByPlayer(npc)) continue;
-                companions++;
-                Log.Warning($"ROLL CALL {npc.EntityName} [id {npc.entityId}] in world at " +
-                            $"({(int)npc.position.x}, {(int)npc.position.z}) " +
-                            $"chunk({World.toChunkXZ((int)npc.position.x)}, {World.toChunkXZ((int)npc.position.z)}) " +
-                            $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
-                            $"addedToChunk={npc.addedToChunk} " +
-                            $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
+                if (!NPCCorePatches.LooksLikeCompanion(npc)) continue;
+                call.Add($"{npc.EntityName} [id {npc.entityId}] " +
+                         $"chunk({World.toChunkXZ((int)npc.position.x)}, {World.toChunkXZ((int)npc.position.z)}) " +
+                         $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
+                         $"addedToChunk={npc.addedToChunk} hired={NPCCorePatches.IsHiredByPlayer(npc)} " +
+                         $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
             }
-            if (companions == 0) Log.Warning("ROLL CALL - no hired companion in the world at save");
+
+            string now = call.Count == 0 ? "nobody" : string.Join(" | ", call.ToArray());
+            if (now == _lastCall) return;
+            _lastCall = now;
+            Log.Warning("ROLL CALL " + now);
         }
     }
 
@@ -628,6 +677,7 @@ namespace NPCLLMChat.Harmony
                             $"({(int)entity.position.x}, {(int)entity.position.z}), dead={entity.IsDead()}");
             }
             NPCContainerCache.Forget(_entityId, entity?.EntityName);
+            SaveGateWatchPatch.Forget(_entityId);
             NPCCorePatches.RemoveChatComponent(_entityId);
         }
     }
