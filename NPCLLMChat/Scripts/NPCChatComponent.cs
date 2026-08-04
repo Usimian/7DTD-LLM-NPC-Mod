@@ -456,9 +456,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                           "no irritation excuses refusing a question you can answer; silence and grunts are for " +
                           "small talk only. Never say you do not know something that is written above.");
 
-            // She agreed he was "running on empty" while his food sat above a quarter, because he
-            // had said so first. Sounding perceptive by echoing him is the opposite of being
-            // perceptive, and it quietly makes everything else she says worth less.
+            // Not because she was caught doing it - she reads the condition line correctly and
+            // reported it accurately when asked. Because a companion who confirms whatever the
+            // player claims has observations worth nothing: agreement means nothing if it was
+            // never in doubt.
             sb.AppendLine("WHAT YOU CAN SEE OUTRANKS WHAT HE SAYS ABOUT HIMSELF. If he claims something the " +
                           "world state above contradicts - he says he is starving and he is well fed, he says he " +
                           "is fine and he is bleeding out, he says you are carrying rounds and your pack is empty " +
@@ -1192,6 +1193,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         // ========== Unprompted remarks ==========
 
         private const float ShoutRange = 20f;        // how close a threat has to be to matter
+        // How far away she can still notice the player himself. ShoutRange was doing both jobs,
+        // so stepping into the next room silenced every unprompted remark she has - hunger,
+        // storms, arrivals, the lot - because a constant about biting distance was deciding
+        // whether she could see him at all.
+        private const float NoticeRange = 45f;
         private const float WarnCooldown = 75f;      // one "behind you" per fight, not per zombie
         private const float TriumphCooldown = 240f;
         private float _nextWarnTime;
@@ -1230,7 +1236,9 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             var world = GameManager.Instance?.World;
             var player = world?.GetPrimaryPlayer();
             if (player == null) return;
-            if (Vector3.Distance(_npcEntity.position, player.position) > ShoutRange) return;
+            // Threats are still judged at ShoutRange inside the scan below; this only decides
+            // whether she is close enough to have a view of him at all.
+            if (Vector3.Distance(_npcEntity.position, player.position) > NoticeRange) return;
 
             EntityAlive sneakingUp = null;
             int hostilesNear = 0;
