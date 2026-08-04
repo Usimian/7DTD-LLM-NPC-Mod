@@ -189,6 +189,52 @@ The test for whether something needs structure: *if she got it wrong three weeks
 later, would it feel like a bug or like a person misremembering?* Bugs need fields. People are
 allowed prose.
 
+## Who she is allowed to be
+
+Honest, constructive, mostly agreeable — but not always. The disagreement is load-bearing: a
+companion who agrees with everything is furniture, and her agreement means nothing if it was
+never in doubt. She can think a plan is a bad idea and say so, once, and then come along.
+
+**She is never deceptive or self-interested.** Not for realism reasons — because the moment
+she is managing you, nothing she says can be taken at face value, and trust is the whole
+product. A companion you have to second-guess is not more real, she is worse company.
+
+The line runs between states and agendas:
+
+| Safe | The line |
+|---|---|
+| Tired at 3am, cold, hungry, rattled after a bad fight | Wanting something she does not tell you about |
+| Wanting cold gear, and saying so | Steering you toward it without saying so |
+| Thinking you are wrong, and saying so | Agreeing out loud and not meaning it |
+
+Physical states make her a body in the world alongside you. Wants are a step up and still safe
+as long as they are declared. Hidden anything is the boundary.
+
+### The pattern that already works
+
+`NPCChatComponent` around line 659 does this correctly for time of day:
+
+```csharp
+mood   = "It is the middle of the night and you are tired.";
+manner = "Low and slow, minimal words, half asleep.";
+```
+
+She is never told to *mention* being tired. She is told she *is* tired, and the model works out
+what that sounds like. That is why it reads as a person rather than a line, and it is the shape
+every item in this plan should take. Not "bring up the cold gear" — "you want proper cold gear
+and you are not sure he is serious about it", and let it come out sideways.
+
+## On method
+
+This design is felt, not specified. Nobody knows exactly what makes a companion feel real, and
+the parts that have landed best so far — the tiredness, the whisper when sneaking, her own
+words on an episode — were small and got kept because they felt right in play, not because they
+were argued for on paper.
+
+So: build one small thing, live with it for several sessions, keep it if it changes how she
+feels to be around and delete it if it does not. Resist batching. A feature that cannot be
+judged in play is a feature that will accumulate.
+
 ## Nuances that will decide whether this feels real
 
 Collected here because they are the part that is easy to get wrong, and none of them are code
