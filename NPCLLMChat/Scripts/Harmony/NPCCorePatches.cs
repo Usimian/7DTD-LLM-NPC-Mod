@@ -635,6 +635,59 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// The same lie, told the other way. Chunks are pooled: Reset, read and OnLoadedFromCache all
+    /// empty entityLists when the object is recycled or refilled from disk, and none of them tells
+    /// the entities they have been dropped. Vanilla does not care, because an entity whose chunk
+    /// goes away is normally unloaded with it - it becomes an EntityCreationData stub and comes
+    /// back when the chunk does.
+    ///
+    /// Ours does not go away. bWillRespawn keeps her alive through the chunk unload, so when the
+    /// chunk object is reused her addedToChunk still points at it and still says true. TickEntity
+    /// re-registers only on !addedToChunk or a change of chunk coordinates, and she has neither:
+    /// same coordinates, flag still lying. She belongs to nothing and is never written.
+    ///
+    /// Measured on 2026-08-04: inChunkList went True, then no-chunk as the player drove 600m off,
+    /// then FALSE when the chunk came back without her - and she was FALSE at the final save.
+    /// </summary>
+    [HarmonyPatch]
+    public class ChunkRecycledPatch
+    {
+        static IEnumerable<MethodBase> TargetMethods()
+        {
+            foreach (string name in new[] { "Reset", "OnLoadedFromCache", "read" })
+            {
+                var m = AccessTools.Method(typeof(Chunk), name);
+                if (m != null) yield return m;
+            }
+        }
+
+        static void Prefix(Chunk __instance)
+        {
+            var lists = __instance?.entityLists;
+            if (lists == null) return;
+
+            foreach (var band in lists)
+            {
+                if (band == null) continue;
+                for (int i = 0; i < band.Count; i++)
+                {
+                    var e = band[i];
+                    if (e == null || !e.addedToChunk) continue;
+                    e.addedToChunk = false;
+
+                    var npc = e as EntityAlive;
+                    if (NPCCorePatches.LooksLikeCompanion(npc))
+                    {
+                        Log.Warning($"CHUNK RECYCLED under {npc.EntityName} [id {npc.entityId}] " +
+                                    $"at chunk({__instance.X}, {__instance.Z}) - flag cleared so the " +
+                                    "next tick registers her with the chunk that is actually there.");
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// The last dark stretch of the chain. Everything the other watchers can see said she was
     /// healthy at the final save - in a chunk, gate agreeing to write her - and she still did not
     /// come back, and never even reached SpawnEntityInWorld on the next load. So the question is
@@ -652,9 +705,9 @@ namespace NPCLLMChat.Harmony
     {
         static void Postfix(Entity _e, bool _bNetworkWrite)
         {
-            // The network variant is chatter to clients, not persistence, and would drown the log
-            if (_bNetworkWrite) return;
-
+            // Do NOT skip on _bNetworkWrite. It defaults to true, and both persistence callers -
+            // Chunk.Write and the stub building in OnLoadedFromCache - take the default, so
+            // filtering it out silenced exactly the calls this exists to see.
             var npc = _e as EntityAlive;
             if (!NPCCorePatches.LooksLikeCompanion(npc)) return;
 
