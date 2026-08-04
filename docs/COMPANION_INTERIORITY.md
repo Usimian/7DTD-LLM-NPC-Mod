@@ -137,6 +137,58 @@ referring to.
 
 ---
 
+## What must survive, and what currently does not
+
+This is a prerequisite for all four stages, not a detail of any of them. A goal she forgets
+you agreed to is worse than no goal at all — it is the same wound as the vanishing, one layer
+up.
+
+### Durable today
+
+Structured fields on `NPCMemory`, written atomically with a `.bak` since `a8ffb80`:
+`placesVisited`, `placesSeen`, `biomesSeen`, `markedPlaces`, `cargoSnapshots`, `rapport`,
+`persona`, `episodes`. These are safe. Whatever is in them will be there next session, and
+nothing rewrites them behind your back.
+
+### Not durable
+
+**Anything said in conversation.** `TrimHistory` moves expired messages into `pendingSummary`,
+which is compressed into `longTermMemory` — capped at 150 words of prose and **rewritten from
+scratch on every batch**. The summarizer is asked to preserve "promises made, shared events,
+plans", and mostly does, but each rewrite is a fresh chance to drop something, and there is no
+second copy. `pendingSummary` itself is also capped at 60 and discards the oldest.
+
+So an agreement reached in chat decays. She will remember it for a while and then quietly not.
+
+### The rule
+
+**If it matters, it must be structured. The summarizer is a nicety, never the only copy.**
+
+Prose memory is right for texture — how you two get on, what she has picked up about you. It
+is wrong for anything with a truth value: a goal you agreed, a promise she made, a place you
+told her to avoid.
+
+### The mechanism
+
+Promote it at the moment it is agreed, not afterwards from the transcript. There is already a
+pass that reads her replies and extracts intent — `NPCLLMChat/Scripts/Actions/ActionParser.cs`,
+which is how she acts on her own words. The same pass can recognise an agreement and write it
+to a structured field.
+
+Worth capturing this way:
+
+| Said | Lands in |
+|---|---|
+| She proposes a goal and you agree | `Goal` (stage 1) |
+| You ask her to remember a place | `markedPlaces` — already works |
+| You tell her to avoid somewhere | a new avoid list |
+| She promises something | a `promise` field on the goal, with the day |
+| You tell her a fact about yourself | prose is fine — this is texture |
+
+The test for whether something needs structure: *if she got it wrong three weeks of game time
+later, would it feel like a bug or like a person misremembering?* Bugs need fields. People are
+allowed prose.
+
 ## Nuances that will decide whether this feels real
 
 Collected here because they are the part that is easy to get wrong, and none of them are code
@@ -170,6 +222,8 @@ vanishes cannot be realistic *or* fun. Persistence and the save path come first,
 
 ## Order of work
 
+0. Promote agreements out of prose into structured memory. Prerequisite — a goal she forgets
+   you agreed to is worse than no goal.
 1. Standing goal, talk-only. Live with it several sessions.
 2. Taste, if the goal is landing.
 3. Quests folded into both.
