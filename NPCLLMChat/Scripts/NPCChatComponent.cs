@@ -1231,7 +1231,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
         /// </summary>
         private void CheckForSomethingWorthSaying()
         {
+            // IsSpeaking matters as much as the other two. _isWaitingForResponse clears the moment
+            // the reply arrives, while she still has seconds of audio to deliver - and Speak stops
+            // whatever is playing before it starts, so a trigger firing in that window cuts her
+            // off mid-sentence and says something unrelated instead. Nobody interrupts themselves.
             if (_remarkPending || _isWaitingForResponse || _audioPlayer == null) return;
+            if (_audioPlayer.IsSpeaking) return;
 
             var world = GameManager.Instance?.World;
             var player = world?.GetPrimaryPlayer();
