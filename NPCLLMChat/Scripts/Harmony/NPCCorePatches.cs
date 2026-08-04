@@ -164,6 +164,28 @@ namespace NPCLLMChat.Harmony
         ///
         /// Buffs only: this is called from the chunk save thread, so no Unity API here.
         /// </summary>
+        /// <summary>
+        /// The frames above us, named. Only ever called on a companion event, which happens a
+        /// handful of times a session - too rare for the cost to matter, and the only way to stop
+        /// guessing which of three callers took her out of her chunk.
+        /// </summary>
+        internal static string Callers(int depth)
+        {
+            try
+            {
+                var trace = new System.Diagnostics.StackTrace(2, false);
+                var sb = new System.Text.StringBuilder();
+                for (int i = 0; i < depth && i < trace.FrameCount; i++)
+                {
+                    var m = trace.GetFrame(i)?.GetMethod();
+                    if (m == null) continue;
+                    sb.AppendLine($"      <- {m.DeclaringType?.Name}.{m.Name}");
+                }
+                return sb.ToString().TrimEnd();
+            }
+            catch (Exception ex) { return "      <- (stack unavailable: " + ex.GetType().Name + ")"; }
+        }
+
         internal static bool LooksLikeCompanion(EntityAlive npc)
         {
             if (npc?.Buffs == null) return false;
@@ -642,9 +664,12 @@ namespace NPCLLMChat.Harmony
             var npc = _entity as EntityAlive;
             if (NPCCorePatches.LooksLikeCompanion(npc))
             {
+                // Who is doing this matters more than that it happened. On 2026-08-04 she was
+                // written correctly by the save at 10:14:30, released here two seconds later at
+                // Disconnect, and erased by the second save - and the removal marks the chunk
+                // modified, so it is the removal itself that forces the rewrite without her.
                 Log.Warning($"CHUNK RELEASE {npc.EntityName} [id {npc.entityId}] taken out of " +
-                            $"chunk({__instance.X}, {__instance.Z}) - flag cleared so the next tick " +
-                            "puts her back. Left set, she would belong to no chunk and never be saved.");
+                            $"chunk({__instance.X}, {__instance.Z}) by:\n{NPCCorePatches.Callers(4)}");
             }
         }
     }
