@@ -594,6 +594,64 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// The last dark stretch of the chain. Everything the other watchers can see said she was
+    /// healthy at the final save - in a chunk, gate agreeing to write her - and she still did not
+    /// come back, and never even reached SpawnEntityInWorld on the next load. So the question is
+    /// no longer what state she was in but whether she was ever captured at all.
+    ///
+    /// EntityCreationData is the record an entity becomes on its way to disk: Chunk.Write makes
+    /// one per entity it saves, and a chunk being unloaded makes one per entity it is holding.
+    /// If this never fires for her, she was never written, and the loss is upstream of the file.
+    /// If it fires and she is still gone next session, the file or the read is at fault.
+    ///
+    /// Y is in the line on purpose - she was guarding an upper floor when she went.
+    /// </summary>
+    [HarmonyPatch(typeof(EntityCreationData), MethodType.Constructor, new[] { typeof(Entity), typeof(bool) })]
+    public class PersistWatchPatch
+    {
+        static void Postfix(Entity _e, bool _bNetworkWrite)
+        {
+            // The network variant is chatter to clients, not persistence, and would drown the log
+            if (_bNetworkWrite) return;
+
+            var npc = _e as EntityAlive;
+            if (!NPCCorePatches.LooksLikeCompanion(npc)) return;
+
+            Log.Warning($"CAPTURED FOR SAVE {npc.EntityName} [id {npc.entityId}] at " +
+                        $"({(int)npc.position.x}, {(int)npc.position.y}, {(int)npc.position.z}) " +
+                        $"chunk({World.toChunkXZ((int)npc.position.x)}, {World.toChunkXZ((int)npc.position.z)}) " +
+                        $"band={Utils.Fastfloor(npc.position.y / 16f)} " +
+                        $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
+        }
+    }
+
+    /// <summary>
+    /// The other end of the same chain: Chunk.OnLoad turns each saved stub back into an entity
+    /// through here. A companion who was written but does not come back fails at this step, and
+    /// the only way it can return null is an unknown entity class - worth saying out loud, since
+    /// that would be silent otherwise and the chunk would simply drop her.
+    /// </summary>
+    [HarmonyPatch(typeof(EntityFactory), nameof(EntityFactory.CreateEntity), new[] { typeof(EntityCreationData) })]
+    public class RestoreWatchPatch
+    {
+        static void Postfix(EntityCreationData _ecd, Entity __result)
+        {
+            if (__result == null)
+            {
+                Log.Warning($"RESTORE FAILED for saved entity '{_ecd?.entityName}' " +
+                            $"[id {_ecd?.id}] class={_ecd?.entityClass} - dropped from the world");
+                return;
+            }
+
+            var npc = __result as EntityAlive;
+            if (!NPCCorePatches.LooksLikeCompanion(npc)) return;
+
+            Log.Warning($"RESTORED FROM SAVE {npc.EntityName} [id {npc.entityId}] at " +
+                        $"({(int)npc.position.x}, {(int)npc.position.y}, {(int)npc.position.z})");
+        }
+    }
+
+    /// <summary>
     /// Placing her from the item makes a brand new entity with a brand new id - EntityFactory
     /// .CreateEntity, not a restore - so every pick-up-and-put-down changes who she is as far as
     /// anything keyed by id is concerned. Record the new id at the moment it appears.
