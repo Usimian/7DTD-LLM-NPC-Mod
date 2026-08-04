@@ -594,6 +594,47 @@ namespace NPCLLMChat.Harmony
     }
 
     /// <summary>
+    /// THE VANISHING. Chunk.RemoveEntityFromChunk takes an entity out of the chunk's list and
+    /// leaves entity.addedToChunk saying true - a flag that now means the opposite of the truth.
+    ///
+    /// Nothing in vanilla minds, because its two callers immediately set the flag themselves or
+    /// are deleting the entity anyway. SCore does mind. EntityUtilities.Respawn, hung off
+    /// GameManager.PlayerSpawnedInWorld, runs on every load, every death and every dismount:
+    ///
+    ///     if (npc.addedToChunk) chunk.RemoveEntityFromChunk(npc);
+    ///     npc.TeleportToPlayer(player, randomPosition: true);
+    ///
+    /// and then World.TickEntity re-registers her only if she landed in a DIFFERENT chunk, or her
+    /// old chunk emptied entirely - because the check it makes first is !e.addedToChunk, which is
+    /// the flag that is lying. Land in the same chunk and nothing puts her back. She lives on in
+    /// World.Entities, ticking and talking, belonging to no chunk. Chunk.Write walks chunk lists.
+    /// She is never written, and the next load opens without her.
+    ///
+    /// It is why she was lost when left behind and never when tagging along - following crosses
+    /// chunk boundaries constantly, and each crossing re-registers her - and why standing on
+    /// Guard upstairs was fatal: no chunk change, no height band change, nothing to heal her.
+    ///
+    /// Clearing the flag makes it honest, and TickEntity puts her back on the next tick.
+    /// </summary>
+    [HarmonyPatch(typeof(Chunk), nameof(Chunk.RemoveEntityFromChunk))]
+    public class ChunkMembershipTruthPatch
+    {
+        static void Postfix(Chunk __instance, Entity _entity)
+        {
+            if (_entity == null || !_entity.addedToChunk) return;
+            _entity.addedToChunk = false;
+
+            var npc = _entity as EntityAlive;
+            if (NPCCorePatches.LooksLikeCompanion(npc))
+            {
+                Log.Warning($"CHUNK RELEASE {npc.EntityName} [id {npc.entityId}] taken out of " +
+                            $"chunk({__instance.X}, {__instance.Z}) - flag cleared so the next tick " +
+                            "puts her back. Left set, she would belong to no chunk and never be saved.");
+            }
+        }
+    }
+
+    /// <summary>
     /// The last dark stretch of the chain. Everything the other watchers can see said she was
     /// healthy at the final save - in a chunk, gate agreeing to write her - and she still did not
     /// come back, and never even reached SpawnEntityInWorld on the next load. So the question is
@@ -704,6 +745,26 @@ namespace NPCLLMChat.Harmony
         /// pass unremarked. Always speak there, unchanged or not - "she was still here at the
         /// last save" is the fact worth having when the next session opens without her.
         /// </summary>
+        /// <summary>
+        /// Whether the chunk she believes she is in actually holds her. Chunk.Write only ever
+        /// walks these lists, so this - not the addedToChunk flag - decides whether she survives
+        /// to the next session.
+        /// </summary>
+        private static string InAChunkList(World world, EntityAlive npc)
+        {
+            try
+            {
+                var chunk = world.GetChunkSync(npc.chunkPosAddedEntityTo.x, npc.chunkPosAddedEntityTo.z) as Chunk;
+                if (chunk == null) return "no-chunk";
+                foreach (var band in chunk.entityLists)
+                {
+                    if (band.Contains(npc)) return "True";
+                }
+                return "FALSE";
+            }
+            catch (Exception ex) { return "threw:" + ex.GetType().Name; }
+        }
+
         internal static void RollCall(World world, bool force)
         {
             if (world?.Entities?.list == null) return;
@@ -716,11 +777,13 @@ namespace NPCLLMChat.Harmony
                 call.Add($"{npc.EntityName} [id {npc.entityId}] " +
                          $"chunk({World.toChunkXZ((int)npc.position.x)}, {World.toChunkXZ((int)npc.position.z)}) " +
                          $"dead={npc.IsDead()} bWillRespawn={npc.bWillRespawn} " +
-                         $"addedToChunk={npc.addedToChunk} hired={NPCCorePatches.IsHiredByPlayer(npc)} " +
+                         $"addedToChunk={npc.addedToChunk} inChunkList={InAChunkList(world, npc)} " +
+                         $"hired={NPCCorePatches.IsHiredByPlayer(npc)} " +
                          $"savedToFile={RefuseToDespawnCompanionPatch.SafeIsSavedToFile(npc)}");
             }
 
             string now = call.Count == 0 ? "nobody" : string.Join(" | ", call.ToArray());
+            // addedToChunk is a claim; this is the fact. They disagreed for a whole day.
             if (now == _lastCall && !force) return;
             _lastCall = now;
             Log.Warning((force ? "ROLL CALL (final save) " : "ROLL CALL ") + now);
