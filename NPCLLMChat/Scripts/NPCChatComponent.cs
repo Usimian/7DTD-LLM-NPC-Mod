@@ -1248,6 +1248,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             if (hostilesNear > 0) _lastCombatTime = Time.unscaledTime;
             if (hostilesNear > _hostilesSeenThisFight) _hostilesSeenThisFight = hostilesNear;
 
+            // A scrap he nearly lost is the part worth remembering about it
+            if (hostilesNear > 0 && player.Stats?.Health != null && player.Stats.Health.ValuePercentUI < 0.25f)
+            {
+                _closeCallThisFight = true;
+            }
+
             if (sneakingUp != null && Time.unscaledTime >= _nextWarnTime)
             {
                 _nextWarnTime = Time.unscaledTime + WarnCooldown;
@@ -1264,13 +1270,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 _nextTriumphTime = Time.unscaledTime + TriumphCooldown;
                 _nextRemarkTime = Time.unscaledTime + RemarkGlobalGap;
                 int killed = _hostilesSeenThisFight - hostilesNear;
+                int faced = _hostilesSeenThisFight;
+                bool closeCall = _closeCallThisFight;
                 _hostilesSeenThisFight = 0;
+                _closeCallThisFight = false;
+
+                // Her triumph line becomes the note on the memory, so what she recalls later is
+                // the thing she actually said standing over it rather than a generated summary.
                 SpeakUnprompted($"The shooting just stopped - about {killed} of them down, both of you standing. " +
-                                "One pleased remark, SIX WORDS OR FEWER. No plan, no advice, no follow-up.");
+                                "One pleased remark, SIX WORDS OR FEWER. No plan, no advice, no follow-up.",
+                                said => RecordEpisode(IsHordeNight() ? "horde" : "fight", faced, closeCall, said));
                 return;
             }
 
-            if (hostilesNear == 0) _hostilesSeenThisFight = 0;
+            if (hostilesNear == 0) { _hostilesSeenThisFight = 0; _closeCallThisFight = false; }
 
             // Nothing tactical to shout about, so look for something else worth saying
             if (hostilesNear == 0) CheckForSomethingWorthMentioning(player);
@@ -1391,6 +1404,20 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                                       $"to remember as \"{mark.label}\". Say so in a few words.");
                     return;
                 }
+                // Something happened here. That beats bare recognition - "we've been here before"
+                // is a fact, "not again, hon" is a companion.
+                var happenedHere = NotableEpisodeHere();
+                if (happenedHere != null)
+                {
+                    string what = happenedHere.kind == "horde"
+                        ? "you saw a blood moon out"
+                        : $"{happenedHere.enemies} of them came at you";
+                    Remark("arrival", $"You are back at {_currentPlace}, where {what} on Day {happenedHere.day}" +
+                                      (happenedHere.closeCall ? " and he nearly went down" : "") +
+                                      ". One short line - the way someone sounds walking back into that.");
+                    return;
+                }
+
                 if (visitedBefore)
                 {
                     Remark("arrival", $"You have just arrived back at {_currentPlace}, somewhere you two have been " +
@@ -1571,7 +1598,7 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             return string.Join(" ", words, 0, 8).TrimEnd(',', ';', ':') + ".";
         }
 
-        private void SpeakUnprompted(string situation)
+        private void SpeakUnprompted(string situation, Action<string> onSaid = null)
         {
             _remarkPending = true;
             string prompt = _systemPrompt + BuildWorldContext() +
@@ -1592,12 +1619,137 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                     var player = GameManager.Instance?.World?.GetPrimaryPlayer() as EntityPlayerLocal;
                     if (player != null) GameManager.ShowTooltip(player, $"{_npcName}: {speech}", false);
+
+                    onSaid?.Invoke(speech);
                 },
                 error =>
                 {
                     _remarkPending = false;
                     Log.Warning($"Unprompted remark failed: {error}");
                 });
+        }
+
+        /// <summary>True on the night of a blood moon, after dark.</summary>
+        private static bool IsHordeNight()
+        {
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+            int hour = 12;
+            if (!string.IsNullOrEmpty(time) && time.Length >= 2) int.TryParse(time.Substring(0, 2), out hour);
+            return GameStats.GetInt(EnumGameStats.BloodMoonDay) == day && (hour >= 21 || hour < 4);
+        }
+
+        /// <summary>
+        /// A fight worth remembering afterwards. Small scraps are not events - three shamblers
+        /// outside a gas station is a Tuesday - so only a real one lands here, and a night she
+        /// nearly lost him lands whatever the count.
+        /// </summary>
+        private void RecordEpisode(string kind, int enemies, bool closeCall, string note)
+        {
+            if (_memory == null) return;
+            if (enemies < NotableFightSize && !closeCall && kind != "horde") return;
+
+            int day; string time;
+            WorldContextHelper.GetGameDayTime(out day, out time);
+
+            var episode = new Episode
+            {
+                kind = kind,
+                place = _currentPlace ?? WorldContextHelper.BiomeLabel(
+                    WorldContextHelper.BiomeIdAt(_npcEntity.position)),
+                day = day,
+                time = time,
+                x = (int)_npcEntity.position.x,
+                z = (int)_npcEntity.position.z,
+                enemies = enemies,
+                closeCall = closeCall,
+                note = note
+            };
+
+            _memory.episodes.Add(episode);
+
+            // Keep the biggest and the most recent; a long save should not bury the night that
+            // mattered under forty ordinary ones.
+            if (_memory.episodes.Count > MaxEpisodes)
+            {
+                _memory.episodes.Sort((a, b) =>
+                {
+                    int scoreA = a.enemies + (a.closeCall ? 12 : 0) + (a.kind == "horde" ? 20 : 0) + a.day / 4;
+                    int scoreB = b.enemies + (b.closeCall ? 12 : 0) + (b.kind == "horde" ? 20 : 0) + b.day / 4;
+                    return scoreB.CompareTo(scoreA);
+                });
+                _memory.episodes.RemoveRange(MaxEpisodes, _memory.episodes.Count - MaxEpisodes);
+            }
+
+            PersistMemory();
+            Log.Out($"{_npcName} remembers: {kind} at {episode.place}, {enemies} of them, " +
+                    $"Day {day} {time}{(closeCall ? ", close call" : "")} - \"{note}\"");
+        }
+
+        private bool _closeCallThisFight;
+        private const int NotableFightSize = 6;
+        private const int MaxEpisodes = 30;
+
+        /// <summary>The worst thing that happened where they are standing, if anything did.</summary>
+        private Episode NotableEpisodeHere()
+        {
+            if (_memory?.episodes == null || string.IsNullOrEmpty(_currentPlace)) return null;
+
+            Episode worst = null;
+            foreach (var e in _memory.episodes)
+            {
+                if (!string.Equals(e.place, _currentPlace, StringComparison.OrdinalIgnoreCase)) continue;
+                if (worst == null ||
+                    e.enemies + (e.closeCall ? 12 : 0) > worst.enemies + (worst.closeCall ? 12 : 0)) worst = e;
+            }
+            return worst;
+        }
+
+        /// <summary>
+        /// The handful worth carrying into this conversation: whatever happened where they are
+        /// standing, then the worst nights they have had. All thirty every turn would cost more
+        /// context than it is worth and would have her reciting a war diary.
+        /// </summary>
+        private string DescribeEpisodes()
+        {
+            if (_memory?.episodes == null || _memory.episodes.Count == 0) return null;
+
+            var here = new List<Episode>();
+            var elsewhere = new List<Episode>();
+            foreach (var e in _memory.episodes)
+            {
+                float d = Vector3.Distance(_npcEntity.position, new Vector3(e.x, _npcEntity.position.y, e.z));
+                if (d < 60f || (!string.IsNullOrEmpty(_currentPlace) && _currentPlace == e.place)) here.Add(e);
+                else elsewhere.Add(e);
+            }
+
+            elsewhere.Sort((a, b) =>
+            {
+                int scoreA = a.enemies + (a.closeCall ? 12 : 0) + (a.kind == "horde" ? 20 : 0);
+                int scoreB = b.enemies + (b.closeCall ? 12 : 0) + (b.kind == "horde" ? 20 : 0);
+                return scoreB.CompareTo(scoreA);
+            });
+
+            var chosen = new List<Episode>(here);
+            foreach (var e in elsewhere)
+            {
+                if (chosen.Count >= 5) break;
+                chosen.Add(e);
+            }
+
+            var lines = new List<string>();
+            foreach (var e in chosen)
+            {
+                string what = e.kind == "horde" ? "blood moon night" : $"{e.enemies} of them";
+                string where = string.IsNullOrEmpty(e.place) ? "out in the open" : e.place;
+                bool standingHere = here.Contains(e);
+                lines.Add($"- {what} at {where}, Day {e.day} {e.time}" +
+                          (e.closeCall ? ", he nearly went down" : "") +
+                          (standingHere ? " - RIGHT WHERE YOU ARE NOW" : "") +
+                          (string.IsNullOrEmpty(e.note) ? "" : $". You said: \"{e.note}\""));
+            }
+
+            return string.Join("\n", lines.ToArray());
         }
 
         /// <summary>
@@ -2479,6 +2631,15 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                 }
 
                 sb.AppendLine(DescribeWhatAilsHim(thePlayer));
+
+                string beenThrough = DescribeEpisodes();
+                if (!string.IsNullOrEmpty(beenThrough))
+                {
+                    sb.AppendLine("Things the two of you have been through, in your own words at the time:");
+                    sb.AppendLine(beenThrough);
+                    sb.AppendLine("Bring one up only if it fits - standing where it happened, or a night like it " +
+                                  "coming. Do not recite the list.");
+                }
 
                 // What she can see from where she is standing - and nothing whatsoever beyond it.
                 // She has no map. A building she has never walked up to is a shape on the skyline.

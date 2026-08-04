@@ -45,6 +45,26 @@ namespace NPCLLMChat
         public int z;
     }
 
+    /// <summary>
+    /// Something that happened, as opposed to somewhere they went. The notebook records that
+    /// they were at Bobcats Bar on Day 186; this records that eleven of them came through the
+    /// door while they were in there, and that he nearly went down. Facts make a companion who
+    /// can answer questions - episodes make one who can say "not again, hon".
+    /// </summary>
+    [Serializable]
+    public class Episode
+    {
+        public string kind;      // "fight" | "horde" | "swarm"
+        public string place;     // where, by the name she knows it
+        public int day;
+        public string time;
+        public int x;
+        public int z;
+        public int enemies;      // the most she counted at once
+        public bool closeCall;   // his health went under a quarter during it
+        public string note;      // her own line, in her own words, said at the time
+    }
+
     [Serializable]
     public class NPCMemory
     {
@@ -68,6 +88,8 @@ namespace NPCLLMChat
         public List<SavedMessage> pendingSummary = new List<SavedMessage>();
         // Locations the player explicitly asked the NPC to remember
         public List<MarkedPlace> markedPlaces = new List<MarkedPlace>();
+        // Fights and horde nights worth remembering afterwards
+        public List<Episode> episodes = new List<Episode>();
         // Last-seen contents of the player's vehicles, drone, and storage containers
         public List<CargoSnapshot> cargoSnapshots = new List<CargoSnapshot>();
         // How the player has treated her, -1 (prickly) to +1 (close). Relationships carry over
