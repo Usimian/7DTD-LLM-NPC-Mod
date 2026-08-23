@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -248,6 +249,7 @@ namespace NPCLLMChat
                     Log.Warning($"{error}");
                     Log.Warning($"Response code: {request.responseCode}");
                     Log.Warning($"Response text: {request.downloadHandler?.text}");
+                    ExplainFailure(request.responseCode, request.downloadHandler?.text);
                     onError?.Invoke(error);
                 }
             }
@@ -361,6 +363,61 @@ namespace NPCLLMChat
         // quiet spell always failed, and she answered with a canned fallback or nothing at all.
         // Holding it resident costs VRAM, which on this machine is not the scarce thing.
         private const string KeepAlive = "60m";
+
+        /// <summary>
+        /// Say what actually went wrong, once. A model that is not installed 404s instantly and
+        /// every reply becomes "Using fallback" with the reason buried three lines up - which on
+        /// 2026-08-23 read as "text to speech is broken" and cost an hour. The two failures worth
+        /// naming are a model Ollama does not have, and a cold load outrunning the timeout.
+        /// </summary>
+        private void ExplainFailure(long code, string body)
+        {
+            string key = code + (body ?? "");
+            if (key == _lastExplained) return;
+            _lastExplained = key;
+
+            if (code == 404 && !string.IsNullOrEmpty(body) && body.Contains("not found"))
+            {
+                Log.Error($"MODEL NOT INSTALLED: the mod is set to '{_model}' and Ollama does not have it. " +
+                          "Nothing she says will come from the model until this is fixed - pick an installed " +
+                          "model in the settings dialog, or pull this one. Asking Ollama what it has:");
+                StartCoroutine(ListModelsCoroutine());
+                return;
+            }
+
+            if (code == 0)
+            {
+                Log.Error($"NO ANSWER IN {_timeoutSeconds}s from {_endpoint}. If the model is cold this is the " +
+                          "load, not the reply - a 27B takes about 40 seconds off disk. Raise TimeoutSeconds in " +
+                          "llmconfig.xml, or check the server is up.");
+            }
+        }
+
+        private string _lastExplained;
+
+        private IEnumerator ListModelsCoroutine()
+        {
+            string tags = _endpoint;
+            int api = tags.IndexOf("/api/", StringComparison.OrdinalIgnoreCase);
+            if (api < 0) yield break;
+            tags = tags.Substring(0, api) + "/api/tags";
+
+            using (UnityWebRequest request = UnityWebRequest.Get(tags))
+            {
+                request.timeout = 5;
+                yield return request.SendWebRequest();
+                if (request.result != UnityWebRequest.Result.Success) yield break;
+
+                var names = new List<string>();
+                foreach (Match m in Regex.Matches(request.downloadHandler.text, "\"name\"\\s*:\\s*\"([^\"]+)\""))
+                {
+                    names.Add(m.Groups[1].Value);
+                }
+                Log.Error(names.Count == 0
+                    ? "  Ollama reports no models at all - none have been pulled."
+                    : "  Ollama has: " + string.Join(", ", names.ToArray()));
+            }
+        }
 
         private string BuildOpenAIRequest(string systemPrompt, List<ChatMessage> history, string playerMessage)
         {
