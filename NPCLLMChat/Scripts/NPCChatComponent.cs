@@ -453,8 +453,14 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine("FIRST: if the player asks about something the world state above actually tells you - " +
                           "what is in your pack, where a place is, the time, the weather, the horde, your health - " +
                           "ANSWER IT from those facts. Read the list before you reply. No mood, no tiredness and " +
-                          "no irritation excuses refusing a question you can answer; silence and grunts are for " +
-                          "small talk only. Never say you do not know something that is written above.");
+                          "no irritation excuses refusing a question you can answer. Never say you do not know " +
+                          "something that is written above.");
+            // This used to end "silence and grunts are for small talk only", meaning terseness is
+            // permitted THERE and nowhere else. Read as a licence instead: "good morning" is small
+            // talk, so "Mm." became the compliant answer, and in a quiet mood the obvious one.
+            sb.AppendLine("Small talk still gets a real answer. A greeting gets a greeting. Brief means few " +
+                          "words, never no words - do not reply with only a grunt, a hum or a single syllable, " +
+                          "however tired or short-tempered you are.");
 
             // Not because she was caught doing it - she reads the condition line correctly and
             // reported it accurately when asked. Because a companion who confirms whatever the
@@ -475,7 +481,10 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                               "need saying. No banter and no stories while he is sneaking.");
             }
 
-            sb.AppendLine($"Answer in one sentence, {wordLimit} words at most, in the manner described above.");
+            // A ceiling with no floor collapses to one syllable in the quiet moods, which read
+            // "minimal words, half asleep" and take it literally.
+            sb.AppendLine($"Answer in one sentence, at least three words and {wordLimit} at most, in the " +
+                          "manner described above.");
             sb.AppendLine("Only when the player asks for a story, an explanation or directions do you get " +
                           "up to 80 words - then tell it properly, all the way to the end.");
             sb.AppendLine("Never pad the answer with a plan, a follow-up question or a joke tacked on the end.");
