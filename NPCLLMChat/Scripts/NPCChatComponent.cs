@@ -455,12 +455,11 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
                           "ANSWER IT from those facts. Read the list before you reply. No mood, no tiredness and " +
                           "no irritation excuses refusing a question you can answer. Never say you do not know " +
                           "something that is written above.");
-            // This used to end "silence and grunts are for small talk only", meaning terseness is
-            // permitted THERE and nowhere else. Read as a licence instead: "good morning" is small
-            // talk, so "Mm." became the compliant answer, and in a quiet mood the obvious one.
-            sb.AppendLine("Small talk still gets a real answer. A greeting gets a greeting. Brief means few " +
-                          "words, never no words - do not reply with only a grunt, a hum or a single syllable, " +
-                          "however tired or short-tempered you are.");
+            // The clause here used to be "silence and grunts are for small talk only" - meant as a
+            // restriction, read as permission. Stated as the rule instead, and deliberately worded
+            // to agree with the restraint block further down rather than fight it.
+            sb.AppendLine("A greeting gets a greeting. Brief means few words, never no words - never reply to " +
+                          "something said to you with only a grunt, a hum or a single syllable.");
 
             // Not because she was caught doing it - she reads the condition line correctly and
             // reported it accurately when asked. Because a companion who confirms whatever the
@@ -491,12 +490,18 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
             sb.AppendLine("If he asks you something twice, he has a reason - your first answer missed, or he needs " +
                           "it exact. Answer it properly again, better than the first time. Never grunt at a repeated " +
                           "question and never tell him you have already said it.");
-            sb.AppendLine("Not everything deserves a reply. If the player is making small talk, thinking out " +
-                          "loud, or saying something that asks nothing of you, a grunt is plenty - \"Mm.\", " +
-                          "\"Yeah.\", \"Hm.\" - or say nothing at all by answering with exactly <silence> " +
-                          "and no other characters. " + (_quietMood
-                              ? "In the state you are in, silence or a grunt is the likely answer."
-                              : "Use it when it fits; a real answer is still the norm when you are asked something."));
+            // This block used to offer "Mm." as its first example of a good reply and then tell
+            // her, in any quiet mood, that a grunt was the LIKELY answer. qwen3.8 follows that
+            // exactly - "good morning" at night came back "Mm." three times running. Restraint is
+            // still wanted (see docs/COMPANION_INTERIORITY.md) but as something occasional, never
+            // the default, and never the response to being spoken to directly.
+            sb.AppendLine("Not everything deserves a reply. When the player is thinking out loud, or narrating " +
+                          "something that asks nothing of you, you may let it pass - answer with exactly " +
+                          "<silence> and no other characters. That is for remarks aimed at nobody. Anything " +
+                          "said TO you - a greeting, a question, a thank you, being told something - gets a " +
+                          "real answer, however short and however tired you are." + (_quietMood
+                              ? " Tired means fewer words and a flatter tone, not fewer replies."
+                              : ""));
             return sb.ToString();
         }
 
