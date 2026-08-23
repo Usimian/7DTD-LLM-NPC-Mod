@@ -82,8 +82,14 @@
         -->
         <ApiKey></ApiKey>
 
-        <!-- Timeout - can be shorter with fast GPU -->
-        <TimeoutSeconds>15</TimeoutSeconds>
+        <!--
+            Timeout. A warm model answers in a second or two, so this is not about generation -
+            it is about the cold load. Ollama evicts an idle model and a 27B takes far longer
+            than 15s to come back off disk, so the first thing said after a quiet spell used to
+            fail every time. Requests now ask Ollama to hold the model resident, which mostly
+            removes the cold load; this is the headroom for when it happens anyway.
+        -->
+        <TimeoutSeconds>90</TimeoutSeconds>
 
         <!--
             Token limits - higher = longer responses

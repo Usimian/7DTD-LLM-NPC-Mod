@@ -281,6 +281,7 @@ namespace NPCLLMChat
                 ""prompt"": ""{EscapeJson(prompt)}"",
                 ""stream"": false,
                 ""think"": false,
+                ""keep_alive"": ""{KeepAlive}"",
                 ""options"": {{ ""temperature"": {temp}, ""num_predict"": {completionBudget}, ""num_ctx"": {_numCtx} }}
             }}"
                 // hosted providers speak chat/completions, so a one-off completion is just a
@@ -350,9 +351,16 @@ namespace NPCLLMChat
                 ""prompt"": ""{EscapeJson(prompt.ToString())}"",
                 ""stream"": false,
                 ""think"": false,
+                ""keep_alive"": ""{KeepAlive}"",
                 ""options"": {{ {options} }}
             }}";
         }
+
+        // Ollama evicts an idle model after five minutes by default, and a 17.7GB model cold
+        // loads for far longer than any sane request timeout - so the first thing said after a
+        // quiet spell always failed, and she answered with a canned fallback or nothing at all.
+        // Holding it resident costs VRAM, which on this machine is not the scarce thing.
+        private const string KeepAlive = "60m";
 
         private string BuildOpenAIRequest(string systemPrompt, List<ChatMessage> history, string playerMessage)
         {
