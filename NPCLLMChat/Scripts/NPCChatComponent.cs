@@ -1778,6 +1778,12 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
         private bool _closeCallThisFight;
         private const int NotableFightSize = 6;
+        // What she is TOLD each turn, not what she remembers. Measured 2026-08-23: 16 cargo
+        // snapshots ~4250 tokens and 184 sightings ~3680, together 63% of a 12,605 token prompt
+        // that was re-read from scratch on every reply.
+        private const int CargoInPrompt = 4;
+        private const int CargoSummaryChars = 220;
+        private const int SeenInPrompt = 30;
         private const int MaxEpisodes = 30;
 
         /// <summary>
@@ -2789,10 +2795,35 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                 if (_memory != null && _memory.cargoSnapshots.Count > 0)
                 {
-                    sb.AppendLine("Stored supplies you keep mental track of (contents as of when you last saw them - they may have changed since):");
-                    foreach (var snap in _memory.cargoSnapshots)
+                    // Sixteen containers listed in full came to ~4250 tokens - the single largest
+                    // thing she was told, every turn, and by the mod's own warning text the least
+                    // useful of it. She keeps remembering all of them; she is only TOLD about the
+                    // nearest few, and each one's contents are trimmed to what a person would
+                    // actually carry in their head.
+                    var nearest = new List<CargoSnapshot>(_memory.cargoSnapshots);
+                    var from = _npcEntity.position;
+                    nearest.Sort((a, b) =>
+                        Vector2.Distance(new Vector2(from.x, from.z), new Vector2(a.x, a.z)).CompareTo(
+                        Vector2.Distance(new Vector2(from.x, from.z), new Vector2(b.x, b.z))));
+                    int shown = Math.Min(CargoInPrompt, nearest.Count);
+
+                    sb.AppendLine($"Stored supplies you keep mental track of - the {shown} nearest of " +
+                                  $"{_memory.cargoSnapshots.Count} (contents as of when you last saw them - they may have changed since):");
+                    for (int i = 0; i < shown; i++)
                     {
-                        sb.AppendLine($"- {snap.name} (last checked Day {snap.day} {snap.time}): {snap.summary}");
+                        var snap = nearest[i];
+                        string contents = snap.summary ?? "";
+                        if (contents.Length > CargoSummaryChars)
+                        {
+                            int cut = contents.LastIndexOf(',', CargoSummaryChars);
+                            contents = contents.Substring(0, cut > 0 ? cut : CargoSummaryChars) + ", and more besides";
+                        }
+                        sb.AppendLine($"- {snap.name} (last checked Day {snap.day} {snap.time}): {contents}");
+                    }
+                    if (_memory.cargoSnapshots.Count > shown)
+                    {
+                        sb.AppendLine($"You know of {_memory.cargoSnapshots.Count - shown} other stores further off. " +
+                                      "If he asks about one by name, say you would have to go and look.");
                     }
                     sb.AppendLine("A name in quotes is what the player has actually painted on that crate, so " +
                                   "use it when you tell him where something is - \"it's in the Ammo crate\" - " +
@@ -2891,8 +2922,26 @@ The ""dialogue"" field and any plain response are spoken aloud word for word: on
 
                 if (_memory != null && _memory.placesSeen.Count > 0)
                 {
-                    sb.AppendLine($"Passed but never gone into ({_memory.placesSeen.Count}):");
-                    foreach (var seen in _memory.placesSeen) sb.AppendLine(NotebookLine(seen));
+                    // 184 of these came to ~3680 tokens. She keeps every one - the notebook is the
+                    // point - but reading the whole thing aloud every turn is what made her slow.
+                    // The nearest are the ones that could possibly come up in conversation.
+                    var seenNear = new List<PlaceVisit>(_memory.placesSeen);
+                    var at = _npcEntity.position;
+                    seenNear.Sort((a, b) =>
+                        Vector2.Distance(new Vector2(at.x, at.z), new Vector2(a.x, a.z)).CompareTo(
+                        Vector2.Distance(new Vector2(at.x, at.z), new Vector2(b.x, b.z))));
+                    int show = Math.Min(SeenInPrompt, seenNear.Count);
+
+                    sb.AppendLine(show < seenNear.Count
+                        ? $"Passed but never gone into - the {show} nearest of {seenNear.Count} in the notebook:"
+                        : $"Passed but never gone into ({seenNear.Count}):");
+                    for (int i = 0; i < show; i++) sb.AppendLine(NotebookLine(seenNear[i]));
+                    if (show < seenNear.Count)
+                    {
+                        sb.AppendLine($"There are {seenNear.Count - show} more in the notebook, further away. You " +
+                                      "have them written down - if he asks about somewhere not listed here, say " +
+                                      "you would have to check your notes rather than that you have never seen it.");
+                    }
                 }
 
                 sb.AppendLine("That notebook is the whole of it. A name that is not written down you have never seen, " +
